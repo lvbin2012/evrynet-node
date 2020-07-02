@@ -116,8 +116,11 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 	t.PV = (*big.Int)(dec.PV)
 	t.PR = (*big.Int)(dec.PR)
 	t.PS = (*big.Int)(dec.PS)
-
-	t.Provider = dec.Provider
-	t.Owner = dec.Owner
+	if dec.Provider!=nil && dec.Provider.String()!=(common.Address{}).String() {
+			t.Provider = dec.Provider
+	}
+	if dec.Owner!=nil && dec.Provider.String()!=(common.Address{}.String()) {
+		t.Owner = dec.Owner
+	}
 	return nil
 }
