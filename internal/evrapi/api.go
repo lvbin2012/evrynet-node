@@ -1130,8 +1130,8 @@ type RPCTransaction struct {
 	TransactionIndex hexutil.Uint    `json:"transactionIndex"`
 	Value            *hexutil.Big    `json:"value"`
 
-	Owner    common.Address `json:"owner"`
-	Provider common.Address `json:"provider"`
+	Owner    *common.Address `json:"owner"`
+	Provider *common.Address `json:"provider"`
 
 	V *hexutil.Big `json:"v"`
 	R *hexutil.Big `json:"r"`
@@ -1167,19 +1167,11 @@ func newRPCTransaction(tx *types.Transaction, blockHash common.Hash, blockNumber
 		R:        (*hexutil.Big)(r),
 		S:        (*hexutil.Big)(s),
 
-		PV: (*hexutil.Big)(PV),
-		PR: (*hexutil.Big)(PR),
-		PS: (*hexutil.Big)(PS),
-	}
-
-	ownerAddr := tx.Owner()
-	if ownerAddr != nil {
-		result.Owner = *ownerAddr
-	}
-
-	providerAddr := tx.Provider()
-	if providerAddr != nil {
-		result.Provider = *providerAddr
+		PV:       (*hexutil.Big)(PV),
+		PR:       (*hexutil.Big)(PR),
+		PS:       (*hexutil.Big)(PS),
+		Owner:    tx.Owner(),
+		Provider: tx.Provider(),
 	}
 
 	if blockHash != (common.Hash{}) {

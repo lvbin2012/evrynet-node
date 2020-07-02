@@ -119,6 +119,9 @@ type txdataMarshaling struct {
 	V            *hexutil.Big
 	R            *hexutil.Big
 	S            *hexutil.Big
+	PV           *hexutil.Big
+	PR           *hexutil.Big
+	PS           *hexutil.Big
 }
 
 func NewTransaction(nonce uint64, to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte) *Transaction {
