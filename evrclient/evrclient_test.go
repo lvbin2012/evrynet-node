@@ -379,7 +379,6 @@ func TestGetTransactionByHash(t *testing.T) {
 	creationEnterpriseContractTx := types.NewContractCreation(uint64(1), big.NewInt(0), 1000000, big.NewInt(params.GasPriceConfig), data, opts)
 	creationEnterpriseContractTx, err = types.SignTx(creationEnterpriseContractTx, types.NewEIP155Signer(chainID), testKey2)
 	require.NoError(t, err)
-	//TODO: creating contract should not be signed by provider
 
 	backend, _ := newTestBackend(t, types.Transactions{tx, txWithProvider, creationContractTx, creationEnterpriseContractTx})
 	client, _ := backend.Attach()
