@@ -24,6 +24,7 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 		Payload      hexutil.Bytes   `json:"input"    gencodec:"required"`
 		Owner        *common.Address `json:"owner" rlp:"nil"`
 		Provider     *common.Address `json:"provider" rlp:"nil"`
+		Extra        hexutil.Bytes   `json:"extraData" rlp:"nil"`
 		V            *hexutil.Big    `json:"v" gencodec:"required"`
 		R            *hexutil.Big    `json:"r" gencodec:"required"`
 		S            *hexutil.Big    `json:"s" gencodec:"required"`
@@ -41,6 +42,7 @@ func (t txdata) MarshalJSON() ([]byte, error) {
 	enc.Payload = t.Payload
 	enc.Owner = t.Owner
 	enc.Provider = t.Provider
+	enc.Extra = t.Extra
 	enc.V = (*hexutil.Big)(t.V)
 	enc.R = (*hexutil.Big)(t.R)
 	enc.S = (*hexutil.Big)(t.S)
@@ -62,6 +64,7 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 		Payload      *hexutil.Bytes  `json:"input"    gencodec:"required"`
 		Owner        *common.Address `json:"owner" rlp:"nil"`
 		Provider     *common.Address `json:"provider" rlp:"nil"`
+		Extra        *hexutil.Bytes  `json:"extraData" rlp:"nil"`
 		V            *hexutil.Big    `json:"v" gencodec:"required"`
 		R            *hexutil.Big    `json:"r" gencodec:"required"`
 		S            *hexutil.Big    `json:"s" gencodec:"required"`
@@ -102,6 +105,9 @@ func (t *txdata) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Provider != nil {
 		t.Provider = dec.Provider
+	}
+	if dec.Extra != nil {
+		t.Extra = *dec.Extra
 	}
 	if dec.V == nil {
 		return errors.New("missing required field 'v' for txdata")

@@ -305,7 +305,7 @@ func (fs FrontierSigner) SignatureValues(tx *Transaction, sig []byte) (r, s, v *
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
 func (fs FrontierSigner) Hash(tx *Transaction) common.Hash {
-	if tx.data.Provider == nil {
+	if tx.data.Provider == nil && len(tx.data.Extra) == 0 {
 		return rlpHash([]interface{}{
 			tx.data.AccountNonce,
 			tx.data.Price,
@@ -325,6 +325,7 @@ func (fs FrontierSigner) Hash(tx *Transaction) common.Hash {
 		tx.data.Payload,
 		tx.data.Owner,
 		tx.data.Provider,
+		tx.data.Extra,
 	})
 }
 

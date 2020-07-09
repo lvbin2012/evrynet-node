@@ -228,12 +228,12 @@ func (self *StateDB) GetOwner(addr common.Address) *common.Address {
 }
 
 // GetProviders returns providers of account
-func (self *StateDB) GetProviders(addr common.Address) []*common.Address {
+func (self *StateDB) GetProviders(addr common.Address) []common.Address {
 	so := self.getStateObject(addr)
 	if so != nil {
 		return so.ProviderAddresses()
 	}
-	return []*common.Address{}
+	return nil
 }
 
 // Retrieve the balance from the given address or 0 if object not found
@@ -358,6 +358,14 @@ func (self *StateDB) HasSuicided(addr common.Address) bool {
 /*
  * SETTERS
  */
+
+// SetProviders sets provider to the account associated with addr.
+func (self *StateDB) SetProviders(addr common.Address, providers []common.Address) {
+	stateObject := self.GetOrNewStateObject(addr)
+	if stateObject != nil {
+		stateObject.SetProvider(providers)
+	}
+}
 
 // AddBalance adds amount to the account associated with addr.
 func (self *StateDB) AddBalance(addr common.Address, amount *big.Int) {
@@ -516,7 +524,7 @@ func (self *StateDB) createObject(addr common.Address, opts ...types.CreateAccou
 			OwnerAddress: opts[0].OwnerAddress,
 		}
 		if opts[0].ProviderAddress != nil {
-			account.ProviderAddresses = []*common.Address{opts[0].ProviderAddress}
+			account.ProviderAddresses = []common.Address{*opts[0].ProviderAddress}
 		}
 	}
 	newobj = newObject(self, addr, account)

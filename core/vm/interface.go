@@ -27,6 +27,10 @@ import (
 type StateDB interface {
 	CreateAccount(common.Address, ...types.CreateAccountOption)
 
+	GetOwner(common.Address) *common.Address
+	GetProviders(common.Address) []common.Address
+	SetProviders(common.Address, []common.Address)
+
 	SubBalance(common.Address, *big.Int)
 	AddBalance(common.Address, *big.Int)
 	GetBalance(common.Address) *big.Int

@@ -102,8 +102,8 @@ type Account struct {
 	Balance           *big.Int
 	Root              common.Hash // merkle root of the storage trie
 	CodeHash          []byte
-	OwnerAddress      *common.Address   `rlp:"nil"`
-	ProviderAddresses []*common.Address `rlp:"nil"`
+	OwnerAddress      *common.Address  `rlp:"nil"`
+	ProviderAddresses []common.Address `rlp:"nil"`
 }
 
 // AccountWithoutProvider represent an account without provider
@@ -122,7 +122,7 @@ func (a *AccountWithoutProvider) ToAccount() Account {
 		Root:              a.Root,
 		CodeHash:          a.CodeHash,
 		OwnerAddress:      nil,
-		ProviderAddresses: []*common.Address{},
+		ProviderAddresses: nil,
 	}
 }
 
@@ -428,6 +428,18 @@ func (s *stateObject) OwnerAddress() *common.Address {
 	return s.data.OwnerAddress
 }
 
-func (s *stateObject) ProviderAddresses() []*common.Address {
+func (s *stateObject) ProviderAddresses() []common.Address {
 	return s.data.ProviderAddresses
+}
+
+func (s *stateObject) SetProvider(providerAddresses []common.Address) {
+	s.db.journal.append(providersChange{
+		account: &s.address,
+		prev:    s.data.ProviderAddresses,
+	})
+	s.setProvider(providerAddresses)
+}
+
+func (s *stateObject) setProvider(providerAddresses []common.Address) {
+	s.data.ProviderAddresses = providerAddresses
 }
