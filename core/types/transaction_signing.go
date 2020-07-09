@@ -54,8 +54,8 @@ func MakeSigner(config *params.ChainConfig, blockNumber *big.Int) Signer {
 
 // ProviderSignTx signs the transaction using the given signer and private key
 func ProviderSignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	h,err := s.HashWithSender(tx)
-	if err!=nil {
+	h, err := s.HashWithSender(tx)
+	if err != nil {
 		return nil, err
 	}
 	sig, err := crypto.Sign(h[:], prv)
@@ -135,11 +135,9 @@ type Signer interface {
 	// Hash returns the hash to be signed.
 	Hash(tx *Transaction) common.Hash
 	// HashWithSender returns the hash with sender address for provider to sign
-	HashWithSender(tx *Transaction) (common.Hash,error)
+	HashWithSender(tx *Transaction) (common.Hash, error)
 	// Equal returns true if the given signer is the same as the receiver.
 	Equal(Signer) bool
-
-	//TODO: Implement HashWithSenderSignature
 }
 
 // EIP155Transaction implements Signer using the EIP155 rules.
@@ -187,7 +185,7 @@ func (s EIP155Signer) Provider(tx *Transaction) (common.Address, error) {
 	V := new(big.Int).Sub(tx.data.PV, s.chainIdMul)
 	V.Sub(V, big8)
 	h, err := s.HashWithSender(tx)
-	if err !=nil {
+	if err != nil {
 		return common.Address{}, err
 	}
 	return recoverPlain(h, tx.data.PR, tx.data.PS, V, true)
@@ -238,7 +236,7 @@ func (s EIP155Signer) Hash(tx *Transaction) common.Hash {
 // It does not uniquely identify the transaction.
 func (s EIP155Signer) HashWithSender(tx *Transaction) (common.Hash, error) {
 	sender, err := s.Sender(tx)
-	if err!=nil {
+	if err != nil {
 		return common.Hash{}, err
 	}
 
@@ -274,7 +272,7 @@ func (hs HomesteadSigner) SignatureValues(tx *Transaction, sig []byte) (r, s, v 
 //Provider return the Address of provider based on PV, PS, PR
 func (hs HomesteadSigner) Provider(tx *Transaction) (common.Address, error) {
 	h, err := hs.HashWithSender(tx)
-	if err !=nil {
+	if err != nil {
 		return common.Address{}, err
 	}
 	return recoverPlain(h, tx.data.PR, tx.data.PS, tx.data.PV, true)
@@ -330,12 +328,11 @@ func (fs FrontierSigner) Hash(tx *Transaction) common.Hash {
 	})
 }
 
-
 // Hash returns the hash to be signed by the sender.
 // It does not uniquely identify the transaction.
-func (fs FrontierSigner) HashWithSender(tx *Transaction) (common.Hash, error){
+func (fs FrontierSigner) HashWithSender(tx *Transaction) (common.Hash, error) {
 	sender, err := fs.Sender(tx)
-	if err!=nil {
+	if err != nil {
 		return common.Hash{}, nil
 	}
 	return rlpHash([]interface{}{
@@ -348,11 +345,11 @@ func (fs FrontierSigner) HashWithSender(tx *Transaction) (common.Hash, error){
 		tx.data.Owner,
 		tx.data.Provider,
 		sender,
-	}),nil
+	}), nil
 }
 func (fs FrontierSigner) Provider(tx *Transaction) (common.Address, error) {
 	hash, err := fs.HashWithSender(tx)
-	if err!=nil {
+	if err != nil {
 		return common.Address{}, err
 	}
 	return recoverPlain(hash, tx.data.PR, tx.data.PS, tx.data.PV, false)

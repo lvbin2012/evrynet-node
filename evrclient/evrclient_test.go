@@ -170,8 +170,9 @@ var (
 	testAddr    = crypto.PubkeyToAddress(testKey.PublicKey)
 	testBalance = new(big.Int).Exp(big.NewInt(10), big.NewInt(25), nil)
 
-	testKey2, _ = crypto.HexToECDSA("ce900e4057ef7253ce737dccf3979ec4e74a19d595e8cc30c6c5ea92dfdd37f1")
-	testAddr2   = crypto.PubkeyToAddress(testKey2.PublicKey)
+	testKey2, _  = crypto.HexToECDSA("ce900e4057ef7253ce737dccf3979ec4e74a19d595e8cc30c6c5ea92dfdd37f1")
+	testAddr2    = crypto.PubkeyToAddress(testKey2.PublicKey)
+	testBalance2 = new(big.Int).Exp(big.NewInt(10), big.NewInt(25), nil)
 )
 
 func newTestBackend(t *testing.T, txs types.Transactions) (*node.Node, []*types.Block) {
@@ -204,7 +205,7 @@ func generateTestChain(txs types.Transactions) (*core.Genesis, []*types.Block) {
 	config := params.AllEthashProtocolChanges
 	genesis := &core.Genesis{
 		Config:    config,
-		Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}, testAddr2: {Balance: big.NewInt(1)}},
+		Alloc:     core.GenesisAlloc{testAddr: {Balance: testBalance}, testAddr2: {Balance: testBalance2}},
 		ExtraData: []byte("test genesis"),
 		Timestamp: 9000,
 	}
@@ -378,8 +379,7 @@ func TestGetTransactionByHash(t *testing.T) {
 	creationEnterpriseContractTx := types.NewContractCreation(uint64(1), big.NewInt(0), 1000000, big.NewInt(params.GasPriceConfig), data, opts)
 	creationEnterpriseContractTx, err = types.SignTx(creationEnterpriseContractTx, types.NewEIP155Signer(chainID), testKey2)
 	require.NoError(t, err)
-	creationEnterpriseContractTx, err = types.ProviderSignTx(creationEnterpriseContractTx, types.NewEIP155Signer(chainID), testKey)
-	require.NoError(t, err)
+	//TODO: creating contract should not be signed by provider
 
 	backend, _ := newTestBackend(t, types.Transactions{tx, txWithProvider, creationContractTx, creationEnterpriseContractTx})
 	client, _ := backend.Attach()
@@ -407,14 +407,22 @@ func TestGetTransactionByHash(t *testing.T) {
 	msg, err = tx2.AsMessage(types.NewEIP155Signer(chainID))
 	require.NoError(t, err)
 	require.Equal(t, msg.From().Hex(), testAddr.Hex())
+
+	tx3, _, err := ec.TransactionByHash(context.Background(), creationEnterpriseContractTx.Hash())
+	require.NoError(t, err)
+	require.Equal(t, tx3.Hash(), creationEnterpriseContractTx.Hash())
+	msg, err = tx3.AsMessage(types.NewEIP155Signer(chainID))
+	require.NoError(t, err)
+	require.Equal(t, msg.From().Hex(), testAddr2.Hex())
+	require.Equal(t, msg.GasPayer().Hex(), testAddr2.Hex())
 }
 
 func TestReplayAttackWithProviderAddress(t *testing.T) {
 	var (
-		err error
-		chainID = big.NewInt(15)
-		senderKey = testKey2
-		providerKey = testKey
+		err          error
+		chainID      = big.NewInt(15)
+		senderKey    = testKey2
+		providerKey  = testKey
 		providerAddr = testAddr
 	)
 	//Create atx and sign it with senderKey
@@ -429,15 +437,14 @@ func TestReplayAttackWithProviderAddress(t *testing.T) {
 
 	var fSigner = &fakeSigner{pv: pv, pr: pr, ps: ps, base: types.NewEIP155Signer(chainID)}
 
-
 	replayTx := types.NewTransaction(uint64(0), common.HexToAddress("0x0102"), big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
 	//sign the message with the copied signature from the sender
 	replayTx, err = types.SignTx(replayTx, fSigner, senderKey)
 	require.NoError(t, err)
 
 	msg, err := replayTx.AsMessage(types.NewEIP155Signer(chainID))
-	//The address from this relay attack will not success
-	require.NotEqual(t, msg.From().Hex(), providerAddr.Hex())
+	require.NoError(t, err)
+	require.NotEqual(t, msg.From().Hex(), providerAddr.Hex(), "The address from this relay attack will not success")
 }
 
 type fakeSigner struct {
@@ -463,7 +470,7 @@ func (f *fakeSigner) Hash(tx *types.Transaction) common.Hash {
 	return f.base.Hash(tx)
 }
 
-func (f *fakeSigner) HashWithSender(tx *types.Transaction) (common.Hash,error) {
+func (f *fakeSigner) HashWithSender(tx *types.Transaction) (common.Hash, error) {
 	return f.base.HashWithSender(tx)
 }
 

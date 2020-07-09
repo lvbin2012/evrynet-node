@@ -59,7 +59,7 @@ func (s *senderFromServer) Hash(tx *types.Transaction) common.Hash {
 	panic("can't sign with senderFromServer")
 }
 
-func (s *senderFromServer) HashWithSender(tx *types.Transaction) (common.Hash,error) {
+func (s *senderFromServer) HashWithSender(tx *types.Transaction) (common.Hash, error) {
 	panic("can't sign with senderFromServer")
 }
 
