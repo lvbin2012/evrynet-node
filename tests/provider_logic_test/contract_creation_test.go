@@ -129,7 +129,7 @@ func TestCreateContractWithProviderSignature(t *testing.T) {
 	assert.NoError(t, err)
 	tx, err = types.ProviderSignTx(tx, types.HomesteadSigner{}, ppk)
 	assert.NoError(t, err)
-	require.Error(t, ethClient.SendTransaction(context.Background(), tx))
+	require.Error(t, ethClient.SendTransaction(context.Background(), tx), "Must return error: redundant provider's signature")
 }
 
 func TestCreateContractWithProviderAddressWithoutGas(t *testing.T) {
