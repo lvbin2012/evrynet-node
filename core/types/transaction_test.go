@@ -29,8 +29,6 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 
-	ethercommon "github.com/ethereum/go-ethereum/common"
-	ethertypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 // The values in those tests are from the Transaction Tests
@@ -57,11 +55,11 @@ var (
 )
 
 func TestTransactionCompatiblity(t *testing.T) {
+	etherHashString:="0x32d0ec31372e18e22e4af25a00926e344c16473978dce150112a89d0bdf5795a"
 	evrTx := NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
 	evrHash := evrTx.Hash()
-	ethTx := ethertypes.NewTransaction(0, ethercommon.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
-	ethHash := ethTx.Hash()
-	assert.Equal(t, evrHash.String(), ethHash.String())
+
+	assert.Equal(t, evrHash.String(), etherHashString)
 }
 
 func TestTransactionSigHash(t *testing.T) {
