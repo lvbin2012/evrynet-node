@@ -110,6 +110,20 @@ type txdata struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
+func (d txdata) toNormalTxData() txdataNormal {
+	return txdataNormal{
+		AccountNonce: d.AccountNonce,
+		Price:        d.Price,
+		GasLimit:     d.GasLimit,
+		Recipient:    d.Recipient,
+		Amount:       d.Amount,
+		Payload:      d.Payload,
+		V:            d.V,
+		R:            d.R,
+		S:            d.S,
+	}
+}
+
 type txdataMarshaling struct {
 	AccountNonce hexutil.Uint64
 	Price        *hexutil.Big
@@ -189,6 +203,10 @@ func isProtectedV(V *big.Int) bool {
 
 // EncodeRLP implements rlp.Encoder
 func (tx *Transaction) EncodeRLP(w io.Writer) error {
+	if (tx.data.Provider == nil) && (tx.data.Owner == nil) {
+		normalData := tx.data.toNormalTxData()
+		return rlp.Encode(w, &normalData)
+	}
 	return rlp.Encode(w, &tx.data)
 }
 

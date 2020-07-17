@@ -23,9 +23,14 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
+
+	ethercommon "github.com/ethereum/go-ethereum/common"
+	ethertypes "github.com/ethereum/go-ethereum/core/types"
 )
 
 // The values in those tests are from the Transaction Tests
@@ -50,6 +55,14 @@ var (
 		common.Hex2Bytes("98ff921201554726367d2be8c804a7ff89ccf285ebc57dff8ae4c44b9c19ac4a8887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a301"),
 	)
 )
+
+func TestTransactionCompatiblity(t *testing.T) {
+	evrTx := NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
+	evrHash := evrTx.Hash()
+	ethTx := ethertypes.NewTransaction(0, ethercommon.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
+	ethHash := ethTx.Hash()
+	assert.Equal(t, evrHash.String(), ethHash.String())
+}
 
 func TestTransactionSigHash(t *testing.T) {
 	var homestead HomesteadSigner
