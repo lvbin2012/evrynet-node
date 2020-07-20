@@ -49,7 +49,8 @@ type Transaction struct {
 	from atomic.Value
 }
 
-type txdataNormal struct {
+//ethTxData is the original ethTxData format. It is kept for backward compatibility purpose.
+type ethTxData struct {
 	AccountNonce uint64          `json:"nonce"    gencodec:"required"`
 	Price        *big.Int        `json:"gasPrice" gencodec:"required"`
 	GasLimit     uint64          `json:"gas"      gencodec:"required"`
@@ -66,7 +67,7 @@ type txdataNormal struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
-func (d txdataNormal) toTxData() txdata {
+func (d ethTxData) toTxData() txdata {
 	return txdata{
 		AccountNonce: d.AccountNonce,
 		Price:        d.Price,
@@ -110,8 +111,8 @@ type txdata struct {
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
 
-func (d txdata) toNormalTxData() txdataNormal {
-	return txdataNormal{
+func (d txdata) toEthTxData() ethTxData {
+	return ethTxData{
 		AccountNonce: d.AccountNonce,
 		Price:        d.Price,
 		GasLimit:     d.GasLimit,
@@ -123,6 +124,20 @@ func (d txdata) toNormalTxData() txdataNormal {
 		S:            d.S,
 	}
 }
+
+func (d txdata) isEthTxData() bool {
+	if d.Owner!=nil {
+		return false
+	}
+	if d.Provider!=nil {
+		return false
+	}
+	if (d.PR!=nil) || (d.PS!=nil) || (d.PV!=nil){
+		return false
+	}
+	return true
+}
+
 
 type txdataMarshaling struct {
 	AccountNonce hexutil.Uint64
@@ -203,9 +218,10 @@ func isProtectedV(V *big.Int) bool {
 
 // EncodeRLP implements rlp.Encoder
 func (tx *Transaction) EncodeRLP(w io.Writer) error {
-	if (tx.data.Provider == nil) && (tx.data.Owner == nil) {
-		normalData := tx.data.toNormalTxData()
-		return rlp.Encode(w, &normalData)
+	//if txdata doesn't involve with Evrynet fee scheme, encode it as Ethereum tx for backward compatibility
+	if tx.data.isEthTxData() {
+		d := tx.data.toEthTxData()
+		return rlp.Encode(w, &d)
 	}
 	return rlp.Encode(w, &tx.data)
 }
@@ -231,7 +247,7 @@ func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
 		return nil
 	}
 
-	var dataNormal txdataNormal
+	var dataNormal ethTxData
 	err = rlp.DecodeBytes(raw, &dataNormal)
 	if err == nil {
 		tx.data = dataNormal.toTxData()

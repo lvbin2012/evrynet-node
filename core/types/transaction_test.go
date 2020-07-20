@@ -53,12 +53,17 @@ var (
 	)
 )
 
-func TestTransactionCompatiblity(t *testing.T) {
-	etherHashString := "0x32d0ec31372e18e22e4af25a00926e344c16473978dce150112a89d0bdf5795a"
-	evrTx := NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
-	evrHash := evrTx.Hash()
+func TestTransactionCompatibility(t *testing.T) {
+	unsignedEtherHashString := "0x32d0ec31372e18e22e4af25a00926e344c16473978dce150112a89d0bdf5795a"
+	signedEthereHashString := "0x4aba6ccfa807932610b108dcb0f0c5491781bfb0d408e9909a967c6793a9c9ed"
 
-	assert.Equal(t, evrHash.String(), etherHashString)
+	evrTx := NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
+	//unsigned version should be hashed to the same hash
+	assert.Equal(t, evrTx.Hash().String(), unsignedEtherHashString)
+
+	evrSignedTx := signTx(t, evrTx)
+	//signed Tx should be hashed to the same hash
+	assert.Equal(t, 	 evrSignedTx.Hash().String(), signedEthereHashString)
 }
 
 func TestTransactionSigHash(t *testing.T) {
@@ -76,7 +81,7 @@ func TestTransactionEncode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("encode error: %v", err)
 	}
-	should := common.FromHex("f86603018207d094b94f5374fce5edbc8e2a8697c15331677e6ebf0b0a82554480801ca098ff921201554726367d2be8c804a7ff89ccf285ebc57dff8ae4c44b9c19ac4aa08887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3808080")
+	should := common.FromHex("f86103018207d094b94f5374fce5edbc8e2a8697c15331677e6ebf0b0a8255441ca098ff921201554726367d2be8c804a7ff89ccf285ebc57dff8ae4c44b9c19ac4aa08887321be575c8095f789dd4c743dfe42c1820f9231f98a962b210e3ac2452a3")
 	if !bytes.Equal(txb, should) {
 		t.Errorf("encoded RLP mismatch, got %x", txb)
 	}
