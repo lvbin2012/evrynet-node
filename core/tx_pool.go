@@ -667,8 +667,9 @@ func (pool *TxPool) ValidateTx(tx *types.Transaction, local bool) error {
 	// Check permission to execute transaction to enterprise contract
 	switch {
 	case txMsg.To() == nil: // nothing need to check
-	case txMsg.Type() == types.AddProviderTxType || txMsg.Type() == types.RemoveProviderTxType:
+	case txMsg.TxType() == types.AddProviderTxType || txMsg.TxType() == types.RemoveProviderTxType:
 		owner := pool.currentState.GetOwner(*txMsg.To())
+		// if this is not an enterprise contract, return error
 		if owner == nil {
 			return ErrInvalidAddressToModifyProviders
 		}
@@ -676,15 +677,15 @@ func (pool *TxPool) ValidateTx(tx *types.Transaction, local bool) error {
 			return ErrOnlyOwner
 		}
 	default:
-		// If the destination is an enterprise smart contract, the tx must be signed with valid provider
-		// Otherwise, it should not have any provider's signature
 		owner := pool.currentState.GetOwner(*txMsg.To())
+		// if this is not an enterprise contract, there must be no provider signature
 		if owner == nil {
 			if txMsg.HasProviderSignature() {
 				return ErrRedundantProviderSignature
 			}
 			break
 		}
+		// If the destination is an enterprise smart contract, the tx must be signed with valid provider
 		if !txMsg.HasProviderSignature() {
 			return ErrProviderSignatureIsRequired
 		}

@@ -78,7 +78,7 @@ type Message interface {
 	Nonce() uint64
 	CheckNonce() bool
 	Data() []byte
-	Type() types.TransactionType
+	TxType() types.TransactionType
 	ExtraData() interface{}
 }
 
@@ -224,7 +224,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 			option.ProviderAddress = msg.Provider()
 		}
 		ret, _, st.gas, vmerr = evm.Create(sender, st.data, st.gas, st.value, option)
-	case msg.Type() == types.AddProviderTxType || msg.Type() == types.RemoveProviderTxType:
+	case msg.TxType() == types.AddProviderTxType || msg.TxType() == types.RemoveProviderTxType:
 		var (
 			msgData types.ModifyProvidersMsg
 			ok      bool
@@ -233,7 +233,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 			return nil, 0, false, errors.New("msg should be type ModifyProvidersMsg")
 		}
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
-		if msg.Type() == types.AddProviderTxType {
+		if msg.TxType() == types.AddProviderTxType {
 			vmerr = evm.AddProvider(st.msg.From(), st.to(), msgData)
 		} else {
 			vmerr = evm.RemoveProvider(st.msg.From(), st.to(), msgData)

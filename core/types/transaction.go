@@ -729,6 +729,6 @@ func (m Message) Gas() uint64                { return m.gasLimit }
 func (m Message) Nonce() uint64              { return m.nonce }
 func (m Message) Data() []byte               { return m.data }
 func (m Message) CheckNonce() bool           { return m.checkNonce }
-func (m Message) Type() TransactionType      { return m.txType }
+func (m Message) TxType() TransactionType    { return m.txType }
 func (m Message) ExtraData() interface{}     { return m.extraData }
 func (m Message) HasProviderSignature() bool { return m.hasProviderSignature }
