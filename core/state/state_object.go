@@ -443,7 +443,7 @@ func (s *stateObject) CheckOwner(owner common.Address) error {
 	return nil
 }
 
-// AddProvider is assumed that the permission for add provider here is valid
+// AddProvider assumes that the permission for add provider here is valid
 func (s *stateObject) AddProvider(providerAddress common.Address) error {
 	if len(s.data.ProviderAddresses) >= params.MaxProvider {
 		return ErrMaxProvider
@@ -461,7 +461,7 @@ func (s *stateObject) AddProvider(providerAddress common.Address) error {
 	return nil
 }
 
-// RemoveProvider is assumed that the permission for remove provider here is valid
+// RemoveProvider assumes that the permission for remove provider here is valid
 func (s *stateObject) RemoveProvider(providerAddress common.Address) error {
 	index := -1
 	for i, addr := range s.data.ProviderAddresses {

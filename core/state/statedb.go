@@ -359,6 +359,7 @@ func (self *StateDB) HasSuicided(addr common.Address) bool {
  * SETTERS
  */
 
+// AddProvider add a provider to an enterprise contract
 func (self *StateDB) AddProvider(addr common.Address, from common.Address, providerAddress common.Address) error {
 	stateObject := self.GetOrNewStateObject(addr)
 	if stateObject == nil {
@@ -370,6 +371,7 @@ func (self *StateDB) AddProvider(addr common.Address, from common.Address, provi
 	return stateObject.AddProvider(providerAddress)
 }
 
+// RemoveProvider remove a provider from an enterprise contract
 func (self *StateDB) RemoveProvider(addr common.Address, from common.Address, providerAddress common.Address) error {
 	stateObject := self.GetOrNewStateObject(addr)
 	if stateObject == nil {
