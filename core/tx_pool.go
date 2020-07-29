@@ -721,6 +721,7 @@ func (pool *TxPool) ValidateTx(tx *types.Transaction, local bool) error {
 	} else {
 		// Sender pays transaction fee, check sender's balance for tx costs
 		// cost == V + GP * GL
+
 		if pool.currentState.GetBalance(from).Cmp(tx.Cost()) < 0 {
 			return ErrInsufficientFunds
 		}

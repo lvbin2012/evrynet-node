@@ -236,7 +236,7 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		if msg.TxType() == types.AddProviderTxType {
 			vmerr = st.state.AddProvider(st.to(), msg.From(), msgData.Provider)
 		} else {
-			vmerr = st.state.AddProvider(st.to(), msg.From(), msgData.Provider)
+			vmerr = st.state.RemoveProvider(st.to(), msg.From(), msgData.Provider)
 		}
 	default:
 		// Increment the nonce for the next transaction

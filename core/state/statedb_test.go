@@ -470,6 +470,9 @@ func TestStateDB_AddProvider(t *testing.T) {
 	require.Error(t, statedb.AddProvider(contractAddr, common.HexToAddress("0x11"), newProviderAddr), vm.ErrOnlyOwner)
 
 	require.NoError(t, statedb.AddProvider(contractAddr, ownerAddr, newProviderAddr))
+
+	root, _ = statedb.Commit(false)
+	statedb, _ = New(root, db)
 	require.Equal(t, statedb.GetProviders(contractAddr), []common.Address{providerAddr, newProviderAddr})
 }
 
