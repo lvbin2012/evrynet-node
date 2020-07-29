@@ -26,6 +26,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/metrics"
+	"github.com/Evrynetlabs/evrynet-node/params"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
 
@@ -430,6 +431,54 @@ func (s *stateObject) OwnerAddress() *common.Address {
 
 func (s *stateObject) ProviderAddresses() []common.Address {
 	return s.data.ProviderAddresses
+}
+
+func (s *stateObject) CheckOwner(owner common.Address) error {
+	if s.data.OwnerAddress == nil {
+		return ErrOwnerNotFound
+	}
+	if *s.data.OwnerAddress != owner {
+		return ErrOnlyOwner
+	}
+	return nil
+}
+
+// AddProvider is assumed that the permission for add provider here is valid
+func (s *stateObject) AddProvider(providerAddress common.Address) error {
+	if len(s.data.ProviderAddresses) >= params.MaxProvider {
+		return ErrMaxProvider
+	}
+
+	for _, addr := range s.data.ProviderAddresses {
+		if addr == providerAddress { // provider has been already added
+			return nil
+		}
+	}
+	var newProviders []common.Address
+	newProviders = append(newProviders, s.data.ProviderAddresses...)
+	newProviders = append(newProviders, providerAddress)
+	s.SetProvider(newProviders)
+	return nil
+}
+
+// RemoveProvider is assumed that the permission for remove provider here is valid
+func (s *stateObject) RemoveProvider(providerAddress common.Address) error {
+	index := -1
+	for i, addr := range s.data.ProviderAddresses {
+		if addr == providerAddress {
+			index = i
+			break
+		}
+	}
+	if index == -1 { // provider has been already removed
+		return nil
+	}
+
+	var newProviders []common.Address
+	newProviders = append(newProviders, s.data.ProviderAddresses[:index]...)
+	newProviders = append(newProviders, s.data.ProviderAddresses[index+1:]...)
+	s.SetProvider(newProviders)
+	return nil
 }
 
 func (s *stateObject) SetProvider(providerAddresses []common.Address) {

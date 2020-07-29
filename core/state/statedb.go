@@ -359,12 +359,26 @@ func (self *StateDB) HasSuicided(addr common.Address) bool {
  * SETTERS
  */
 
-// SetProviders sets provider to the account associated with addr.
-func (self *StateDB) SetProviders(addr common.Address, providers []common.Address) {
+func (self *StateDB) AddProvider(addr common.Address, from common.Address, providerAddress common.Address) error {
 	stateObject := self.GetOrNewStateObject(addr)
-	if stateObject != nil {
-		stateObject.SetProvider(providers)
+	if stateObject == nil {
+		return ErrOwnerNotFound
 	}
+	if err := stateObject.CheckOwner(from); err != nil {
+		return err
+	}
+	return stateObject.AddProvider(providerAddress)
+}
+
+func (self *StateDB) RemoveProvider(addr common.Address, from common.Address, providerAddress common.Address) error {
+	stateObject := self.GetOrNewStateObject(addr)
+	if stateObject == nil {
+		return ErrOwnerNotFound
+	}
+	if err := stateObject.CheckOwner(from); err != nil {
+		return err
+	}
+	return stateObject.RemoveProvider(providerAddress)
 }
 
 // AddBalance adds amount to the account associated with addr.

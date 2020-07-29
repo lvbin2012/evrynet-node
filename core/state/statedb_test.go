@@ -28,11 +28,13 @@ import (
 	"testing"
 	"testing/quick"
 
+	"github.com/stretchr/testify/require"
 	check "gopkg.in/check.v1"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
+	"github.com/Evrynetlabs/evrynet-node/core/vm"
 )
 
 // Tests that updating a state trie does not leak any database writes prior to
@@ -448,4 +450,45 @@ func TestCopyOfCopy(t *testing.T) {
 	if got := sdb.Copy().Copy().GetBalance(addr).Uint64(); got != 42 {
 		t.Fatalf("2nd copy fail, expected 42, got %v", got)
 	}
+}
+
+func TestStateDB_AddProvider(t *testing.T) {
+	var (
+		contractAddr    = common.HexToAddress("0x00000000000000000000000000000000deadbeef")
+		ownerAddr       = common.HexToAddress("0x560089ab68dc224b250f9588b3db540d87a66b7a")
+		providerAddr    = common.HexToAddress("954e4bf2c68f13d97c45db0e02645d145db6911f")
+		newProviderAddr = common.HexToAddress("3ca5f11792bad2aa50816726b441fa306ddeab2f")
+	)
+
+	db := NewDatabase(rawdb.NewMemoryDatabase())
+	statedb, _ := New(common.Hash{}, db)
+	statedb.CreateAccount(contractAddr, types.CreateAccountOption{OwnerAddress: &ownerAddr, ProviderAddress: &providerAddr})
+	root, _ := statedb.Commit(false)
+	statedb, _ = New(root, db)
+
+	require.Error(t, statedb.AddProvider(common.HexToAddress("0x11"), ownerAddr, newProviderAddr), vm.ErrOwnerNotFound)
+	require.Error(t, statedb.AddProvider(contractAddr, common.HexToAddress("0x11"), newProviderAddr), vm.ErrOnlyOwner)
+
+	require.NoError(t, statedb.AddProvider(contractAddr, ownerAddr, newProviderAddr))
+	require.Equal(t, statedb.GetProviders(contractAddr), []common.Address{providerAddr, newProviderAddr})
+}
+
+func TestEVM_RemoveProvider(t *testing.T) {
+	var (
+		contractAddr = common.HexToAddress("0x00000000000000000000000000000000deadbeef")
+		ownerAddr    = common.HexToAddress("0x560089ab68dc224b250f9588b3db540d87a66b7a")
+		providerAddr = common.HexToAddress("954e4bf2c68f13d97c45db0e02645d145db6911f")
+	)
+
+	db := NewDatabase(rawdb.NewMemoryDatabase())
+	statedb, _ := New(common.Hash{}, db)
+	statedb.CreateAccount(contractAddr, types.CreateAccountOption{OwnerAddress: &ownerAddr, ProviderAddress: &providerAddr})
+	root, _ := statedb.Commit(false)
+	statedb, _ = New(root, db)
+
+	require.Error(t, statedb.RemoveProvider(common.HexToAddress("0x11"), ownerAddr, providerAddr), vm.ErrOwnerNotFound)
+	require.Error(t, statedb.RemoveProvider(contractAddr, common.HexToAddress("0x11"), providerAddr), vm.ErrOnlyOwner)
+
+	require.NoError(t, statedb.RemoveProvider(contractAddr, ownerAddr, providerAddr))
+	require.Equal(t, len(statedb.GetProviders(contractAddr)), 0)
 }

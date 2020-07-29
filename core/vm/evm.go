@@ -448,60 +448,6 @@ func (evm *EVM) create(caller ContractRef, codeAndHash *codeAndHash, gas uint64,
 
 }
 
-func (evm *EVM) AddProvider(from common.Address, to common.Address, msg types.ModifyProvidersMsg) error {
-	owner := evm.StateDB.GetOwner(to)
-	if owner == nil {
-		return ErrOwnerNotFound
-	}
-	if *owner != from {
-		return ErrOnlyOwner
-	}
-
-	providers := evm.StateDB.GetProviders(to)
-	if len(providers) >= params.MaxProvider {
-		return ErrMaxProvider
-	}
-
-	for _, addr := range providers {
-		if addr == msg.Provider { // provider has been already added
-			return nil
-		}
-	}
-	var newProviders []common.Address
-	newProviders = append(newProviders, providers...)
-	newProviders = append(newProviders, msg.Provider)
-	evm.StateDB.SetProviders(to, newProviders)
-	return nil
-}
-
-func (evm *EVM) RemoveProvider(from common.Address, to common.Address, msg types.ModifyProvidersMsg) error {
-	owner := evm.StateDB.GetOwner(to)
-	if owner == nil {
-		return ErrOwnerNotFound
-	}
-	if *owner != from {
-		return ErrOnlyOwner
-	}
-
-	providers := evm.StateDB.GetProviders(to)
-	index := -1
-	for i, addr := range providers {
-		if addr == msg.Provider {
-			index = i
-			break
-		}
-	}
-	if index == -1 { // provider has been already removed
-		return nil
-	}
-
-	var newProviders []common.Address
-	newProviders = append(newProviders, providers[:index]...)
-	newProviders = append(newProviders, providers[index+1:]...)
-	evm.StateDB.SetProviders(to, newProviders)
-	return nil
-}
-
 // Create creates a new contract using code as deployment code.
 func (evm *EVM) Create(caller ContractRef, code []byte, gas uint64, value *big.Int, opts ...types.CreateAccountOption) (ret []byte, contractAddr common.Address, leftOverGas uint64, err error) {
 	contractAddr = crypto.CreateAddress(caller.Address(), evm.StateDB.GetNonce(caller.Address()))

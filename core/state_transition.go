@@ -234,9 +234,9 @@ func (st *StateTransition) TransitionDb() (ret []byte, usedGas uint64, failed bo
 		}
 		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 		if msg.TxType() == types.AddProviderTxType {
-			vmerr = evm.AddProvider(st.msg.From(), st.to(), msgData)
+			vmerr = st.state.AddProvider(st.to(), msg.From(), msgData.Provider)
 		} else {
-			vmerr = evm.RemoveProvider(st.msg.From(), st.to(), msgData)
+			vmerr = st.state.AddProvider(st.to(), msg.From(), msgData.Provider)
 		}
 	default:
 		// Increment the nonce for the next transaction
