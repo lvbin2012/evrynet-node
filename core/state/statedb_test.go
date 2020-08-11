@@ -296,7 +296,7 @@ func newTestAction(addr common.Address, r *rand.Rand) testAction {
 	action := actions[r.Intn(len(actions))]
 	var nameargs []string
 	if !action.noAddr {
-		nameargs = append(nameargs, addr.Hex())
+		nameargs = append(nameargs, addr.String())
 	}
 	for _, i := range action.args {
 		action.args[i] = rand.Int63n(100)
@@ -382,7 +382,7 @@ func (test *snapshotTest) checkEqual(state, checkstate *StateDB) error {
 		var err error
 		checkeq := func(op string, a, b interface{}) bool {
 			if err == nil && !reflect.DeepEqual(a, b) {
-				err = fmt.Errorf("got %s(%s) == %v, want %v", op, addr.Hex(), a, b)
+				err = fmt.Errorf("got %s(%s) == %v, want %v", op, addr.String(), a, b)
 				return false
 			}
 			return true
@@ -441,7 +441,7 @@ func (s *StateSuite) TestTouchDelete(c *check.C) {
 // See https://github.com/Evrynetlabs/evrynet-node/pull/15225#issuecomment-380191512
 func TestCopyOfCopy(t *testing.T) {
 	sdb, _ := New(common.Hash{}, NewDatabase(rawdb.NewMemoryDatabase()))
-	addr := common.HexToAddress("aaaa")
+	addr, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmfy7efdWvK")
 	sdb.SetBalance(addr, big.NewInt(42))
 
 	if got := sdb.Copy().GetBalance(addr).Uint64(); got != 42 {
@@ -454,10 +454,11 @@ func TestCopyOfCopy(t *testing.T) {
 
 func TestStateDB_AddProvider(t *testing.T) {
 	var (
-		contractAddr    = common.HexToAddress("0x00000000000000000000000000000000deadbeef")
-		ownerAddr       = common.HexToAddress("0x560089ab68dc224b250f9588b3db540d87a66b7a")
-		providerAddr    = common.HexToAddress("954e4bf2c68f13d97c45db0e02645d145db6911f")
-		newProviderAddr = common.HexToAddress("3ca5f11792bad2aa50816726b441fa306ddeab2f")
+		contractAddr, _    = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18zc1uiRuj2DGN")
+		ownerAddr, _       = common.EvryAddressStringToAddressCheck("EQzeFSroGjB4xodbMYP1qydXeWYgypGSJe")
+		providerAddr, _    = common.EvryAddressStringToAddressCheck("EWmMyKETQCsTYEC3W51dZ3bpUWvn3XtrwG")
+		newProviderAddr, _ = common.EvryAddressStringToAddressCheck("ENgapvtxruaDvhhygA4jeqSQkgufFnHoAH")
+		addr, _            = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWAULFYZT")
 	)
 
 	db := NewDatabase(rawdb.NewMemoryDatabase())
@@ -466,8 +467,8 @@ func TestStateDB_AddProvider(t *testing.T) {
 	root, _ := statedb.Commit(false)
 	statedb, _ = New(root, db)
 
-	require.Error(t, statedb.AddProvider(common.HexToAddress("0x11"), ownerAddr, newProviderAddr), vm.ErrOwnerNotFound)
-	require.Error(t, statedb.AddProvider(contractAddr, common.HexToAddress("0x11"), newProviderAddr), vm.ErrOnlyOwner)
+	require.Error(t, statedb.AddProvider(addr, ownerAddr, newProviderAddr), vm.ErrOwnerNotFound)
+	require.Error(t, statedb.AddProvider(contractAddr, addr, newProviderAddr), vm.ErrOnlyOwner)
 
 	require.NoError(t, statedb.AddProvider(contractAddr, ownerAddr, newProviderAddr))
 
@@ -478,9 +479,10 @@ func TestStateDB_AddProvider(t *testing.T) {
 
 func TestEVM_RemoveProvider(t *testing.T) {
 	var (
-		contractAddr = common.HexToAddress("0x00000000000000000000000000000000deadbeef")
-		ownerAddr    = common.HexToAddress("0x560089ab68dc224b250f9588b3db540d87a66b7a")
-		providerAddr = common.HexToAddress("954e4bf2c68f13d97c45db0e02645d145db6911f")
+		contractAddr, _ = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18zc1uiRuj2DGN")
+		ownerAddr, _    = common.EvryAddressStringToAddressCheck("EQzeFSroGjB4xodbMYP1qydXeWYgypGSJe")
+		providerAddr, _ = common.EvryAddressStringToAddressCheck("EWmMyKETQCsTYEC3W51dZ3bpUWvn3XtrwG")
+		addr, _         = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWAULFYZT")
 	)
 
 	db := NewDatabase(rawdb.NewMemoryDatabase())
@@ -489,8 +491,8 @@ func TestEVM_RemoveProvider(t *testing.T) {
 	root, _ := statedb.Commit(false)
 	statedb, _ = New(root, db)
 
-	require.Error(t, statedb.RemoveProvider(common.HexToAddress("0x11"), ownerAddr, providerAddr), vm.ErrOwnerNotFound)
-	require.Error(t, statedb.RemoveProvider(contractAddr, common.HexToAddress("0x11"), providerAddr), vm.ErrOnlyOwner)
+	require.Error(t, statedb.RemoveProvider(addr, ownerAddr, providerAddr), vm.ErrOwnerNotFound)
+	require.Error(t, statedb.RemoveProvider(contractAddr, addr, providerAddr), vm.ErrOnlyOwner)
 
 	require.NoError(t, statedb.RemoveProvider(contractAddr, ownerAddr, providerAddr))
 	require.Equal(t, len(statedb.GetProviders(contractAddr)), 0)

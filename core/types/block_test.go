@@ -29,8 +29,8 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
 
-func signTx(t *testing.T, tx *Transaction) *Transaction{
-	keyString:="09C73E3F79CFAA928089CD69AFCD5E1623B1D32415166A6A0436BF0FECAC9B7C"
+func signTx(t *testing.T, tx *Transaction) *Transaction {
+	keyString := "09C73E3F79CFAA928089CD69AFCD5E1623B1D32415166A6A0436BF0FECAC9B7C"
 	key, err := crypto.HexToECDSA(keyString)
 	assert.NoError(t, err)
 	signer := NewEIP155Signer(common.Big1)
@@ -53,10 +53,11 @@ func TestBlockEncoding(t *testing.T) {
 			t.Errorf("%s mismatch: got %v, want %v", f, got, want)
 		}
 	}
+	coinbase, _ := common.EvryAddressStringToAddressCheck("EVbqSnUvbyzdvApBehFuT4Uqz1G5VUYuKW")
 	check("Difficulty", block.Difficulty(), big.NewInt(131072))
 	check("GasLimit", block.GasLimit(), uint64(3141592))
 	check("GasUsed", block.GasUsed(), uint64(21000))
-	check("Coinbase", block.Coinbase(), common.HexToAddress("8888f1f195afa192cfee860698584c030f4c9db1"))
+	check("Coinbase", block.Coinbase(), coinbase)
 	check("MixDigest", block.MixDigest(), common.HexToHash("bd4472abb6659ebe3ee06ee4d7b72a00a9f4d001caca51342001075469aff498"))
 	check("Root", block.Root(), common.HexToHash("ef1552a40b7165c3cd773806b9e0c165b75356e0314bf0706f279c729f51e017"))
 	check("Hash", block.Hash(), common.HexToHash("0a5843ac1cb04865017cb35a57b50b07084e5fcee39b5acadade33149f4fff9e"))
@@ -64,8 +65,8 @@ func TestBlockEncoding(t *testing.T) {
 	check("Time", block.Time(), uint64(1426516743))
 	check("Size", block.Size(), common.StorageSize(len(blockEnc)))
 
-
-	tx1 := NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
+	to, _ := common.EvryAddressStringToAddressCheck("EJ1Sm7ZPs136zds7axDPJ2LCGQtSi8B2AN")
+	tx1 := NewTransaction(0, to, big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1 = signTx(t, tx1)
 	check("len(Transactions)", len(block.Transactions()), 1)
 	check("Transactions[0].Hash", block.Transactions()[0].Hash(), tx1.Hash())

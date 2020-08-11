@@ -1249,14 +1249,11 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 	if ctx.GlobalIsSet(TxPoolLocalsFlag.Name) {
 		locals := strings.Split(ctx.GlobalString(TxPoolLocalsFlag.Name), ",")
 		for _, account := range locals {
-			if trimmed := strings.TrimSpace(account); !common.IsHexAddress(trimmed) {
-				Fatalf("Invalid account in --txpool.locals: %s", trimmed)
+			account = strings.TrimSpace(account)
+			if address, err := common.EvryAddressStringToAddressCheck(account); err == nil {
+				cfg.Locals = append(cfg.Locals, address)
 			} else {
-				if address, err := common.EvryAddressStringToAddressCheck(account); err == nil {
-					cfg.Locals = append(cfg.Locals, address)
-				} else {
-					Fatalf("Invalid account in --txpool.locals: %s", account)
-				}
+				Fatalf("Invalid account in --txpool.locals: %s", account)
 			}
 		}
 	}
