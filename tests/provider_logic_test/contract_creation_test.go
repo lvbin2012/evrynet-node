@@ -201,9 +201,9 @@ func assertTransactionSuccess(t *testing.T, client *evrclient.Client, txHash com
 		if err == nil {
 			assert.Equal(t, uint64(1), receipt.Status)
 			if contractCreation {
-				assert.NotEqual(t, receipt.ContractAddress, common.Address{})
+				assert.NotEqual(t, receipt.ContractAddress, common.Address{}, "not contract creation")
 			}
-			assert.Equal(t, gasPayer, receipt.GasPayer)
+			assert.Equal(t, gasPayer, receipt.GasPayer, "unexpected gas payer")
 			return
 		}
 		time.Sleep(1 * time.Second)
