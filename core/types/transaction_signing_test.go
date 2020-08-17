@@ -20,6 +20,8 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
@@ -135,4 +137,25 @@ func TestChainId(t *testing.T) {
 	if err != nil {
 		t.Error("expected no error")
 	}
+}
+
+func TestEIP155SigningCompatible(t *testing.T) {
+	var ( // this value is got from signing by ethereum source code
+		expectedV, _ = new(big.Int).SetString("71", 10)
+		expectedR, _ = new(big.Int).SetString("62873707122857357665543871915925550568730555762217611648458340453155819239571", 10)
+		expectedS, _ = new(big.Int).SetString("39748707077210856456616806995773321404126510975285671090303555280372005595386", 10)
+	)
+	signer := NewEIP155Signer(big.NewInt(18))
+	tx, err := SignTx(NewTransaction(0, common.HexToAddress("0x002"), big.NewInt(20), 0, new(big.Int), nil), signer, testKey)
+	require.NoError(t, err)
+
+	from, err := Sender(signer, tx)
+	require.NoError(t, err)
+
+	require.Equal(t, from, testAddr)
+
+	v, r, s := tx.RawSignatureValues()
+	require.Equal(t, expectedV, v)
+	require.Equal(t, expectedR, r)
+	require.Equal(t, expectedS, s)
 }
