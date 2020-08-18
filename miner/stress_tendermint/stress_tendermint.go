@@ -34,7 +34,9 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/fdlimit"
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
+	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
 	"github.com/Evrynetlabs/evrynet-node/core"
+	"github.com/Evrynetlabs/evrynet-node/core/state/staking"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/evr"
@@ -57,7 +59,7 @@ const (
 	defaultConfigFile  = "./stress_config.json"
 	dataDir            = "test_data"
 	txsBatchSize       = 1024
-	maxTxPoolSize      = 40960
+	maxTxPoolSize      = 20480
 )
 
 func main() {
@@ -97,9 +99,10 @@ func main() {
 		panic(err)
 	}
 	// wait until testNode is synced
-	nonces := waitForSyncingAndStableNonces(ethereum, faucets)
+	gasPrice := testNode.Server().ChainReader.Config().GasPrice
+	nonces := waitForSyncingAndStableNonces(ethereum, faucets, ethereum.BlockChain().CurrentHeader().Number.Uint64())
 	if TxMode(cfg.TxMode) == SmartContractMode {
-		if contractAddr, err = prepareNewContract(cfg.RPCEndpoint, faucets[0], nonces[0]); err != nil {
+		if contractAddr, err = prepareNewContract(cfg.RPCEndpoint, faucets[0], nonces[0], gasPrice); err != nil {
 			panic(err)
 		}
 		nonces[0]++
@@ -113,7 +116,7 @@ func main() {
 		// Note: if we add a single transaction one by one, the queue for broadcast txs might be full
 		for i := 0; i < txsBatchSize; i++ {
 			index := rand.Intn(len(faucets))
-			tx, err := createTx(cfg.TxMode, faucets[index], nonces[index], contractAddr)
+			tx, err := createTx(cfg.TxMode, gasPrice, faucets[index], nonces[index], contractAddr)
 			if err != nil {
 				panic(err)
 			}
@@ -157,7 +160,11 @@ func forceBroadcastPendingTxs(ethereum *evr.Evrynet) {
 	}
 	for _, pendingTxs := range pendings {
 		ethereum.TxPool().State()
-		txs = append(txs, pendingTxs...)
+		if len(pendingTxs) > txsBatchSize {
+			txs = append(txs, pendingTxs[:txsBatchSize]...)
+		} else {
+			txs = append(txs, pendingTxs...)
+		}
 	}
 	go func() {
 		ethereum.GetPm().ForceBroadcastTxs(txs)
@@ -241,10 +248,9 @@ func makeNode(genesis *core.Genesis, enodes []*enode.Node) (*node.Node, error) {
 		return nil, err
 	}
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
-		return evr.New(ctx, &evr.Config{
+		cfg := &evr.Config{
 			Genesis:         genesis,
 			NetworkId:       genesis.Config.ChainID.Uint64(),
-			GasPrice:        big.NewInt(params.GasPriceConfig),
 			SyncMode:        downloader.FullSync,
 			DatabaseCache:   256,
 			DatabaseHandles: 256,
@@ -263,10 +269,20 @@ func makeNode(genesis *core.Genesis, enodes []*enode.Node) (*node.Node, error) {
 			Miner: miner.Config{
 				GasFloor: genesis.GasLimit * 9 / 10,
 				GasCeil:  genesis.GasLimit * 11 / 10,
-				GasPrice: genesis.Config.GasPrice,
 				Recommit: time.Second,
 			},
-		})
+			Tendermint: tendermint.Config{
+				IndexStateVariables: staking.DefaultConfig,
+			},
+		}
+
+		fullNode, err := evr.New(ctx, cfg)
+		// Init Tendermint ChainReader for p2p server to read validators set
+		if fullNode != nil && fullNode.BlockChain() != nil && fullNode.BlockChain().Config().Tendermint != nil && stack.P2PServer.ChainReader == nil {
+			stack.P2PServer.ChainReader = fullNode.BlockChain()
+		}
+		stack.P2PServerInitDone <- struct{}{}
+		return fullNode, err
 	}); err != nil {
 		return nil, err
 	}
@@ -297,9 +313,9 @@ func makeNode(genesis *core.Genesis, enodes []*enode.Node) (*node.Node, error) {
 }
 
 // waitForSyncingAndStableNonces wait util the node is syncing and the nonces of given addresses are not change, also returns stable nonces
-func waitForSyncingAndStableNonces(ethereum *evr.Evrynet, faucets []*ecdsa.PrivateKey) []uint64 {
+func waitForSyncingAndStableNonces(ethereum *evr.Evrynet, faucets []*ecdsa.PrivateKey, initBlkNumber uint64) []uint64 {
 	bc := ethereum.BlockChain()
-	for !ethereum.Synced() {
+	for !ethereum.Synced() || ethereum.BlockChain().CurrentHeader().Number.Uint64() == initBlkNumber {
 		log.Warn("testNode is not synced, sleeping", "current_block", bc.CurrentHeader().Number)
 		time.Sleep(3 * time.Second)
 	}
@@ -328,7 +344,7 @@ func waitForSyncingAndStableNonces(ethereum *evr.Evrynet, faucets []*ecdsa.Priva
 	return nonces
 }
 
-func prepareNewContract(rpcEndpoint string, acc *ecdsa.PrivateKey, nonce uint64) (*common.Address, error) {
+func prepareNewContract(rpcEndpoint string, acc *ecdsa.PrivateKey, nonce uint64, gasPrice *big.Int) (*common.Address, error) {
 	log.Info("Creating Smart Contract ...")
 
 	evrClient, err := evrclient.Dial(rpcEndpoint)
@@ -354,7 +370,7 @@ func prepareNewContract(rpcEndpoint string, acc *ecdsa.PrivateKey, nonce uint64)
 		return nil, err
 	}
 
-	tx := types.NewContractCreation(nonce, big.NewInt(0), estGas, big.NewInt(params.GasPriceConfig), payLoadBytes)
+	tx := types.NewContractCreation(nonce, big.NewInt(0), estGas, gasPrice, payLoadBytes)
 	tx, err = types.SignTx(tx, types.HomesteadSigner{}, acc)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to sign Tx")
@@ -377,18 +393,18 @@ func prepareNewContract(rpcEndpoint string, acc *ecdsa.PrivateKey, nonce uint64)
 	return nil, errors.New("Can not get SC address")
 }
 
-func createTx(txMode TxMode, faucet *ecdsa.PrivateKey, nonces uint64, contractAddr *common.Address) (*types.Transaction, error) {
+func createTx(txMode TxMode, gasPrice *big.Int, faucet *ecdsa.PrivateKey, nonces uint64, contractAddr *common.Address) (*types.Transaction, error) {
 	switch txMode {
 	case NormalTxMode:
 		return types.SignTx(
 			types.NewTransaction(nonces, crypto.PubkeyToAddress(faucet.PublicKey), new(big.Int),
-				21000, big.NewInt(params.GasPriceConfig), nil),
+				21000, gasPrice, nil),
 			types.HomesteadSigner{},
 			faucet)
 	case SmartContractMode:
 		return types.SignTx(
 			types.NewTransaction(nonces, *contractAddr, new(big.Int),
-				40000, big.NewInt(params.GasPriceConfig),
+				40000, gasPrice,
 				[]byte("0x3fb5c1cb0000000000000000000000000000000000000000000000000000000000000002")),
 			types.HomesteadSigner{},
 			faucet)

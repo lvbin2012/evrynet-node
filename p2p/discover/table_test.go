@@ -27,6 +27,7 @@ import (
 	"testing/quick"
 	"time"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enode"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enr"
@@ -272,6 +273,42 @@ func TestTable_ReadRandomNodesGetAll(t *testing.T) {
 			return false
 		}
 		if hasDuplicates(wrapNodes(buf[:gotN])) {
+			t.Errorf("result contains duplicates")
+			return false
+		}
+		return true
+	}
+	if err := quick.Check(test, cfg); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestTable_ReadDiscoveredNodes(t *testing.T) {
+	cfg := &quick.Config{
+		MaxCount: 200,
+		Rand:     rand.New(rand.NewSource(time.Now().Unix())),
+		Values: func(args []reflect.Value, rand *rand.Rand) {
+			args[0] = reflect.ValueOf(make(map[common.Address]*enode.Node, rand.Intn(1000)))
+		},
+	}
+	test := func(buf map[common.Address]*enode.Node) bool {
+		transport := newPingRecorder()
+		tab, db := newTestTable(transport)
+		defer db.Close()
+		defer tab.close()
+		<-tab.initDone
+
+		gotN := tab.ReadDiscoveredNodes(buf)
+		if gotN != tab.len() {
+			t.Errorf("wrong number of nodes, got %d, want %d", gotN, tab.len())
+			return false
+		}
+
+		var nodes []*enode.Node
+		for _, node := range buf {
+			nodes = append(nodes, node)
+		}
+		if hasDuplicates(wrapNodes(nodes)) {
 			t.Errorf("result contains duplicates")
 			return false
 		}

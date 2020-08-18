@@ -59,7 +59,11 @@ func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func
 		db     = rawdb.NewMemoryDatabase()
 		gspec  = &core.Genesis{
 			Config: params.TestChainConfig,
-			Alloc:  core.GenesisAlloc{testBank: {Balance: big.NewInt(1000000)}},
+			Alloc: core.GenesisAlloc{
+				testBank: {
+					Balance: new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+				},
+			},
 		}
 		genesis       = gspec.MustCommit(db)
 		blockchain, _ = core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{}, nil)
@@ -158,7 +162,7 @@ func (p *testTxPool) SubscribeNewTxsEvent(ch chan<- core.NewTxsEvent) event.Subs
 
 // newTestTransaction create a new dummy transaction.
 func newTestTransaction(from *ecdsa.PrivateKey, nonce uint64, datasize int) *types.Transaction {
-	tx := types.NewTransaction(nonce, common.Address{}, big.NewInt(0), 100000, big.NewInt(0), make([]byte, datasize))
+	tx := types.NewTransaction(nonce, common.Address{}, big.NewInt(0), 100000, big.NewInt(params.GasPriceConfig), make([]byte, datasize))
 	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, from)
 	return tx
 }

@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/mclock"
 	"github.com/Evrynetlabs/evrynet-node/event"
 	"github.com/Evrynetlabs/evrynet-node/log"
@@ -137,6 +138,11 @@ func NewPeerFromNode(node *enode.Node, name string, caps []Cap) *Peer {
 // ID returns the node's public key.
 func (p *Peer) ID() enode.ID {
 	return p.rw.node.ID()
+}
+
+// Address returns the node's address.
+func (p *Peer) Address() common.Address {
+	return p.rw.node.Address()
 }
 
 // Node returns the peer's node descriptor.

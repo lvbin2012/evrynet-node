@@ -18,9 +18,12 @@ package evr
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -148,14 +151,13 @@ func testSendTransactions(t *testing.T, protocol int) {
 		for n := 0; n < len(alltxs) && !t.Failed(); {
 			var txs []*types.Transaction
 			msg, err := p.app.ReadMsg()
-			if err != nil {
-				t.Errorf("%v: read error: %v", p.Peer, err)
-			} else if msg.Code != TxMsg {
-				t.Errorf("%v: got code %d, want TxMsg", p.Peer, msg.Code)
-			}
-			if err := msg.Decode(&txs); err != nil {
-				t.Errorf("%v: %v", p.Peer, err)
-			}
+			require.NoError(t, err)
+			require.Equal(t, msg.Code, uint64(TxMsg))
+			//TODO: this should be from msg.Decode
+			//require.NoError(t, msg.Decode(&txs))
+			bs, err := ioutil.ReadAll(msg.Payload)
+			require.NoError(t, rlp.DecodeBytes(bs, &txs))
+
 			for _, tx := range txs {
 				hash := tx.Hash()
 				seentx, want := seen[hash]

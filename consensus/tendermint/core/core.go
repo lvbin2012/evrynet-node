@@ -16,17 +16,34 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
 
+type Option func(c *core) error
+
+//WithoutRebroadcast return an option to set whether or not core will rebroadcast its message
+func WithoutRebroadcast() Option {
+	return func(c *core) error {
+		c.rebroadcast = false
+		return nil
+	}
+}
+
 // New creates an Tendermint consensus core
-func New(backend tendermint.Backend, config *tendermint.Config) Engine {
+func New(backend tendermint.Backend, config *tendermint.Config, opts ...Option) Engine {
 	c := &core{
-		handlerWg:      new(sync.WaitGroup),
-		backend:        backend,
-		timeout:        NewTimeoutTicker(),
-		config:         config,
-		mu:             &sync.RWMutex{},
-		blockFinalize:  new(event.TypeMux),
-		futureMessages: queue.NewPriorityQueue(0, true),
-		sentMsgStorage: NewMsgStorage(),
+		handlerWg:       new(sync.WaitGroup),
+		backend:         backend,
+		timeout:         NewTimeoutTicker(),
+		config:          config,
+		mu:              &sync.RWMutex{},
+		blockFinalize:   new(event.TypeMux),
+		futureMessages:  queue.NewPriorityQueue(0, true),
+		futureProposals: make(map[int64]message),
+		sentMsgStorage:  NewMsgStorage(),
+		rebroadcast:     true,
+	}
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			panic(err)
+		}
 	}
 	return c
 }
@@ -73,6 +90,12 @@ type core struct {
 	// and handle them later when we jump to that block number
 	// futureMessages only accepts msgItem
 	futureMessages *queue.PriorityQueue
+
+	// futureProposals stores future proposal which is ahead in round from current state
+	// In case: the current node is still at precommit but another node jumps to next round and sends the proposal
+	futureProposals map[int64]message
+
+	rebroadcast bool
 }
 
 // Start implements core.Engine.Start
@@ -147,7 +170,7 @@ func (c *core) SendPropose(propose *Proposal) {
 	// store before send propose msg
 	c.sentMsgStorage.storeSentMsg(c.getLogger(), RoundStepPropose, propose.Round, payload)
 
-	if err := c.backend.Broadcast(c.valSet, c.currentState.CopyBlockNumber(), payload); err != nil {
+	if err := c.backend.Broadcast(c.valSet, c.currentState.CopyBlockNumber(), propose.Round, msgPropose, payload); err != nil {
 		c.getLogger().Errorw("Failed to Broadcast proposal", "error", err)
 		return
 	}
@@ -164,11 +187,6 @@ func (c *core) SetBlockForProposal(b *types.Block) {
 //it only accept 2 voteType: msgPrevote and msgcommit
 func (c *core) SendVote(voteType uint64, block *types.Block, round int64) {
 	logger := c.getLogger().With("send_vote_type", voteType, "send_vote_round", round)
-	//This should never happen, but it is a safe guard
-	if i, _ := c.valSet.GetByAddress(c.backend.Address()); i == -1 {
-		logger.Warnw("this node is not a validator of this round, skipping vote", "address", c.backend.Address())
-		return
-	}
 	if voteType != msgPrevote && voteType != msgPrecommit {
 		logger.Errorw("vote type is invalid")
 		return
@@ -216,7 +234,7 @@ func (c *core) SendVote(voteType uint64, block *types.Block, round int64) {
 	default:
 	}
 
-	if err := c.backend.Broadcast(c.valSet, c.currentState.CopyBlockNumber(), payload); err != nil {
+	if err := c.backend.Broadcast(c.valSet, c.currentState.CopyBlockNumber(), round, voteType, payload); err != nil {
 		logger.Errorw("Failed to Broadcast vote", "error", err)
 		return
 	}
@@ -263,4 +281,9 @@ func (c *core) getLogger() *zap.SugaredLogger {
 		zap.Stringer("block", c.currentState.BlockNumber()),
 		zap.Int64("round", c.currentState.Round()),
 		zap.Stringer("step", c.currentState.Step())).Sugar()
+}
+
+// address returns address of current nodes
+func (c *core) getAddress() common.Address {
+	return c.backend.Address()
 }

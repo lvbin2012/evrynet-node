@@ -18,6 +18,9 @@ import (
 )
 
 func (c *core) checkAndFakeProposal(proposal *Proposal) error {
+	if proposal == nil {
+		return nil
+	}
 	// Check faulty mode to inject fake block
 	if c.config.FaultyMode == tendermint.SendFakeProposal.Uint64() {
 		fakeHeader := *proposal.Block.Header()

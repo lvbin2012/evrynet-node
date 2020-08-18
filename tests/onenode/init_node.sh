@@ -21,7 +21,7 @@ do
 done < ${privatekeys}
 
 echo '===========starting node'
-gev --datadir ${basedir}/data --nodiscover --tendermint.blockperiod 1 --gasprice 1000000000 --syncmode full --mine --networkid 15 \
+gev --datadir ${basedir}/data --nodiscover --tendermint.blockperiod 1 --syncmode full --mine --networkid 15 \
     --rpc --rpcaddr 0.0.0.0 --rpcport 8545 --port 30303 \
     --etherbase ${etherbase} \
     --unlock ${addresses} --password ${basedir}/accounts/password \

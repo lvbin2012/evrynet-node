@@ -20,6 +20,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	godebug "runtime/debug"
 	"sort"
@@ -55,7 +56,7 @@ var (
 	gitCommit = ""
 	gitDate   = ""
 	// The app that holds all commands and flags.
-	app = utils.NewApp(gitCommit, gitDate, "the go-ethereum command line interface")
+	app = utils.NewApp(gitCommit, gitDate, "the evrynet-node command line interface")
 	// flags that configure the node
 	nodeFlags = []cli.Flag{
 		utils.IdentityFlag,
@@ -119,8 +120,6 @@ var (
 		utils.MinerGasTargetFlag,
 		utils.MinerLegacyGasTargetFlag,
 		utils.MinerGasLimitFlag,
-		utils.MinerGasPriceFlag,
-		utils.MinerLegacyGasPriceFlag,
 		utils.MinerEtherbaseFlag,
 		utils.MinerLegacyEtherbaseFlag,
 		utils.MinerExtraDataFlag,
@@ -131,6 +130,7 @@ var (
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,
 		utils.NetrestrictFlag,
+		utils.NodeKeyFromKeystoreFlag,
 		utils.NodeKeyFileFlag,
 		utils.NodeKeyHexFlag,
 		utils.DeveloperFlag,
@@ -158,6 +158,7 @@ var (
 		utils.TendermintTimeoutPrecommitFlag,
 		utils.TendermintTimeoutPrecommitDeltaFlag,
 		utils.TendermintTimeoutCommitFlag,
+		utils.TendermintSCUseEVMCallerFlag,
 	}
 
 	rpcFlags = []cli.Flag{
@@ -338,11 +339,11 @@ func geth(ctx *cli.Context) error {
 func startNode(ctx *cli.Context, stack *node.Node) {
 	debug.Memsize.Add("node", stack)
 
-	// Start up the node itself
-	utils.StartNode(stack)
-
 	// Unlock any account specifically requested
 	unlockAccounts(ctx, stack)
+
+	// Start up the node itself
+	utils.StartNode(stack)
 
 	// Register wallet event handlers to open and auto-derive wallets
 	events := make(chan accounts.WalletEvent, 16)
@@ -419,22 +420,19 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		if ctx.GlobalString(utils.SyncModeFlag.Name) == "light" {
 			utils.Fatalf("Light clients do not support mining")
 		}
-		var ethereum *evr.Evrynet
-		if err := stack.Service(&ethereum); err != nil {
+		var evrynet *evr.Evrynet
+		if err := stack.Service(&evrynet); err != nil {
 			utils.Fatalf("Evrynet service not running: %v", err)
 		}
 		// Set the gas price to the limits from the CLI and start mining
-		gasprice := utils.GlobalBig(ctx, utils.MinerLegacyGasPriceFlag.Name)
-		if ctx.IsSet(utils.MinerGasPriceFlag.Name) {
-			gasprice = utils.GlobalBig(ctx, utils.MinerGasPriceFlag.Name)
-		}
-		ethereum.TxPool().SetGasPrice(gasprice)
+		gasPrice := new(big.Int).Set(evrynet.BlockChain().Config().GasPrice)
+		evrynet.TxPool().SetGasPrice(gasPrice)
 
 		threads := ctx.GlobalInt(utils.MinerLegacyThreadsFlag.Name)
 		if ctx.GlobalIsSet(utils.MinerThreadsFlag.Name) {
 			threads = ctx.GlobalInt(utils.MinerThreadsFlag.Name)
 		}
-		if err := ethereum.StartMining(threads); err != nil {
+		if err := evrynet.StartMining(threads); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
 		}
 	}
@@ -463,4 +461,18 @@ func unlockAccounts(ctx *cli.Context, stack *node.Node) {
 	for i, account := range unlocks {
 		unlockAccount(ks, account, i, passwords)
 	}
+
+	if stack.Config().P2P.PrivateKey == nil && ctx.GlobalBool(utils.NodeKeyFromKeystoreFlag.Name) {
+		hasUnlockedKey := false
+		for _, account := range unlocks {
+			if pk := ks.GetUnlockPk(common.HexToAddress(account)); pk != nil {
+				stack.Config().P2P.PrivateKey = pk
+				hasUnlockedKey = true
+			}
+		}
+		if !hasUnlockedKey {
+			log.Warn("can not found any unlock key from keystore, using nodekey file")
+		}
+	}
+
 }

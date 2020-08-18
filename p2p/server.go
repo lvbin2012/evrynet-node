@@ -21,7 +21,6 @@ import (
 	"bytes"
 	"crypto/ecdsa"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -29,8 +28,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/pkg/errors"
+
+	evrnet "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/mclock"
+	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/event"
 	"github.com/Evrynetlabs/evrynet-node/log"
@@ -40,6 +43,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/p2p/enr"
 	"github.com/Evrynetlabs/evrynet-node/p2p/nat"
 	"github.com/Evrynetlabs/evrynet-node/p2p/netutil"
+	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
 
 const (
@@ -157,6 +161,9 @@ type Config struct {
 type Server struct {
 	// Config fields may not be modified while the server is running.
 	Config
+
+	ChainReader       evrnet.P2PChainReader
+	currentValidators map[common.Address]struct{}
 
 	// Hooks for testing. These are useful because we can inhibit
 	// the whole protocol stack.
@@ -315,6 +322,11 @@ func (srv *Server) PeerCount() int {
 	return count
 }
 
+// Address returns the node's address.
+func (srv *Server) Address() common.Address {
+	return crypto.PubkeyToAddress(srv.PrivateKey.PublicKey)
+}
+
 // AddPeer connects to the given node and maintains the connection until the
 // server is shut down. If the connection fails for any reason, the server will
 // attempt to reconnect the peer.
@@ -452,6 +464,10 @@ func (srv *Server) Start() (err error) {
 	srv.peerOp = make(chan peerOpFunc)
 	srv.peerOpDone = make(chan struct{})
 
+	if srv.Config.MaxPeers < len(srv.currentValidators) {
+		srv.Config.MaxPeers = len(srv.currentValidators)
+		srv.log.Warn("Update the maxpeers config", "maxPeers", srv.Config.MaxPeers)
+	}
 	if err := srv.setupLocalNode(); err != nil {
 		return err
 	}
@@ -469,6 +485,58 @@ func (srv *Server) Start() (err error) {
 	srv.loopWG.Add(1)
 	go srv.run(dialer)
 	return nil
+}
+
+// UpdateCurrentValidators will use Tendermint config to get validator
+func (srv *Server) UpdateCurrentValidators() error {
+	// Ignore if Tendermint config it does not exist
+	if srv.ChainReader != nil && srv.ChainReader.Config().Tendermint != nil {
+		currentValidatorAddrs, err := srv.GetValSetAddresses(srv.ChainReader.CurrentHeader())
+		if err != nil {
+			return errors.Wrap(err, "Can't get the validators's address from extra-data")
+		}
+
+		var currentValidatorMap = make(map[common.Address]struct{})
+		for _, valAddr := range currentValidatorAddrs {
+			currentValidatorMap[valAddr] = struct{}{}
+		}
+		srv.currentValidators = currentValidatorMap
+	}
+	return nil
+}
+
+// GetValSetAddresses returns the address of validators from the extra-data field.
+func (srv *Server) GetValSetAddresses(header *types.Header) ([]common.Address, error) {
+	if srv.ChainReader == nil {
+		return nil, errors.New("Chain reader of server is nil")
+	}
+	if len(srv.ChainReader.Config().Tendermint.FixedValidators) > 0 {
+		return srv.ChainReader.Config().Tendermint.FixedValidators, nil
+	}
+
+	var (
+		validators       []common.Address
+		epoch            = srv.ChainReader.Config().Tendermint.Epoch
+		transitionHeader = srv.ChainReader.GetHeaderByNumber((header.Number.Uint64() / epoch) * epoch)
+	)
+	if transitionHeader == nil {
+		return nil, errors.Errorf("Can not get transition header at number %v with epoch %v", header.Number.Uint64(), epoch)
+	}
+
+	tdmExtra, err := types.ExtractTendermintExtra(transitionHeader)
+	if err != nil {
+		return nil, err
+	}
+	if len(tdmExtra.ValidatorAdds) == 0 {
+		return nil, errors.New("Zero validator set")
+	}
+
+	// RLP decode validator's address from bytes
+	err = rlp.DecodeBytes(tdmExtra.ValidatorAdds, &validators)
+	if err != nil {
+		return nil, err
+	}
+	return validators, nil
 }
 
 func (srv *Server) setupLocalNode() error {
@@ -606,7 +674,7 @@ func (srv *Server) setupListening() error {
 }
 
 type dialer interface {
-	newTasks(running int, peers map[enode.ID]*Peer, now time.Time) []task
+	newTasks(running int, peers map[enode.ID]*Peer, validatorAddrs map[common.Address]struct{}, now time.Time) []task
 	taskDone(task, time.Time)
 	addStatic(*enode.Node)
 	removeStatic(*enode.Node)
@@ -656,7 +724,7 @@ func (srv *Server) run(dialstate dialer) {
 		queuedTasks = append(queuedTasks[:0], startTasks(queuedTasks)...)
 		// Query dialer for new tasks and start as many as possible now.
 		if len(runningTasks) < maxActiveDialTasks {
-			nt := dialstate.newTasks(len(runningTasks)+len(queuedTasks), peers, time.Now())
+			nt := dialstate.newTasks(len(runningTasks)+len(queuedTasks), peers, srv.currentValidators, time.Now())
 			queuedTasks = append(queuedTasks, startTasks(nt)...)
 		}
 	}
@@ -864,7 +932,6 @@ func (srv *Server) listenLoop() {
 			}
 			break
 		}
-
 		remoteIP := netutil.AddrIP(fd.RemoteAddr())
 		if err := srv.checkInboundConn(fd, remoteIP); err != nil {
 			srv.log.Debug("Rejected inbound connnection", "addr", fd.RemoteAddr(), "err", err)
@@ -945,6 +1012,29 @@ func (srv *Server) setupConn(c *conn, flags connFlag, dialDest *enode.Node) erro
 	} else {
 		c.node = nodeFromConn(remotePubkey, c.fd)
 	}
+
+	// Setup current validators
+	if err := srv.UpdateCurrentValidators(); err != nil {
+		return err
+	}
+
+	var (
+		connectedPeers               = srv.Peers()
+		_, isValidatorNode           = srv.currentValidators[srv.Address()]
+		_, isValidatorNodeConnection = srv.currentValidators[c.node.Address()]
+	)
+	// If you are the validator node, handle peers connection priority
+	// Handle for validator node connection
+	if len(connectedPeers) == srv.MaxPeers && isValidatorNode && isValidatorNodeConnection {
+		for _, connectedPeer := range connectedPeers {
+			// Disconnect non-validator node to add new validator node
+			if _, ok := srv.currentValidators[crypto.PubkeyToAddress(*connectedPeer.Node().Pubkey())]; !ok {
+				connectedPeer.Disconnect(DiscNonValidator)
+				break
+			}
+		}
+	}
+
 	if conn, ok := c.fd.(*meteredConn); ok {
 		conn.handshakeDone(c.node.ID())
 	}

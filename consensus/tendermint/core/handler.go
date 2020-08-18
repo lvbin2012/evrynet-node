@@ -8,6 +8,7 @@ import (
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
+	evrynetCore "github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
@@ -115,27 +116,45 @@ func (c *core) handleFinalCommitted(newHeadNumber *big.Int) error {
 	c.sentMsgStorage.truncateMsgStored(logger)
 	c.updateStateForNewblock()
 	c.startNewRound()
+	if _, err := c.processFutureMessages(logger); err != nil {
+		logger.Errorw("failed to process future msg", "err", err)
+	}
 	return nil
 }
 
 func (c *core) handleNewBlock(block *types.Block) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	var state = c.CurrentState()
-	c.getLogger().Infow("received New Block event", "new_block_number", block.Number(), "new_block_hash", block.Hash().Hex())
+	var (
+		state  = c.CurrentState()
+		logger = c.getLogger()
+	)
+	logger.Infow("received New Block event", "new_block_number", block.Number(), "new_block_hash", block.Hash().Hex())
 
 	if block.Number() == nil || state.BlockNumber().Cmp(block.Number()) > 0 {
 		//This is temporary to let miner come up with a newer block
-		c.getLogger().Errorw("new block number is smaller than current block",
+		logger.Errorw("new block number is smaller than current block",
 			"new_block_number", block.Number(), "state.BlockNumber", state.BlockNumber())
 		//return a nil block to allow miner to send over a new one
-		c.backend.Cancel(types.NewBlockWithHeader(&types.Header{
-			Number: block.Number(),
-		}))
+		c.backend.Cancel(block)
 
 		return
 	}
 	state.SetBlock(block)
+	// in case handleNewBlock is called after enterPropose
+	if state.step == RoundStepPropose {
+		if i, _ := c.valSet.GetByAddress(c.backend.Address()); i == -1 {
+			logger.Infow("this node is not a validator of this round", "address", c.backend.Address())
+			return
+		}
+		if c.valSet.IsProposer(c.backend.Address()) {
+			logger.Infow("this node is proposer of this round", "node_address", c.backend.Address())
+			proposal := c.getDefaultProposal(logger, state.Round())
+			if proposal != nil {
+				c.SendPropose(proposal)
+			}
+		}
+	}
 }
 
 //VerifyProposal validate msg & proposal when get from other nodes
@@ -167,24 +186,8 @@ func (c *core) VerifyProposal(proposal Proposal, msg message) error {
 		return err
 	}
 
-	// verify transaction hash & header
-	if err := c.verifyTxs(proposal); err != nil {
+	if err := c.backend.VerifyProposalBlock(proposal.Block); err != nil {
 		return err
-	}
-
-	return nil
-}
-
-func (c *core) verifyTxs(proposal Proposal) error {
-	var (
-		block   = proposal.Block
-		txs     = block.Transactions()
-		txsHash = types.DeriveSha(txs)
-	)
-
-	// Verify txs hash
-	if txsHash != block.Header().TxHash {
-		return tendermint.ErrMismatchTxhashes
 	}
 
 	return nil
@@ -210,24 +213,46 @@ func (c *core) handlePropose(msg message) error {
 	}
 
 	// Does not apply, this is not an error but may happen due to network lattency
-	if proposal.Block.Number().Cmp(state.BlockNumber()) != 0 || proposal.Round != state.Round() {
-		logger.Warnw("received proposal with different height/round.")
+	if proposal.Block.Number().Cmp(state.BlockNumber()) != 0 {
+		logger.Warnw("received proposal with different height.")
 		if proposal.Block.Number().Cmp(state.BlockNumber()) > 0 {
 			// vote from future block, save to future message queue
-			logger.Infow("store prevote vote from future block", "from", msg.Address)
+			logger.Infow("store proposal vote from future block", "from", msg.Address)
 			if err := c.futureMessages.Put(&msgItem{message: msg, height: proposal.Block.Number().Uint64()}); err != nil {
-				logger.Errorw("failed to store future prevote message to queue", "err", err, "from", msg.Address)
+				logger.Errorw("failed to store future proposal message to queue", "err", err, "from", msg.Address)
 			}
 		}
 		return nil
 	}
+
+	// Does not apply, this is not an error but may happen due to network latency
+	if proposal.Round != state.Round() {
+		logger.Warnw("received proposal with different round.")
+		if proposal.Round > state.Round() {
+			logger.Warnw("received proposal from future round.")
+			// make sure this is the proposer of next round
+			valSet := c.valSet.Copy()
+			valSet.CalcProposer(c.valSet.GetProposer().Address(), proposal.Round-state.Round())
+			if valSet.GetProposer().Address() == msg.Address {
+				logger.Infow("store proposal from next round", "from", msg.Address)
+				c.futureProposals[proposal.Round] = msg
+			}
+		}
+		return nil
+	}
+
 	if err := c.VerifyProposal(proposal, msg); err != nil {
+		if err == evrynetCore.ErrKnownBlock { // block is already inserted into chain
+			return nil
+		}
 		return err
 	}
 	logger.Infow("setProposal receive...")
 
+	go c.reBroadcastMsg(msg, logger)
+
 	state.SetProposalReceived(&proposal)
-	//WARNING: THIS piece of code is experimental
+	//TODO: Simulate and test the case where core receives proposal at these steps: prevote/ precommit
 	if state.Step() <= RoundStepPropose && state.IsProposalComplete() {
 		log.Info("handle proposal: received proposal, proposal completed. before enterPrevote Jump to enterPrevote")
 		// Move onto the next step
@@ -305,22 +330,8 @@ func (c *core) handlePrevote(msg message) error {
 			}
 		}
 	}
-	//rebroadcast
-	//note that tendermint doesn't do it, but it seems like this would speed up the process of gossiping
-	//go func() {
-	//	//We don't re-gossip if this is our own message
-	//	if msg.Address.Hex() == c.backend.Address().Hex() {
-	//		return
-	//	}
-	//	payload, err := rlp.EncodeToBytes(&msg)
-	//	if err != nil {
-	//		log.Error("failed to encode msg", "error", err)
-	//		return
-	//	}
-	//	if err := c.backend.Gossip(c.valSet, payload); err != nil {
-	//		log.Error("failed to re-gossip the vote received", "error", err)
-	//	}
-	//}()
+
+	go c.reBroadcastMsg(msg, logger)
 	//if we receive a future roundthat come to 2/3 of prevotes on any block
 	switch {
 	case state.Round() < vote.Round && prevotes.HasTwoThirdAny():
@@ -378,23 +389,7 @@ func (c *core) handlePrecommit(msg message) error {
 	}
 	logger.Infow("added precommit vote into roundState")
 
-	//TODO: revise if we need rebroadcast
-	//rebroadcast
-	//note that tendermint doesn't do it, but it seems like this would speed up the process of gossiping
-	//go func() {
-	//	//we don't re-gossip if this is our own message
-	//	if msg.Address.Hex() == c.backend.Address().Hex() {
-	//		return
-	//	}
-	//	payload, err := rlp.EncodeToBytes(&msg)
-	//	if err != nil {
-	//		log.Error("failed to encode msg", "error", err)
-	//		return
-	//	}
-	//	if err := c.backend.Gossip(c.valSet, payload); err != nil {
-	//		log.Error("failed to re-gossip the vote received", "error", err)
-	//	}
-	//}()
+	go c.reBroadcastMsg(msg, logger)
 
 	precommits, ok := state.GetPrecommitsByRound(vote.Round)
 	if !ok {
@@ -412,9 +407,8 @@ func (c *core) handlePrecommit(msg message) error {
 		if blockHash.Hex() != emptyBlockHash.Hex() {
 			c.enterCommit(state.BlockNumber(), vote.Round)
 			//TODO: if we need to skip when precommits has all votes
-		} else {
-			//wait for more precommit
-			c.enterPrecommitWait(state.BlockNumber(), vote.Round)
+		} else { // enter new Round for consensus
+			c.enterNewRound(state.BlockNumber(), vote.Round+1)
 		}
 		return nil
 	}

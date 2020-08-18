@@ -592,7 +592,7 @@ func TestFastVsFullChains(t *testing.T) {
 		gendb   = rawdb.NewMemoryDatabase()
 		key, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		address = crypto.PubkeyToAddress(key.PublicKey)
-		funds   = big.NewInt(1000000000)
+		funds   = new(big.Int).Mul(big.NewInt(1000000000), big.NewInt(params.GasPriceConfig))
 		gspec   = &Genesis{
 			Config: params.TestChainConfig,
 			Alloc:  GenesisAlloc{address: {Balance: funds}},
@@ -606,7 +606,11 @@ func TestFastVsFullChains(t *testing.T) {
 		// If the block number is multiple of 3, send a few bonus transactions to the miner
 		if i%3 == 2 {
 			for j := 0; j < i%4+1; j++ {
-				tx, err := types.SignTx(types.NewTransaction(block.TxNonce(address), common.Address{0x00}, big.NewInt(1000), params.TxGas, nil, nil), signer, key)
+				tx, err := types.SignTx(
+					types.NewTransaction(block.TxNonce(address), common.Address{0x00}, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil),
+					signer,
+					key,
+				)
 				if err != nil {
 					panic(err)
 				}
@@ -823,13 +827,14 @@ func TestChainTxReorgs(t *testing.T) {
 		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
 		addr3   = crypto.PubkeyToAddress(key3.PublicKey)
 		db      = rawdb.NewMemoryDatabase()
+		balance = new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.GasPriceConfig))
 		gspec   = &Genesis{
 			Config:   params.TestChainConfig,
 			GasLimit: 3141592,
 			Alloc: GenesisAlloc{
-				addr1: {Balance: big.NewInt(1000000)},
-				addr2: {Balance: big.NewInt(1000000)},
-				addr3: {Balance: big.NewInt(1000000)},
+				addr1: {Balance: balance},
+				addr2: {Balance: balance},
+				addr3: {Balance: balance},
 			},
 		}
 		genesis = gspec.MustCommit(db)
@@ -839,8 +844,8 @@ func TestChainTxReorgs(t *testing.T) {
 	// Create two transactions shared between the chains:
 	//  - postponed: transaction included at a later block in the forked chain
 	//  - swapped: transaction included at the same block number in the forked chain
-	postponed, _ := types.SignTx(types.NewTransaction(0, addr1, big.NewInt(1000), params.TxGas, nil, nil), signer, key1)
-	swapped, _ := types.SignTx(types.NewTransaction(1, addr1, big.NewInt(1000), params.TxGas, nil, nil), signer, key1)
+	postponed, _ := types.SignTx(types.NewTransaction(0, addr1, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key1)
+	swapped, _ := types.SignTx(types.NewTransaction(1, addr1, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key1)
 
 	// Create two transactions that will be dropped by the forked chain:
 	//  - pastDrop: transaction dropped retroactively from a past block
@@ -856,13 +861,13 @@ func TestChainTxReorgs(t *testing.T) {
 	chain, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 3, func(i int, gen *BlockGen) {
 		switch i {
 		case 0:
-			pastDrop, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr2, big.NewInt(1000), params.TxGas, nil, nil), signer, key2)
+			pastDrop, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr2, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key2)
 
 			gen.AddTx(pastDrop)  // This transaction will be dropped in the fork from below the split point
 			gen.AddTx(postponed) // This transaction will be postponed till block #3 in the fork
 
 		case 2:
-			freshDrop, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr2, big.NewInt(1000), params.TxGas, nil, nil), signer, key2)
+			freshDrop, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr2, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key2)
 
 			gen.AddTx(freshDrop) // This transaction will be dropped in the fork from exactly at the split point
 			gen.AddTx(swapped)   // This transaction will be swapped out at the exact height
@@ -881,18 +886,18 @@ func TestChainTxReorgs(t *testing.T) {
 	chain, _ = GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 5, func(i int, gen *BlockGen) {
 		switch i {
 		case 0:
-			pastAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key3)
+			pastAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key3)
 			gen.AddTx(pastAdd) // This transaction needs to be injected during reorg
 
 		case 2:
 			gen.AddTx(postponed) // This transaction was postponed from block #1 in the original chain
 			gen.AddTx(swapped)   // This transaction was swapped from the exact current spot in the original chain
 
-			freshAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key3)
+			freshAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key3)
 			gen.AddTx(freshAdd) // This transaction will be added exactly at reorg time
 
 		case 3:
-			futureAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, nil, nil), signer, key3)
+			futureAdd, _ = types.SignTx(types.NewTransaction(gen.TxNonce(addr3), addr3, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key3)
 			gen.AddTx(futureAdd) // This transaction will be added after a full reorg
 		}
 	})
@@ -936,7 +941,8 @@ func TestLogReorgs(t *testing.T) {
 		db      = rawdb.NewMemoryDatabase()
 		// this code generates a log
 		code    = common.Hex2Bytes("60606040525b7f24ec1d3ff24c2f6ff210738839dbc339cd45a5294d85c79361016243157aae7b60405180905060405180910390a15b600a8060416000396000f360606040526008565b00")
-		gspec   = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: big.NewInt(10000000000000)}}}
+		balance = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
+		gspec   = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: balance}}}
 		genesis = gspec.MustCommit(db)
 		signer  = types.NewEIP155Signer(gspec.Config.ChainID)
 	)
@@ -948,7 +954,7 @@ func TestLogReorgs(t *testing.T) {
 	blockchain.SubscribeRemovedLogsEvent(rmLogsCh)
 	chain, _ := GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 2, func(i int, gen *BlockGen) {
 		if i == 1 {
-			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), code), signer, key1)
+			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, big.NewInt(params.GasPriceConfig), code), signer, key1)
 			if err != nil {
 				t.Fatalf("failed to create tx: %v", err)
 			}
@@ -983,7 +989,8 @@ func TestLogRebirth(t *testing.T) {
 
 		// this code generates a log
 		code     = common.Hex2Bytes("60606040525b7f24ec1d3ff24c2f6ff210738839dbc339cd45a5294d85c79361016243157aae7b60405180905060405180910390a15b600a8060416000396000f360606040526008565b00")
-		gspec    = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: big.NewInt(10000000000000)}}}
+		balance  = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
+		gspec    = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: balance}}}
 		genesis  = gspec.MustCommit(db)
 		signer   = types.NewEIP155Signer(gspec.Config.ChainID)
 		newLogCh = make(chan bool)
@@ -1029,7 +1036,7 @@ func TestLogRebirth(t *testing.T) {
 
 	chain, _ := GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 2, func(i int, gen *BlockGen) {
 		if i == 1 {
-			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), code), signer, key1)
+			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, big.NewInt(params.GasPriceConfig), code), signer, key1)
 			if err != nil {
 				t.Fatalf("failed to create tx: %v", err)
 			}
@@ -1049,7 +1056,7 @@ func TestLogRebirth(t *testing.T) {
 	// Generate long reorg chain
 	forkChain, _ := GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 2, func(i int, gen *BlockGen) {
 		if i == 1 {
-			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), code), signer, key1)
+			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, big.NewInt(params.GasPriceConfig), code), signer, key1)
 			if err != nil {
 				t.Fatalf("failed to create tx: %v", err)
 			}
@@ -1105,7 +1112,8 @@ func TestSideLogRebirth(t *testing.T) {
 
 		// this code generates a log
 		code     = common.Hex2Bytes("60606040525b7f24ec1d3ff24c2f6ff210738839dbc339cd45a5294d85c79361016243157aae7b60405180905060405180910390a15b600a8060416000396000f360606040526008565b00")
-		gspec    = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: big.NewInt(10000000000000)}}}
+		balance  = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
+		gspec    = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: balance}}}
 		genesis  = gspec.MustCommit(db)
 		signer   = types.NewEIP155Signer(gspec.Config.ChainID)
 		newLogCh = make(chan bool)
@@ -1159,7 +1167,7 @@ func TestSideLogRebirth(t *testing.T) {
 	// Generate side chain with lower difficulty
 	sideChain, _ := GenerateChain(params.TestChainConfig, genesis, ethash.NewFaker(), db, 2, func(i int, gen *BlockGen) {
 		if i == 1 {
-			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), code), signer, key1)
+			tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, big.NewInt(params.GasPriceConfig), code), signer, key1)
 			if err != nil {
 				t.Fatalf("failed to create tx: %v", err)
 			}
@@ -1187,9 +1195,10 @@ func TestReorgSideEvent(t *testing.T) {
 		db      = rawdb.NewMemoryDatabase()
 		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
+		balance = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
 		gspec   = &Genesis{
 			Config: params.TestChainConfig,
-			Alloc:  GenesisAlloc{addr1: {Balance: big.NewInt(10000000000000)}},
+			Alloc:  GenesisAlloc{addr1: {Balance: balance}},
 		}
 		genesis = gspec.MustCommit(db)
 		signer  = types.NewEIP155Signer(gspec.Config.ChainID)
@@ -1204,7 +1213,7 @@ func TestReorgSideEvent(t *testing.T) {
 	}
 
 	replacementBlocks, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 4, func(i int, gen *BlockGen) {
-		tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, new(big.Int), nil), signer, key1)
+		tx, err := types.SignTx(types.NewContractCreation(gen.TxNonce(addr1), new(big.Int), 1000000, big.NewInt(params.GasPriceConfig), nil), signer, key1)
 		if i == 2 {
 			gen.OffsetTime(-9)
 		}
@@ -1318,7 +1327,7 @@ func TestEIP155Transition(t *testing.T) {
 		funds      = big.NewInt(1000000000)
 		deleteAddr = common.Address{1}
 		gspec      = &Genesis{
-			Config: &params.ChainConfig{ChainID: big.NewInt(1), EIP155Block: big.NewInt(2), HomesteadBlock: new(big.Int)},
+			Config: &params.ChainConfig{ChainID: big.NewInt(1), EIP155Block: big.NewInt(2), HomesteadBlock: new(big.Int), GasPrice: big.NewInt(0)},
 			Alloc:  GenesisAlloc{address: {Balance: funds}, deleteAddr: {Balance: new(big.Int)}},
 		}
 		genesis = gspec.MustCommit(db)
@@ -1326,7 +1335,6 @@ func TestEIP155Transition(t *testing.T) {
 
 	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{}, nil)
 	defer blockchain.Stop()
-
 	blocks, _ := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), db, 4, func(i int, block *BlockGen) {
 		var (
 			tx      *types.Transaction
@@ -1389,7 +1397,12 @@ func TestEIP155Transition(t *testing.T) {
 	}
 
 	// generate an invalid chain id transaction
-	config := &params.ChainConfig{ChainID: big.NewInt(2), EIP155Block: big.NewInt(2), HomesteadBlock: new(big.Int)}
+	config := &params.ChainConfig{
+		ChainID:        big.NewInt(2),
+		EIP155Block:    big.NewInt(2),
+		HomesteadBlock: new(big.Int),
+		GasPrice:       big.NewInt(0),
+	}
 	blocks, _ = GenerateChain(config, blocks[len(blocks)-1], ethash.NewFaker(), db, 4, func(i int, block *BlockGen) {
 		var (
 			tx      *types.Transaction
@@ -1426,6 +1439,7 @@ func TestEIP161AccountRemoval(t *testing.T) {
 				HomesteadBlock: new(big.Int),
 				EIP155Block:    new(big.Int),
 				EIP158Block:    big.NewInt(2),
+				GasPrice:       big.NewInt(0),
 			},
 			Alloc: GenesisAlloc{address: {Balance: funds}},
 		}

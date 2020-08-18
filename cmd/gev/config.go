@@ -157,7 +157,7 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	if ctx.GlobalIsSet(utils.ConstantinopleOverrideFlag.Name) {
 		cfg.Eth.ConstantinopleOverride = new(big.Int).SetUint64(ctx.GlobalUint64(utils.ConstantinopleOverrideFlag.Name))
 	}
-	utils.RegisterEthService(stack, &cfg.Eth)
+	utils.RegisterEvrService(stack, &cfg.Eth)
 
 	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)

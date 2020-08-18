@@ -30,6 +30,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/p2p/enode"
 	"github.com/Evrynetlabs/evrynet-node/p2p/simulations/pipes"
 	"github.com/Evrynetlabs/evrynet-node/rpc"
+	"github.com/Evrynetlabs/evrynet-node/tests_utils"
 )
 
 // SimAdapter is a NodeAdapter which creates in-memory simulation nodes and
@@ -265,6 +266,13 @@ func (sn *SimNode) Start(snapshots map[string][]byte) error {
 				return nil, err
 			}
 			sn.running[name] = service
+
+			// Init ChainReader to Server start
+			sn.node.P2PServer.ChainReader, err = tests_utils.GenerateMockChainReader()
+			if err != nil {
+				return nil, err
+			}
+			sn.node.P2PServerInitDone <- struct{}{}
 			return service, nil
 		}
 	}

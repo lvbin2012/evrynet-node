@@ -286,7 +286,7 @@ func (w *wizard) readPassword() string {
 func (w *wizard) readAddress() *common.Address {
 	for {
 		// Read the address from the user
-		fmt.Printf("> 0x")
+		fmt.Printf("> ")
 		text, err := w.in.ReadString('\n')
 		if err != nil {
 			log.Crit("Failed to read user input", "err", err)
@@ -295,12 +295,11 @@ func (w *wizard) readAddress() *common.Address {
 			return nil
 		}
 		// Make sure it looks ok and return it if so
-		if len(text) != 40 {
+		if len(text) != 42 && len(text) != 40 {
 			log.Error("Invalid address length, please retry")
 			continue
 		}
-		bigaddr, _ := new(big.Int).SetString(text, 16)
-		address := common.BigToAddress(bigaddr)
+		address := common.HexToAddress(text)
 		return &address
 	}
 }
@@ -311,7 +310,7 @@ func (w *wizard) readAddress() *common.Address {
 func (w *wizard) readDefaultAddress(def common.Address) common.Address {
 	for {
 		// Read the address from the user
-		fmt.Printf("> 0x")
+		fmt.Printf("> ")
 		text, err := w.in.ReadString('\n')
 		if err != nil {
 			log.Crit("Failed to read user input", "err", err)
@@ -320,12 +319,11 @@ func (w *wizard) readDefaultAddress(def common.Address) common.Address {
 			return def
 		}
 		// Make sure it looks ok and return it if so
-		if len(text) != 40 {
+		if len(text) != 42 && len(text) != 40 {
 			log.Error("Invalid address length, please retry")
 			continue
 		}
-		bigaddr, _ := new(big.Int).SetString(text, 16)
-		return common.BigToAddress(bigaddr)
+		return common.HexToAddress(text)
 	}
 }
 
@@ -364,5 +362,23 @@ func (w *wizard) readIPAddress() string {
 			continue
 		}
 		return text
+	}
+}
+
+//readMandatoryAddress reads at least one address
+func (w *wizard) readMandatoryAddress() *common.Address {
+	for {
+		if addr := w.readAddress(); addr != nil {
+			return addr
+		}
+	}
+}
+
+//readMandatoryBigInt reads at least one value
+func (w *wizard) readMandatoryBigInt() *big.Int {
+	for {
+		if value := w.readDefaultBigInt(nil); value != nil {
+			return value
+		}
 	}
 }

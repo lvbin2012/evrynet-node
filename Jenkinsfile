@@ -23,6 +23,10 @@ pipeline {
                     echo "memory usage"
                     free -m
                 '''
+                sh '''
+                    docker images
+                    free -m
+                '''
                 dir('directoryToDelete') {
                     deleteDir()
                 }

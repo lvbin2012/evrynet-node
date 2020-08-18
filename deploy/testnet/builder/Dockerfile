@@ -17,11 +17,9 @@ RUN cat /root/.netrc
 
 WORKDIR "/evrynet"
 COPY ./project ./project
-RUN ls -la && \
-    cd ./project && \
+RUN cd ./project && \
     go build ./cmd/gev && \
     go build ./cmd/bootnode && \
-    ls -la && \
     cd .. && \
     cp ./project/gev ./ && \
     cp ./project/bootnode ./ && \

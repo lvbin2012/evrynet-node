@@ -263,7 +263,7 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 		req = &SignDataRequest{ContentType: mediaType, Rawdata: cliqueRlp, Message: message, Hash: sighash}
 	default: // also case TextPlain.Mime:
 		// Calculates an Evrynet ECDSA signature for:
-		// hash = keccak256("\x19${byteVersion}Evrynet Signed Message:\n${message length}${message}")
+		// hash = keccak256("\x19${byteVersion}Ethereum Signed Message:\n${message length}${message}")
 		// We expect it to be a string
 		if stringData, ok := data.(string); !ok {
 			return nil, useEvrynetV, fmt.Errorf("input for text/plain must be an hex-encoded string")
@@ -609,7 +609,7 @@ func (api *SignerAPI) EcRecover(ctx context.Context, data hexutil.Bytes, sig hex
 	//
 	// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
 	// the address of:
-	// hash = keccak256("\x19${byteVersion}Evrynet Signed Message:\n${message length}${message}")
+	// hash = keccak256("\x19${byteVersion}Ethereum Signed Message:\n${message length}${message}")
 	// addr = ecrecover(hash, signature)
 	//
 	// Note, the signature must conform to the secp256k1 curve R, S and V values, where

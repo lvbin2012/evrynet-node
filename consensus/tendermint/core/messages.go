@@ -34,39 +34,30 @@ type message struct {
 	Msg       []byte
 	Address   common.Address
 	Signature []byte
-	//TODO: Is CommitedSeal needed in message of Tendermint?
-	CommittedSeal []byte
 }
 
 // EncodeRLP serializes m into the Evrynet RLP format.
 func (m *message) EncodeRLP(w io.Writer) error {
-	return rlp.Encode(w, []interface{}{m.Code, m.Msg, m.Address, m.Signature, m.CommittedSeal})
+	return rlp.Encode(w, []interface{}{m.Code, m.Msg, m.Address, m.Signature})
 }
 
 // DecodeRLP implements rlp.Decoder, and load the consensus fields from a RLP stream.
 func (m *message) DecodeRLP(s *rlp.Stream) error {
-	var msg struct {
-		Code          uint64
-		Msg           []byte
-		Address       common.Address
-		Signature     []byte
-		CommittedSeal []byte
-	}
-
-	if err := s.Decode(&msg); err != nil {
+	type msg message
+	var decodedMsg msg
+	if err := s.Decode(&decodedMsg); err != nil {
 		return err
 	}
-	m.Code, m.Msg, m.Address, m.Signature, m.CommittedSeal = msg.Code, msg.Msg, msg.Address, msg.Signature, msg.CommittedSeal
+	m.Code, m.Msg, m.Address, m.Signature = decodedMsg.Code, decodedMsg.Msg, decodedMsg.Address, decodedMsg.Signature
 	return nil
 }
 
 func (m *message) PayLoadWithoutSignature() ([]byte, error) {
 	return rlp.EncodeToBytes(&message{
-		Code:          m.Code,
-		Address:       m.Address,
-		Msg:           m.Msg,
-		Signature:     []byte{},
-		CommittedSeal: m.CommittedSeal,
+		Code:      m.Code,
+		Address:   m.Address,
+		Msg:       m.Msg,
+		Signature: []byte{},
 	})
 }
 

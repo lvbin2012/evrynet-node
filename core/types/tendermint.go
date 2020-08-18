@@ -42,40 +42,33 @@ var (
 
 // TendermintExtra extra data for Tendermint consensus
 type TendermintExtra struct {
-	// Validators is list of current validators
-	Validators []common.Address
-	// ModifiedValidator is address of modified validator, either add or remove depends on Nonce value in block header
-	ModifiedValidator common.Address
-	// Seal is proposer's seal, 65 bytes
 	Seal []byte
 	// CommittedSeal is list seals of validators that committed the block, 65 * len(Validators) bytes
 	CommittedSeal [][]byte
+	// Set of authorized validators at this moment
+	ValidatorAdds []byte
 }
 
 // EncodeRLP serializes ist into the Evrynet RLP format.
 func (te *TendermintExtra) EncodeRLP(w io.Writer) error {
 	return rlp.Encode(w, []interface{}{
-		te.Validators,
-		te.ModifiedValidator,
 		te.Seal,
 		te.CommittedSeal,
+		te.ValidatorAdds,
 	})
 }
 
 // DecodeRLP implements rlp.Decoder, and load the tendermint fields from a RLP stream.
 func (te *TendermintExtra) DecodeRLP(s *rlp.Stream) error {
 	var tendermintExtra struct {
-		Validators        []common.Address
-		ModifiedValidator common.Address
-		Seal              []byte
-		CommittedSeal     [][]byte
+		Seal          []byte
+		CommittedSeal [][]byte
+		ValidatorAdds []byte
 	}
 	if err := s.Decode(&tendermintExtra); err != nil {
 		return err
 	}
-	te.Validators = tendermintExtra.Validators
-	te.ModifiedValidator = tendermintExtra.ModifiedValidator
-	te.Seal, te.CommittedSeal = tendermintExtra.Seal, tendermintExtra.CommittedSeal
+	te.Seal, te.CommittedSeal, te.ValidatorAdds = tendermintExtra.Seal, tendermintExtra.CommittedSeal, tendermintExtra.ValidatorAdds
 	return nil
 }
 
@@ -109,6 +102,7 @@ func TendermintFilteredHeader(h *Header, keepSeal bool) *Header {
 		tendermintExtra.Seal = []byte{}
 	}
 	tendermintExtra.CommittedSeal = [][]byte{}
+	tendermintExtra.ValidatorAdds = []byte{}
 
 	payload, err := rlp.EncodeToBytes(&tendermintExtra)
 	if err != nil {

@@ -26,8 +26,9 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"golang.org/x/crypto/sha3"
+
+	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 )
 
 // Lengths of hashes and addresses in bytes.
@@ -36,8 +37,6 @@ const (
 	HashLength = 32
 	// AddressLength is the expected length of the address
 	AddressLength = 20
-	// MaxProvider is the maximum of provider
-	MaxProvider = 16
 )
 
 var (
@@ -298,7 +297,7 @@ func (a *Address) UnmarshalGraphQL(input interface{}) error {
 }
 
 // InList will return true if list addresses include this address
-func (a *Address) InList(list []*Address) bool {
+func (a Address) InList(list []Address) bool {
 	for _, ad := range list {
 		if a.Hex() == ad.Hex() {
 			return true

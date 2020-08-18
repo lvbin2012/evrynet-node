@@ -27,8 +27,8 @@ const GasPriceConfig = 1000000000
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xd4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3")
-	TestnetGenesisHash = common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d")
+	MainnetGenesisHash = common.HexToHash("0x38b23d699697336cd0d95a550a1d3a1ac7ee7148c4854c93b0464973dcea17b6")
+	TestnetGenesisHash = common.HexToHash("0x802acb813a7194af31bfbf276ecc028b32cdb2a967ade79f8b384dfe40ef1f8c")
 	RinkebyGenesisHash = common.HexToHash("0x6341fd3daf94b748c72ced5a5b26028f2474f5f00d824504e4fa37a75767e177")
 	GoerliGenesisHash  = common.HexToHash("0xbf7e331f7f7c1dd2e05159666b3bf8bc7a8a3a9eb1d518969eab529dd9b88c1a")
 )
@@ -237,8 +237,11 @@ func (c *CliqueConfig) String() string {
 
 // TendermintConfig is the consensus engine configs for IBFT based sealing.
 type TendermintConfig struct {
-	Epoch          uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
-	ProposerPolicy uint64 `json:"policy"` // The policy for proposer selection
+	Epoch            uint64           `json:"epoch"`            // Epoch length to reset votes and checkpoint
+	ProposerPolicy   uint64           `json:"policy"`           // The policy for proposer selection
+	BlockReward      *big.Int         `json:"blockReward"`      // TendermintBlockReward for accumulating reward
+	StakingSCAddress *common.Address  `json:"stakingSCAddress"` // The staking SC address for validating when deploy SC
+	FixedValidators  []common.Address `json:"fixedValidators"`
 }
 
 // String implements the stringer interface, returning the consensus engine details.

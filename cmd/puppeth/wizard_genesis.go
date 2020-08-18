@@ -53,12 +53,12 @@ func (w *wizard) makeGenesis() {
 		Difficulty: big.NewInt(524288),
 		Alloc:      make(core.GenesisAlloc),
 		Config: &params.ChainConfig{
-			HomesteadBlock:      big.NewInt(1),
-			EIP150Block:         big.NewInt(2),
-			EIP155Block:         big.NewInt(3),
-			EIP158Block:         big.NewInt(3),
-			ByzantiumBlock:      big.NewInt(4),
-			ConstantinopleBlock: big.NewInt(5),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
 		},
 	}
 	// Figure out which consensus engine to choose
@@ -113,17 +113,18 @@ func (w *wizard) makeGenesis() {
 			copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
 		}
 	case choice == "" || choice == "3":
-		fmt.Println("How many block (Epoch) after which to checkpoint and reset the pending votes (default 30000)")
-		epoch := uint64(w.readDefaultInt(30000))
-
-		fmt.Println("What is poclicy to select proposer (default 0 - roundrobin)")
+		fmt.Println("What is policy to select proposer (default 0 - roundrobin)")
 		policy := uint64(w.readDefaultInt(0))
-
 		genesis.Config.Tendermint = &params.TendermintConfig{
-			Epoch:          epoch,
 			ProposerPolicy: policy,
 		}
-		// In the case of Tendermint, configure the consensus parameters
+
+		// Query the tendermint block reward
+		fmt.Println()
+		fmt.Println("Specify your tendermint block reward if you want an explicit one (default = 5e+18)")
+		genesis.Config.Tendermint.BlockReward = new(big.Int).Set(w.readDefaultBigInt(big.NewInt(5e+18)))
+
+		// In the case of Tender-mint, configure the consensus parameters
 		genesis.Difficulty = big.NewInt(1)
 
 		// We also need the initial list of validators
@@ -140,9 +141,24 @@ func (w *wizard) makeGenesis() {
 				break
 			}
 		}
-		tendermintExtra := types.TendermintExtra{
-			Validators: validators,
+		tendermintExtra := types.TendermintExtra{}
+
+		fmt.Println()
+		fmt.Println("Do you want to use fixed validators? (default = no)")
+		if w.readDefaultYesNo(false) {
+			genesis.Config.Tendermint.FixedValidators = validators
+		} else if err := w.configStakingSC(genesis, validators); err != nil {
+			log.Error("Failed to config staking SC", "error", err)
+			return
 		}
+
+		// RLP encode validator's address to bytes
+		valSetData, err := rlp.EncodeToBytes(validators)
+		if err != nil {
+			log.Error("rlp encode got error", "error", err)
+			return
+		}
+		tendermintExtra.ValidatorAdds = valSetData
 		extraData, err := rlp.EncodeToBytes(&tendermintExtra)
 		if err != nil {
 			log.Error("rlp encode got error", "error", err)
@@ -172,6 +188,10 @@ func (w *wizard) makeGenesis() {
 		}
 
 		for _, acc := range accs {
+			if _, ok := genesis.Alloc[acc.Address]; ok {
+				fmt.Printf("- Address %s already existed => Ignore\n", acc.Address.Hex())
+				continue
+			}
 			genesis.Alloc[acc.Address] = core.GenesisAccount{
 				Balance: new(big.Int).Lsh(big.NewInt(1), 256-7), // 2^256 / 128 (allow many pre-funds without balance overflows)
 			}
@@ -183,6 +203,10 @@ func (w *wizard) makeGenesis() {
 		for {
 			// Read the address of the account to fund
 			if address := w.readAddress(); address != nil {
+				if _, ok := genesis.Alloc[*address]; ok {
+					fmt.Printf("- Address %s already existed. Please input another one.\n", address.Hex())
+					continue
+				}
 				genesis.Alloc[*address] = core.GenesisAccount{
 					Balance: new(big.Int).Lsh(big.NewInt(1), 256-7), // 2^256 / 128 (allow many pre-funds without balance overflows)
 				}
@@ -191,11 +215,16 @@ func (w *wizard) makeGenesis() {
 			break
 		}
 		fmt.Println()
-		fmt.Println("Should the precompile-addresses (0x1 .. 0xff) be pre-funded with 1 wei? (advisable yes)")
-		if w.readDefaultYesNo(true) {
+		fmt.Println("Should the precompile-addresses (0x1 .. 0xff) be pre-funded with 1 wei? (advisable no)")
+		if w.readDefaultYesNo(false) {
 			// Add a batch of precompile balances to avoid them getting deleted
 			for i := int64(0); i < 256; i++ {
-				genesis.Alloc[common.BigToAddress(big.NewInt(i))] = core.GenesisAccount{Balance: big.NewInt(1)}
+				addr := common.BigToAddress(big.NewInt(i))
+				if _, ok := genesis.Alloc[addr]; ok {
+					fmt.Printf("- Account %d (address: %s) already existed => Ignore\n", i, addr.Hex())
+					continue
+				}
+				genesis.Alloc[addr] = core.GenesisAccount{Balance: big.NewInt(1)}
 			}
 		}
 	}
@@ -204,6 +233,11 @@ func (w *wizard) makeGenesis() {
 	fmt.Println()
 	fmt.Println("Specify your chain/network ID if you want an explicit one (default = random)")
 	genesis.Config.ChainID = new(big.Int).SetUint64(uint64(w.readDefaultInt(rand.Intn(65536))))
+
+	// Query the gas price
+	fmt.Println()
+	fmt.Println("Specify your network gas price if you want an explicit one (default = 1 Gwei)")
+	genesis.Config.GasPrice = new(big.Int).SetUint64(uint64(w.readDefaultInt(params.GasPriceConfig)))
 
 	// All done, store the genesis and flush to disk
 	log.Info("Configured new genesis block")

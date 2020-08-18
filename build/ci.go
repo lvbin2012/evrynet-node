@@ -204,14 +204,25 @@ func goToolArch(arch string, cc string, subcmd string, args ...string) *exec.Cmd
 
 func doTest(cmdline []string) {
 	coverage := flag.Bool("coverage", false, "Whether to record code coverage")
+	full := flag.Bool("full", false, "Whether to run all the tests")
 	integration := flag.Bool("integration", false, "The flag to decide run integration test or not")
 	flag.CommandLine.Parse(cmdline)
 	env := build.Env()
 
-	// TODO: fix all remaining tests so this could be ./...
-	packages := []string{"./consensus/...", "./cmd/...", "./internal/...", "./evrclient/...", "./miner/..."}
-	if *integration {
+	var packages []string
+	switch {
+	case *full:
+		packages = []string{
+			"./accounts/...", "./cmd/...", "./core/...", "./common/...", "./consensus/...", "./crypto/...",
+			"./dashboard/...", "./ethstats/...", "./event/...", "./evr/...", "./evrclient/...", "./evrdb/...",
+			"./graphql/...", "./internal/...", "./les/...", "./light/...", "./log/...",
+			"./metrics/...", "./miner/...", "./mobile/...", "./node/...", "./p2p/...", "./params/...",
+			"./rlp/...", "./rpc/...", "./signer/...", "./trie/...", "./whisper/...",
+		}
+	case *integration:
 		packages = []string{"./tests/provider_logic_test/..."}
+	default:
+		packages = []string{"./consensus/tendermint/...", "./cmd/...", "./internal/...", "./evrclient/...", "./miner/...", "./core/state/staking/..."}
 	}
 	if len(flag.CommandLine.Args()) > 0 {
 		packages = flag.CommandLine.Args()

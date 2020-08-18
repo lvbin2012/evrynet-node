@@ -45,7 +45,7 @@ func TestTendermintBroadcast(t *testing.T) {
 			GasLimit: 1000000000,
 			Number:   big.NewInt(1),
 		}, nil, nil, nil)
-	}))
+	}, nil))
 	pm1, err := NewTestProtocolManagerWithConsensus(tbe1)
 	time.Sleep(2 * time.Second)
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestTendermintBroadcast(t *testing.T) {
 	assert.Equal(t, true, ok)
 
 	payload := []byte("vote message")
-	assert.NoError(t, bc.Broadcast(validatorSet, payload))
+	assert.NoError(t, bc.Broadcast(validatorSet, big.NewInt(0), 0, 0, payload))
 	time.Sleep(2 * time.Second)
 
 	//Making sure that the handlingMsg is done by calling pm.HandleMsg

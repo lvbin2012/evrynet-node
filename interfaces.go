@@ -25,6 +25,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
+	"github.com/Evrynetlabs/evrynet-node/params"
 )
 
 // NotFound is returned by API methods if the requested item does not exist.
@@ -94,6 +95,16 @@ type ChainStateReader interface {
 	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 	CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
+}
+
+// ChainReader defines a small collection of methods needed to access the local blockchain
+type P2PChainReader interface {
+	// Config retrieves the blockchain's chain configuration.
+	Config() *params.ChainConfig
+	//CurrentHeader retrieves the current header from the local chain.
+	CurrentHeader() *types.Header
+	// GetHeaderByNumber retrieves a block header from the database by number.
+	GetHeaderByNumber(number uint64) *types.Header
 }
 
 // SyncProgress gives progress indications when the node is synchronising with

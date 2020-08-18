@@ -80,3 +80,19 @@ func (t PrettyAge) String() string {
 	}
 	return result
 }
+
+// PrettyAddresses is a pretty printed version of a addresses array
+// addresses are separated by comma, if len of array is 0, it will return an "empty" string
+type PrettyAddresses []Address
+
+// String implements the Stringer interface
+func (a PrettyAddresses) String() string {
+	addressesString := ""
+	for _, addr := range a {
+		addressesString += addr.Hex() + ","
+	}
+	if len(addressesString) != 0 {
+		return addressesString[:len(addressesString)-1]
+	}
+	return "empty"
+}

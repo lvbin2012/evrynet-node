@@ -1,150 +1,121 @@
 version: "3"
 services:
-  gev-builder:
-    hostname: gev-builder
-    build:
-      context: ./builder
-    image: $version
-    container_name: gev-builder
-
   gev-bootnode:
     hostname: gev-bootnode
     build:
       context: ./bootnode
-    image: img_bootnode
+    image: $imageTag
     container_name: gev-bootnode
     environment:
       NODE_HEX_KEY: 9dbcbd49f9f4e1b4949178d7e413142267050377ff99d81c08e371cdea712f09
     ports:
-      - 30300:30300
-    networks:
-      chainnet:
-        ipv4_address: 172.25.0.100
+      - 30300:30300/tcp
+      - 30300:30300/udp
+    network_mode: bridge
 
   gev-node-1:
     hostname: gev-node-1
     build:
       context: ./nodes
-    image: img_node_1
+    image: $imageTag
     container_name: gev-node-1
     environment:
       NODE_ID: 1
       NODEKEYHEX: ce900e4057ef7253ce737dccf3979ec4e74a19d595e8cc30c6c5ea92dfdd37f1
       BOOTNODE_ID: aa8d839e6dbe3524e8c0a62aefae7cefa3880f9c7394ddaaa31cc8679fe3a25396e014c5c48814d0fe18d7f03d72a7971fd50b7dd689bd04498d98902dd0d82f
-      BOOTNODE_IP: 172.25.0.100
-      UNLOCK_ACCOUNT: c1d38df8d2342c84faab9623b2d021466fb2844c
-      UNLOCK_PASS: 123
+      BOOTNODE_IP: $bootnodeIP
       RPC_CORSDOMAIN: $rpccorsdomain
     ports:
-      - 22001:8545
-      - 6061:6060
+      - 22001:8545/tcp
+      - 22001:8545/udp
+      - 6061:6060/tcp
+      - 6061:6060/udp
+      - 30301:30303/tcp
+      - 30301:30303/udp
     volumes:
+      - $genesisPath:/node/genesis.json
       - $shareVolumes/node_1/data:/node/data
       - $shareVolumes/node_1/log:/node/log
-    networks:
-      chainnet:
-        ipv4_address: 172.25.0.101
+    network_mode: bridge
 
   gev-node-2:
     hostname: gev-node-2
     build:
       context: ./nodes
-    image: img_node_2
+    image: $imageTag
     container_name: gev-node-2
     environment:
       NODE_ID: 2
       NODEKEYHEX: e74f3525fb69f193b51d33f4baf602c4572d81ede57907c61a62eaf9ed95374a
       BOOTNODE_ID: aa8d839e6dbe3524e8c0a62aefae7cefa3880f9c7394ddaaa31cc8679fe3a25396e014c5c48814d0fe18d7f03d72a7971fd50b7dd689bd04498d98902dd0d82f
-      BOOTNODE_IP: 172.25.0.100
-      UNLOCK_ACCOUNT: 13ba40986098a83520c06028c6a6470de246b92e
-      UNLOCK_PASS: 123
+      BOOTNODE_IP: $bootnodeIP
       RPC_CORSDOMAIN: $rpccorsdomain
     ports:
-      - 22002:8545
-      - 6062:6060
+      - 22002:8545/tcp
+      - 22002:8545/udp
+      - 6062:6060/tcp
+      - 6062:6060/udp
+      - 30302:30303/tcp
+      - 30302:30303/udp
     volumes:
+      - $genesisPath:/node/genesis.json
       - $shareVolumes/node_2/data:/node/data
       - $shareVolumes/node_2/log:/node/log
-    networks:
-      chainnet:
-        ipv4_address: 172.25.0.102
+    network_mode: bridge
 
   gev-node-3:
     hostname: gev-node-3
     build:
       context: ./nodes
-    image: img_node_3
+    image: $imageTag
     container_name: gev-node-3
     environment:
       NODE_ID: 3
       NODEKEYHEX: 276cd299f350174a6005525a523b59fccd4c536771e4876164adb9f1459b79e4
       BOOTNODE_ID: aa8d839e6dbe3524e8c0a62aefae7cefa3880f9c7394ddaaa31cc8679fe3a25396e014c5c48814d0fe18d7f03d72a7971fd50b7dd689bd04498d98902dd0d82f
-      BOOTNODE_IP: 172.25.0.100
-      UNLOCK_ACCOUNT: 521e188b1d0b1be3d38a432dad14bc102a63de0f
-      UNLOCK_PASS: 123
+      BOOTNODE_IP: $bootnodeIP
       RPC_CORSDOMAIN: $rpccorsdomain
       HAS_METRIC: 1
       METRICS_ENDPOINT: http://52.220.52.16:8086 # Only use if HAS_METRIC is 1
       METRICS_USER: test # Only use if HAS_METRIC is 1
       METRICS_PASS: test # Only use if HAS_METRIC is 1
     ports:
-      - 22003:8545
-      - 6063:6060
+      - 22003:8545/tcp
+      - 22003:8545/udp
+      - 6063:6060/tcp
+      - 6063:6060/udp
+      - 30303:30303/tcp
+      - 30303:30303/udp
     volumes:
+      - $genesisPath:/node/genesis.json
       - $shareVolumes/node_3/data:/node/data
       - $shareVolumes/node_3/log:/node/log
-    networks:
-      chainnet:
-        ipv4_address: 172.25.0.103
+    network_mode: bridge
 
-  gev-explorer:
-    hostname: gev-explorer
-    build:
-      context: ./explorer
-    image: img_explorer
+
+  geth-grafana:
+    image: grafana/grafana
+    container_name: geth-grafana
+    restart: always
     ports:
-      - 8080:8080
-    container_name: gev-explorer
+      - 3001:3000
+    volumes:
+      - /var/lib/docker/volumes/grafana-volume/_data:/var/lib/grafana
+    network_mode: bridge
+
+  geth-influxdb:
+    image: influxdb
+    container_name: geth-influxdb
+    restart: always
+    ports:
+      - 8086:8086
     environment:
-      GETH_RPCPORT: $gevRPCPort # Default is 22001
-    networks:
-      chainnet:
-        ipv4_address: 172.25.0.125
-
-#  geth-grafana:
-#    image: grafana/grafana
-#    container_name: geth-grafana
-#    restart: always
-#    ports:
-#      - 3001:3000
-#    networks:
-#      chainnet:
-#        ipv4_address: 172.25.0.169
-#    volumes:
-#      - grafana-volume:/var/lib/grafana
-#
-#  geth-influxdb:
-#    image: influxdb
-#    container_name: geth-influxdb
-#    restart: always
-#    ports:
-#      - 8086:8086
-#    environment:
-#      - INFLUXDB_DB=geth
-#      - INFLUXDB_ADMIN_ENABLED=true
-#      - INFLUXDB_ADMIN_USER=admin
-#      - INFLUXDB_ADMIN_PASSWORD=admin
-#      - INFLUXDB_USER=test
-#      - INFLUXDB_USER_PASSWORD=test
-#    networks:
-#      chainnet:
-#        ipv4_address: 172.25.0.196
-#    volumes:
-#      - influxdb-volume:/var/lib/influxdb
-
-networks:
-  chainnet:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.25.0.0/24
+      - INFLUXDB_DB=geth
+      - INFLUXDB_ADMIN_ENABLED=true
+      - INFLUXDB_ADMIN_USER=admin
+      - INFLUXDB_ADMIN_PASSWORD=admin
+      - INFLUXDB_USER=test
+      - INFLUXDB_USER_PASSWORD=test
+    volumes:
+      - /var/lib/docker/volumes/influxdb-volume/_data:/var/lib/influxdb
+    network_mode: bridge

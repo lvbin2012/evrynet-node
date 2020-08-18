@@ -207,6 +207,28 @@ func (valSet *defaultSet) V() int { return int(math.Ceil(float64(valSet.Size()) 
 // Policy get proposal policy
 func (valSet *defaultSet) Policy() tendermint.ProposerPolicy { return valSet.policy }
 
+// GetNeighbors returns address of neighbor to rebroadcast tendermint message
+func (valSet *defaultSet) GetNeighbors(addr common.Address) map[common.Address]bool {
+	i, _ := valSet.GetByAddress(addr)
+	if i == -1 {
+		return nil
+	}
+
+	var neighbors = make(map[common.Address]bool)
+	for j := 0; j < int(math.Ceil(math.Sqrt(float64(valSet.Size())))); j++ {
+		neighborIndex := i + j + 1
+		if neighborIndex >= valSet.Size() {
+			neighborIndex -= valSet.Size()
+		}
+
+		if neighborIndex == i {
+			continue
+		}
+		neighbors[valSet.GetByIndex(int64(neighborIndex)).Address()] = true
+	}
+	return neighbors
+}
+
 //CalcProposer implement valSet.CalcProposer. Based on the proposer selection scheme,
 //it will set valSet.proposer to the address of the pre-determined round.
 func (valSet *defaultSet) CalcProposer(lastProposer common.Address, roundDiff int64) {

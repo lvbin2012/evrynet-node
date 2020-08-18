@@ -34,19 +34,15 @@ var maxPrice = big.NewInt(500 * params.GWei)
 type Config struct {
 	Blocks     int
 	Percentile int
-	GasPrice   *big.Int
-	Default    *big.Int `toml:",omitempty"`
 }
 
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend   evrapi.Backend
-	gasPrice  *big.Int
-	lastHead  common.Hash
-	lastPrice *big.Int
-	cacheLock sync.RWMutex
-	fetchLock sync.Mutex
+	backend       evrapi.Backend
+	fixedGasPrice *big.Int
+	lastHead      common.Hash
+	fetchLock     sync.Mutex
 
 	checkBlocks, maxEmpty, maxBlocks int
 	percentile                       int
@@ -66,21 +62,18 @@ func NewOracle(backend evrapi.Backend, params Config) *Oracle {
 		percent = 100
 	}
 	return &Oracle{
-		backend:     backend,
-		gasPrice:    params.GasPrice,
-		lastPrice:   params.Default,
-		checkBlocks: blocks,
-		maxEmpty:    blocks / 2,
-		maxBlocks:   blocks * 5,
-		percentile:  percent,
+		backend:       backend,
+		fixedGasPrice: new(big.Int).Set(backend.ChainConfig().GasPrice),
+		checkBlocks:   blocks,
+		maxEmpty:      blocks / 2,
+		maxBlocks:     blocks * 5,
+		percentile:    percent,
 	}
 }
 
 // SuggestPrice returns the recommended gas price.
 func (gpo *Oracle) SuggestPrice(ctx context.Context) (*big.Int, error) {
-	gpo.cacheLock.RLock()
-	defer gpo.cacheLock.RUnlock()
-	return gpo.gasPrice, nil
+	return gpo.fixedGasPrice, nil
 }
 
 type getBlockPricesResult struct {

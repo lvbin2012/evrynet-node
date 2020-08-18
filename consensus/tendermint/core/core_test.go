@@ -201,6 +201,46 @@ func TestCoreFutureMessage(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestCore_Start_NotValidators assures that core does not jump to propose if it is not a validator
+func TestCore_Start_NotValidators(t *testing.T) {
+	t.Parallel()
+	var (
+		nodePrivateKey = tests_utils.MakeNodeKey()
+		validators     = []common.Address{
+			common.HexToAddress("0x11"),
+		}
+	)
+	testCoreStartNewRound(t, nodePrivateKey, validators, RoundStepNewHeight)
+}
+
+// TestCore_Start_Validators assures that core jump to propose if it is a validator
+func TestCore_Start_Validators(t *testing.T) {
+	t.Parallel()
+	var (
+		nodePrivateKey = tests_utils.MakeNodeKey()
+		nodeAddr       = crypto.PubkeyToAddress(nodePrivateKey.PublicKey)
+		validators     = []common.Address{
+			nodeAddr,
+		}
+	)
+	testCoreStartNewRound(t, nodePrivateKey, validators, RoundStepPropose)
+}
+
+func testCoreStartNewRound(t *testing.T, nodePk *ecdsa.PrivateKey, validators []common.Address, expectedStep RoundStepType) {
+	var (
+		genesisHeader = tests_utils.MakeGenesisHeader(validators)
+	)
+	//create New test backend and newMockChain
+	be, _ := tests_utils.MustCreateAndStartNewBackend(t, nodePk, genesisHeader, validators)
+
+	core := newTestCore(be, tendermint.DefaultConfig)
+	require.NoError(t, core.Start())
+	state := core.CurrentState()
+	assert.Equal(t, RoundStepNewHeight, state.Step())
+	time.Sleep(1 * time.Second)
+	assert.Equal(t, expectedStep, core.CurrentState().Step())
+}
+
 func sign(t *testing.T, msg *message, privateKey *ecdsa.PrivateKey) {
 	rawPayLoad, err := msg.PayLoadWithoutSignature()
 	require.NoError(t, err)

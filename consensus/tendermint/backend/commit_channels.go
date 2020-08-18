@@ -19,15 +19,19 @@ func newCommitChannels() *commitChannels {
 	}
 }
 
-func (cc *commitChannels) sendBlock(block *types.Block) {
+func (cc *commitChannels) sendBlock(block *types.Block) bool {
 	cc.mutex.RLock()
 	defer cc.mutex.RUnlock()
 	ch, ok := cc.chs[block.Number().String()]
 	if !ok {
 		log.Error("no commit channel available", "block_number", block.Number().String())
-		return
+		return false
 	}
-	ch <- block
+	select { // allow only 1 block send to the channel
+	case ch <- block:
+	default:
+	}
+	return true
 }
 
 //createCommitChannelAndCloseIfExist creates the channel and if the channel is exist then close it and replace with new one

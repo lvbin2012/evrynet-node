@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
+	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -20,7 +21,11 @@ type MockChainReader struct {
 }
 
 func (c *MockChainReader) Config() *params.ChainConfig {
-	panic("implement me")
+	return &params.ChainConfig{
+		Tendermint: &params.TendermintConfig{
+			Epoch: params.EpochDuration,
+		},
+	}
 }
 
 func (c *MockChainReader) CurrentHeader() *types.Header {
@@ -61,4 +66,50 @@ func (c *MockChainReader) State() (*state.StateDB, error) {
 		*c.Trigger = false
 	}
 	return stdb, nil
+}
+
+//MockChainReader is mock struct for chain reader,
+//it serves basic header for testing purposes
+type headersMockChainReader struct {
+	headers []*types.Header
+}
+
+func (c *headersMockChainReader) Config() *params.ChainConfig {
+	panic("implement me")
+}
+
+func (c *headersMockChainReader) CurrentHeader() *types.Header {
+	return c.headers[len(c.headers)-1]
+}
+
+func (c *headersMockChainReader) GetHeader(hash common.Hash, number uint64) *types.Header {
+	if int(number) > len(c.headers)-1 {
+		return nil
+	}
+	header := c.headers[number]
+	if header.Hash() != hash {
+		return nil
+	}
+	return header
+}
+
+func (c *headersMockChainReader) GetHeaderByNumber(number uint64) *types.Header {
+	if int(number) > len(c.headers)-1 {
+		return nil
+	}
+	return c.headers[number]
+}
+
+func (c *headersMockChainReader) GetHeaderByHash(hash common.Hash) *types.Header {
+	panic("implement me")
+}
+
+func (c *headersMockChainReader) GetBlock(hash common.Hash, number uint64) *types.Block {
+	panic("implement me")
+}
+
+func NewHeadersMockChainReader(headers []*types.Header) consensus.ChainReader {
+	return &headersMockChainReader{
+		headers: headers,
+	}
 }

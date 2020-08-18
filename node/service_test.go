@@ -90,6 +90,7 @@ func TestContextServices(t *testing.T) {
 	if err := stack.Register(NewNoopServiceB); err != nil {
 		t.Fatalf("latter failed to register service: %v", err)
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Start the protocol stack and ensure services are constructed in order
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start stack: %v", err)

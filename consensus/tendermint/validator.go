@@ -73,6 +73,8 @@ type ValidatorSet interface {
 	GetProposer() Validator
 	// Height return block height when valSet is init
 	Height() int64
+	// GetNeighbors returns address of neighbor to rebroadcast tendermint message
+	GetNeighbors(addr common.Address) map[common.Address]bool
 }
 
 // ----------------------------------------------------------------------------

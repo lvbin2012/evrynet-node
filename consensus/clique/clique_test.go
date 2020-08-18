@@ -36,6 +36,10 @@ import (
 // already in the database. The bug was that processing the block *prior* to an
 // empty one **also completes** the empty one, ending up in a known-block error.
 func TestReimportMirroredState(t *testing.T) {
+	const (
+		// the random number to initialize the balance of an addr.
+		randomNumberForBalance = 100000000
+	)
 	// Initialize a Clique chain with a single signer
 	var (
 		db     = rawdb.NewMemoryDatabase()
@@ -47,7 +51,7 @@ func TestReimportMirroredState(t *testing.T) {
 	genspec := &core.Genesis{
 		ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),
 		Alloc: map[common.Address]core.GenesisAccount{
-			addr: {Balance: big.NewInt(1)},
+			addr: {Balance: new(big.Int).Mul(big.NewInt(randomNumberForBalance), big.NewInt(params.GasPriceConfig))},
 		},
 	}
 	copy(genspec.ExtraData[extraVanity:], addr[:])
@@ -65,7 +69,7 @@ func TestReimportMirroredState(t *testing.T) {
 		// We want to simulate an empty middle block, having the same state as the
 		// first one. The last is needs a state change again to force a reorg.
 		if i != 1 {
-			tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr), common.Address{0x00}, new(big.Int), params.TxGas, nil, nil), signer, key)
+			tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr), common.Address{0x00}, new(big.Int), params.TxGas, big.NewInt(params.GasPriceConfig), nil), signer, key)
 			if err != nil {
 				panic(err)
 			}

@@ -18,6 +18,7 @@ package state
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -53,8 +54,9 @@ func (s *StateSuite) TestDump(c *checker.C) {
 
 	// check that dump contains the state objects that are in trie
 	got := string(s.state.Dump())
+	fmt.Println("got:", string(got))
 	want := `{
-    "root": "71edff0130dd2385947095001c73d9e28d862fc286fca2b922ca6f6f3cddfdd2",
+    "root": "1103869981eb5dc4c85bc37b2cdea2b16570a09501a97575cbba140b9b86e3f3",
     "accounts": {
         "0000000000000000000000000000000000000001": {
             "balance": "22",

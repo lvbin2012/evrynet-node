@@ -22,6 +22,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
+	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enode"
 	"github.com/Evrynetlabs/evrynet-node/p2p/netutil"
@@ -68,6 +70,7 @@ func (t TCPDialer) Dial(dest *enode.Node) (net.Conn, error) {
 // It gets a chance to compute new tasks on every iteration
 // of the main loop in Server.run.
 type dialstate struct {
+	nodeAddress common.Address
 	maxDynDials int
 	ntab        discoverTable
 	netrestrict *netutil.Netlist
@@ -89,6 +92,7 @@ type discoverTable interface {
 	Resolve(*enode.Node) *enode.Node
 	LookupRandom() []*enode.Node
 	ReadRandomNodes([]*enode.Node) int
+	ReadDiscoveredNodes(map[common.Address]*enode.Node) int
 }
 
 type task interface {
@@ -119,6 +123,7 @@ type waitExpireTask struct {
 
 func newDialState(self enode.ID, ntab discoverTable, maxdyn int, cfg *Config) *dialstate {
 	s := &dialstate{
+		nodeAddress: crypto.PubkeyToAddress(cfg.PrivateKey.PublicKey),
 		maxDynDials: maxdyn,
 		ntab:        ntab,
 		self:        self,
@@ -150,7 +155,7 @@ func (s *dialstate) removeStatic(n *enode.Node) {
 	delete(s.static, n.ID())
 }
 
-func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, now time.Time) []task {
+func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, validatorAddrs map[common.Address]struct{}, now time.Time) []task {
 	if s.start.IsZero() {
 		s.start = now
 	}
@@ -194,6 +199,7 @@ func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, now time.Ti
 			newtasks = append(newtasks, t)
 		}
 	}
+
 	// If we don't have any peers whatsoever, try to dial a random bootnode. This
 	// scenario is useful for the testnet (and private networks) where the discovery
 	// table might be full of mostly bad peers, making it hard to find good ones.
@@ -240,6 +246,49 @@ func (s *dialstate) newTasks(nRunning int, peers map[enode.ID]*Peer, now time.Ti
 		t := &waitExpireTask{s.hist.nextExpiry().Sub(now)}
 		newtasks = append(newtasks, t)
 	}
+
+	// If discover table has validator node without adding, creating dyndial task
+	if _, ok := validatorAddrs[s.nodeAddress]; ok && s.ntab != nil {
+		var (
+			missingValPeers []common.Address
+			discoveredPeers = make(map[common.Address]*enode.Node)
+		)
+		if s.ntab.ReadDiscoveredNodes(discoveredPeers) == 0 {
+			return newtasks
+		}
+
+		// Find missing validators didn't connect
+		for valAddr, _ := range validatorAddrs {
+			// Don't check if current node address belongs to validatorAddrs
+			if valAddr.Hex() != s.nodeAddress.Hex() {
+				connectedValPeer := false
+				for _, peer := range peers {
+					if valAddr.Hex() == peer.Address().Hex() {
+						connectedValPeer = true
+						break
+					}
+				}
+				if !connectedValPeer {
+					missingValPeers = append(missingValPeers, valAddr)
+				}
+			}
+		}
+
+		// Create dial task for missing validator nodes
+		for _, missingValAddr := range missingValPeers {
+			if peer, ok := discoveredPeers[missingValAddr]; ok {
+				s.log.Debug("Create dial task for missing validator nodes", "nodeAddress", peer.Address().Hex())
+				t := &dialTask{flags: dynDialedConn, dest: peer}
+				if err := s.checkDial(t.dest, peers); err != nil {
+					s.log.Warn("Check dial task failed", "id", t.dest.ID, "addr", &net.TCPAddr{IP: t.dest.IP(), Port: t.dest.TCP()}, "err", err)
+				} else {
+					s.dialing[peer.ID()] = t.flags
+					newtasks = append(newtasks, t)
+				}
+			}
+		}
+	}
+
 	return newtasks
 }
 

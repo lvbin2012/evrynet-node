@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/pkg/errors"
+
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/misc"
@@ -190,7 +192,19 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		config = params.TestChainConfig
 	}
 	blocks, receipts := make(types.Blocks, n), make([]types.Receipts, n)
-	chainreader := &fakeChainReader{config: config}
+	statedb, err := state.New(parent.Root(), state.NewDatabase(db))
+	if err != nil {
+		panic(err)
+	}
+	chainreader := &fakeChainReader{
+		config: config,
+		blocksByNumber: map[uint64]*types.Block{
+			parent.NumberU64(): parent,
+		},
+		stateByHash: map[common.Hash]*state.StateDB{
+			parent.Root(): statedb,
+		},
+	}
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
 		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
 		b.header = makeHeader(chainreader, parent, statedb, b.engine)
@@ -213,7 +227,10 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 		}
 		if b.engine != nil {
 			// Finalize and seal the block
-			block, _ := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts)
+			block, err := b.engine.FinalizeAndAssemble(chainreader, b.header, statedb, b.txs, b.uncles, b.receipts)
+			if err != nil {
+				panic(fmt.Sprintf("FinalizeAndAssemble error: %v", err))
+			}
 
 			// Write state changes to db
 			root, err := statedb.Commit(config.IsEIP158(b.header.Number))
@@ -223,6 +240,8 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 			if err := statedb.Database().TrieDB().Commit(root, false); err != nil {
 				panic(fmt.Sprintf("trie write error: %v", err))
 			}
+			chainreader.blocksByNumber[block.NumberU64()] = block
+			chainreader.stateByHash[statedb.IntermediateRoot(true)] = statedb
 			return block, b.receipts
 		}
 		return nil, nil
@@ -283,8 +302,18 @@ func makeBlockChain(parent *types.Block, n int, engine consensus.Engine, db evrd
 }
 
 type fakeChainReader struct {
-	config  *params.ChainConfig
-	genesis *types.Block
+	config         *params.ChainConfig
+	genesis        *types.Block
+	blocksByNumber map[uint64]*types.Block
+	stateByHash    map[common.Hash]*state.StateDB
+}
+
+func (cr *fakeChainReader) StateAt(hash common.Hash) (*state.StateDB, error) {
+	if state, ok := cr.stateByHash[hash]; !ok {
+		return nil, errors.New("state not found")
+	} else {
+		return state, nil
+	}
 }
 
 // Config returns the chain configuration.
@@ -292,8 +321,13 @@ func (cr *fakeChainReader) Config() *params.ChainConfig {
 	return cr.config
 }
 
-func (cr *fakeChainReader) CurrentHeader() *types.Header                            { return nil }
-func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header           { return nil }
+func (cr *fakeChainReader) CurrentHeader() *types.Header { return nil }
+func (cr *fakeChainReader) GetHeaderByNumber(number uint64) *types.Header {
+	if blk, ok := cr.blocksByNumber[number]; ok {
+		return blk.Header()
+	}
+	return nil
+}
 func (cr *fakeChainReader) GetHeaderByHash(hash common.Hash) *types.Header          { return nil }
 func (cr *fakeChainReader) GetHeader(hash common.Hash, number uint64) *types.Header { return nil }
 func (cr *fakeChainReader) GetBlock(hash common.Hash, number uint64) *types.Block   { return nil }

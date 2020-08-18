@@ -1,3 +1,7 @@
 [submodule "tests"]
 	path = tests/testdata
 	url = https://github.com/ethereum/tests
+[submodule "consensus/staking_contracts/staking-contract"]
+	path = consensus/staking_contracts/staking-contract
+	url = git@github.com:Evrynetlabs/staking-contract.git
+	branch = develop

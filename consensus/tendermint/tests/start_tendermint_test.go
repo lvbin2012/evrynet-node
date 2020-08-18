@@ -92,7 +92,7 @@ func TestStartingTendermint(t *testing.T) {
 		}(p)
 	}
 	assert.NoError(t, err)
-	assert.NoError(t, tbe1.Start(nil, nil))
+	assert.NoError(t, tbe1.Start(nil, nil, nil))
 
 	be, ok := tbe1.(tendermint.Backend)
 	assert.Equal(t, true, ok)

@@ -34,17 +34,17 @@ import (
 func TestDefaultGenesisBlock(t *testing.T) {
 	block := DefaultGenesisBlock().ToBlock(nil)
 	if block.Hash() != params.MainnetGenesisHash {
-		t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash(), params.MainnetGenesisHash)
+		t.Errorf("wrong mainnet genesis hash, got %v, want %v", block.Hash().Hex(), params.MainnetGenesisHash.Hex())
 	}
 	block = DefaultTestnetGenesisBlock().ToBlock(nil)
 	if block.Hash() != params.TestnetGenesisHash {
-		t.Errorf("wrong testnet genesis hash, got %v, want %v", block.Hash(), params.TestnetGenesisHash)
+		t.Errorf("wrong testnet genesis hash, got %v, want %v", block.Hash().Hex(), params.TestnetGenesisHash.Hex())
 	}
 }
 
 func TestSetupGenesis(t *testing.T) {
 	var (
-		customghash = common.HexToHash("0x89c99d90b79719238d2645c7642f2c9295246e80775b38cfd162b696817fbd50")
+		customghash = common.HexToHash("0x9079ce192cd7b41d97af1b246eb371ef45f1d934cc43504f5a0787f6b3cdc0ba")
 		customg     = Genesis{
 			Config: &params.ChainConfig{HomesteadBlock: big.NewInt(3)},
 			Alloc: GenesisAlloc{

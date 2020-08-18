@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enode"
@@ -301,6 +302,11 @@ func (t *UDPv4) Close() {
 // ReadRandomNodes reads random nodes from the local table.
 func (t *UDPv4) ReadRandomNodes(buf []*enode.Node) int {
 	return t.tab.ReadRandomNodes(buf)
+}
+
+// ReadDiscoveredNodes reads all discovered nodes from the local table.
+func (t *UDPv4) ReadDiscoveredNodes(buf map[common.Address]*enode.Node) int {
+	return t.tab.ReadDiscoveredNodes(buf)
 }
 
 // LookupRandom finds random nodes in the network.

@@ -1,7 +1,7 @@
 {
   "config": {
     "chainId": 15,
-    "gasPrice": null,
+    "gasPrice": 1000000000,
     "homesteadBlock": 1,
     "eip150Block": 2,
     "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -11,12 +11,17 @@
     "constantinopleBlock": 5,
     "tendermint": {
       "epoch": 2000,
-      "policy": 0
+      "policy": 0,
+      "blockReward": 5000000000000000000,
+      "fixedValidators": [
+        "0x560089aB68dc224b250f9588b3DB540D87A66b7a"
+      ],
+      "stakingSCAddress": null
     }
   },
   "nonce": "0x0",
   "timestamp": "0x5d774897",
-  "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000edd594560089ab68dc224b250f9588b3db540d87a66b7a94000000000000000000000000000000000000000080c0",
+  "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000d980c096d594560089ab68dc224b250f9588b3db540d87a66b7a",
   "gasLimit": "0x47b760",
   "difficulty": "0x1",
   "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",

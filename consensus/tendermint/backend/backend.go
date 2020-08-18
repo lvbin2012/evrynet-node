@@ -4,14 +4,18 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	queue "github.com/enriquebris/goconcurrentqueue"
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/pkg/errors"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
+	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/backend/fixed_valset_info"
+	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/backend/staking"
 	tendermintCore "github.com/Evrynetlabs/evrynet-node/consensus/tendermint/core"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
@@ -28,6 +32,8 @@ const (
 	maxBroadcastSleepTime        = time.Minute * 5
 	initialBroadcastSleepTime    = time.Millisecond * 100
 	broadcastSleepTimeIncreament = time.Millisecond * 100
+	inMemoryValset               = 10
+	inMemoryProposer             = 100
 )
 
 var (
@@ -38,29 +44,34 @@ var (
 //Option return an optional function for backend's initial behaviour
 type Option func(b *Backend) error
 
-//WithDB return an option to set backend's db
-func WithDB(db evrdb.Database) Option {
-	return func(b *Backend) error {
-		b.db = db
-		return nil
-	}
-}
-
 // New creates an backend for Istanbul core engine.
 // The p2p communication, i.e, broadcaster is set separately by calling backend.SetBroadcaster
 func New(config *tendermint.Config, privateKey *ecdsa.PrivateKey, opts ...Option) consensus.Tendermint {
+	valSetCache, _ := lru.NewARC(inMemoryValset)
+	proposerCache, _ := lru.NewARC(inMemoryProposer)
 	be := &Backend{
-		config:               config,
-		tendermintEventMux:   new(event.TypeMux),
-		privateKey:           privateKey,
-		address:              crypto.PubkeyToAddress(privateKey.PublicKey),
-		commitChs:            newCommitChannels(),
-		mutex:                &sync.RWMutex{},
-		storingMsgs:          queue.NewFIFO(),
-		proposedValidator:    newProposedValidator(),
-		dequeueMsgTriggering: make(chan struct{}, maxTrigger),
-		broadcastCh:          make(chan broadcastTask),
-		controlChan:          make(chan struct{}),
+		config:                     config,
+		tendermintEventMux:         new(event.TypeMux),
+		privateKey:                 privateKey,
+		address:                    crypto.PubkeyToAddress(privateKey.PublicKey),
+		commitChs:                  newCommitChannels(),
+		mutex:                      &sync.RWMutex{},
+		storingMsgs:                queue.NewFIFO(),
+		dequeueMsgTriggering:       make(chan struct{}, maxTrigger),
+		closingBackgroundThreadsCh: make(chan struct{}),
+		controlChan:                make(chan struct{}),
+		computedValSetCache:        valSetCache,
+		blockProposerCache:         proposerCache,
+	}
+
+	if config.FixedValidators != nil && len(config.FixedValidators) > 0 {
+		be.valSetInfo = fixed_valset_info.NewFixedValidatorSetInfo(config.FixedValidators)
+	} else {
+		be.valSetInfo = staking.NewStakingValidatorInfo(config.Epoch, config.ProposerPolicy)
+		if config.StakingSCAddress == nil {
+			panic("nil staking address")
+		}
+		be.stakingContractAddr = *config.StakingSCAddress
 	}
 	be.core = tendermintCore.New(be, config)
 
@@ -93,20 +104,25 @@ type Backend struct {
 	//it is a map of blocknumber- channels with mutex
 	commitChs *commitChannels
 
-	coreStarted bool
-	mutex       *sync.RWMutex
-	chain       consensus.ChainReader
-	controlChan chan struct{}
+	coreStarted                bool
+	mutex                      *sync.RWMutex
+	chain                      consensus.FullChainReader
+	controlChan                chan struct{}
+	closingBackgroundThreadsCh chan struct{}
 
 	//storingMsgs is used to store msg to handler when core stopped
 	storingMsgs          *queue.FIFO
 	dequeueMsgTriggering chan struct{}
 
 	currentBlock func() *types.Block
+	//verifyAndSubmitBlock to send the proposal block to miner
+	verifyAndSubmitBlock func(*types.Block) error
 
-	proposedValidator *ProposalValidator
+	valSetInfo          ValidatorSetInfo
+	stakingContractAddr common.Address // stakingContractAddr stores the address of staking smart-contract
+	computedValSetCache *lru.ARCCache  // computedValSetCache stores the valset is computed from stateDB
 
-	broadcastCh chan broadcastTask
+	blockProposerCache *lru.ARCCache // blockProposerCache stores the address of proposal block
 }
 
 // EventMux implements tendermint.Backend.EventMux
@@ -127,16 +143,14 @@ func (sb *Backend) Address() common.Address {
 
 // Broadcast implements tendermint.Backend.Broadcast
 // It sends message to its validator by calling gossiping, and send message to itself by eventMux
-func (sb *Backend) Broadcast(valSet tendermint.ValidatorSet, blockNumber *big.Int, payload []byte) error {
+func (sb *Backend) Broadcast(valSet tendermint.ValidatorSet, blockNumber *big.Int, round int64, msgType uint64, payload []byte) error {
 	// send to others
-	if err := sb.Gossip(valSet, blockNumber, payload); err != nil {
+	if err := sb.Gossip(valSet, blockNumber, round, msgType, payload); err != nil {
 		return err
 	}
 	// send to self
 	go func() {
-		if err := sb.EventMux().Post(tendermint.MessageEvent{
-			Payload: payload,
-		}); err != nil {
+		if err := sb.checkAndSendMsg(payload); err != nil {
 			log.Error("failed to post event to self", "error", err)
 		}
 	}()
@@ -149,15 +163,15 @@ type broadcastTask struct {
 	TotalPeers  int
 	Targets     map[common.Address]bool
 	BlockNumber *big.Int
+	Round       int64
+	MsgType     uint64
 }
 
 // Gossip implements tendermint.Backend.Gossip
 // It sends message to its validators only, not itself.
 // The validators must be able to connected through Peer.
 // It will return backend.ErrNoBroadcaster if no broadcaster is set for backend
-func (sb *Backend) Gossip(valSet tendermint.ValidatorSet, blockNumber *big.Int, payload []byte) error {
-	//TODO: check for known message by lru.ARCCache
-
+func (sb *Backend) Gossip(valSet tendermint.ValidatorSet, blockNumber *big.Int, round int64, msgType uint64, payload []byte) error {
 	targets := make(map[common.Address]bool)
 
 	for _, val := range valSet.List() {
@@ -175,85 +189,94 @@ func (sb *Backend) Gossip(valSet tendermint.ValidatorSet, blockNumber *big.Int, 
 			Targets:     targets,
 			TotalPeers:  len(targets),
 			BlockNumber: blockNumber,
+			Round:       round,
+			MsgType:     msgType,
 		}
-		go func() {
-			sb.broadcastCh <- task
-		}()
+		go sb.gossip(task)
 	}
 	return nil
 }
 
-func (sb *Backend) gossipLoop() {
+func (sb *Backend) gossip(task broadcastTask) {
 	var (
-		task        broadcastTask
+		timeSleep   = initialBroadcastSleepTime
+		successSent = 0
+		mu          sync.Mutex
+
 		finalEvtSub = sb.EventMux().Subscribe(tendermint.FinalCommittedEvent{})
 		stopEvtSub  = sb.EventMux().Subscribe(tendermint.StopCoreEvent{})
+		abort       = make(chan struct{})
 	)
 	defer func() {
 		finalEvtSub.Unsubscribe()
 		stopEvtSub.Unsubscribe()
 	}()
+	// close abort go routine if new block or core.abort()
+	go func() {
+		for {
+			select {
+			case finalEvt, ok := <-finalEvtSub.Chan():
+				if !ok {
+					return
+				}
+				finalizedBlock := finalEvt.Data.(tendermint.FinalCommittedEvent).BlockNumber
+				if finalizedBlock.Cmp(task.BlockNumber) >= 0 {
+					log.Info("cancel broadcast task because of final event", "task_block", task.BlockNumber, "finalized_block", finalizedBlock)
+					close(abort)
+					return
+				}
+			case _ = <-stopEvtSub.Chan():
+				log.Info("cancel broadcast task because core is stopped")
+				close(abort)
+				return
+			}
+		}
+	}()
 	for {
+		ps := sb.broadcaster.FindPeers(task.Targets)
+		log.Info("find peers", "found_peers", len(ps),
+			"block", task.BlockNumber, "round", task.Round, "msg_type", task.MsgType)
+		done := make(chan struct{})
+		var wg sync.WaitGroup
+		for addr, p := range ps {
+			wg.Add(1)
+			go func(p consensus.Peer, addr common.Address) {
+				defer wg.Done()
+				if err := p.Send(consensus.TendermintMsg, task.Payload); err != nil {
+					log.Error("failed to send message to peer", "error", err, "addr", addr,
+						"block", task.BlockNumber, "round", task.Round, "msg_type", task.MsgType)
+					return
+				}
+				mu.Lock()
+				delete(task.Targets, addr)
+				successSent += 1
+				mu.Unlock()
+			}(p, addr)
+		}
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
 		select {
-		case task = <-sb.broadcastCh:
-		case <-finalEvtSub.Chan():
-			continue // we skip finalEvtSub to avoid block the go routine send finalEvt to backend.EventMux()
-		case <-stopEvtSub.Chan():
-			log.Info("cancel broadcast task because core is stopped")
+		case <-done:
+			log.Info("gossip to peers", "found_peers", len(ps), "min", task.MinPeers, "success", successSent,
+				"block", task.BlockNumber, "round", task.Round, "msg_type", task.MsgType)
+			if successSent >= task.MinPeers {
+				return
+			}
+		case _ = <-abort:
 			return
 		}
-
-		var (
-			timeSleep   = initialBroadcastSleepTime
-			successSent = 0
-			mu          sync.Mutex
-		)
-
-	taskLoop:
-		for {
-			ps := sb.broadcaster.FindPeers(task.Targets)
-			log.Info("find peers", "len", len(ps), "min", task.MinPeers, "success", successSent)
-
-			var wg sync.WaitGroup
-			for addr, p := range ps {
-				wg.Add(1)
-				//TODO: check for recent messsages using lru.ARCCache
-				go func(p consensus.Peer, addr common.Address) {
-					defer wg.Done()
-					if err := p.Send(consensus.TendermintMsg, task.Payload); err != nil {
-						log.Error("failed to send message to peer", "error", err)
-						return
-					}
-					mu.Lock()
-					delete(task.Targets, addr)
-					successSent += 1
-					mu.Unlock()
-				}(p, addr)
-			}
-			wg.Wait()
-
-			if successSent < task.MinPeers {
-				log.Info("failed to sent to peer, sleeping", "min", task.MinPeers, "success", successSent,
-					"time_sleep", timeSleep)
-				// sleep and retries until success or core stop or new block event
-				select {
-				case finalEvt := <-finalEvtSub.Chan():
-					if finalEvt.Data.(tendermint.FinalCommittedEvent).BlockNumber.Cmp(task.BlockNumber) >= 0 {
-						log.Info("cancel broadcast task because of final event")
-						break taskLoop
-					}
-				case <-stopEvtSub.Chan():
-					log.Info("cancel broadcast task because core is stopped")
-					return
-				case <-time.After(timeSleep):
-					// increase timeSleep 100ms after each epoch until timeSleep >= maxBroadcastSleepTime
-					if timeSleep < maxBroadcastSleepTime {
-						timeSleep += broadcastSleepTimeIncreament
-					}
-				}
-				continue taskLoop
-			}
-			break taskLoop
+		// sleep and retries until success or core abort or new block event
+		log.Info("failed to sent to peer, sleeping", "time_sleep", timeSleep)
+		select {
+		case <-time.After(timeSleep):
+		case _ = <-abort:
+			return
+		}
+		// increase timeSleep 100ms after each epoch until timeSleep >= maxBroadcastSleepTime
+		if timeSleep < maxBroadcastSleepTime {
+			timeSleep += broadcastSleepTimeIncreament
 		}
 	}
 }
@@ -269,17 +292,23 @@ func (sb *Backend) Multicast(targets map[common.Address]bool, payload []byte) er
 		return nil
 	}
 	var (
-		failed   = 0
-		ps       = sb.broadcaster.FindPeers(targets)
-		notFound = len(targets) - len(ps)
+		failed   int64 = 0
+		ps             = sb.broadcaster.FindPeers(targets)
+		notFound       = len(targets) - len(ps)
 	)
 	log.Trace("multicast", "targets", len(targets), "found", len(ps))
-	for addr, peer := range ps {
-		if err := peer.Send(consensus.TendermintMsg, payload); err != nil {
-			failed++
-			log.Debug("failed to send when multicast", "err", err, "addr", addr)
-		}
+	var wg sync.WaitGroup
+	for a, p := range ps {
+		wg.Add(1)
+		go func(addr common.Address, peer consensus.Peer) {
+			defer wg.Done()
+			if err := peer.Send(consensus.TendermintMsg, payload); err != nil {
+				atomic.AddInt64(&failed, 1)
+				log.Debug("failed to send when multicast", "err", err, "addr", addr)
+			}
+		}(a, p)
 	}
+	wg.Wait()
 	if failed != 0 || notFound != 0 {
 		return errors.Errorf("failed to multicast: failed to send %d address, not found %d address", failed, notFound)
 	}
@@ -287,9 +316,12 @@ func (sb *Backend) Multicast(targets map[common.Address]bool, payload []byte) er
 }
 
 // Validators return validator set for a block number
-// TODO: revise this function once auth vote is implemented
 func (sb *Backend) Validators(blockNumber *big.Int) tendermint.ValidatorSet {
-	return sb.getValSet(sb.chain, blockNumber)
+	valSet, err := sb.valSetInfo.GetValSet(sb.chain, blockNumber)
+	if err != nil {
+		log.Error("failed to get validator set", "error", err, "block", blockNumber.Int64())
+	}
+	return valSet
 }
 
 // FindExistingPeers check validator peers exist or not by address
@@ -305,22 +337,15 @@ func (sb *Backend) FindExistingPeers(valSet tendermint.ValidatorSet) map[common.
 
 //Commit implement tendermint.Backend.Commit()
 func (sb *Backend) Commit(block *types.Block) {
-	sb.commitChs.sendBlock(block)
-	// if node is not proposer, EnqueueBlock for downloading
-	if block.Coinbase() != sb.address {
-		sb.EnqueueBlock(block)
+	isSent := sb.commitChs.sendBlock(block)
+	// if don't have committed channel to sent, then enqueue for downloading
+	if !isSent {
+		sb.broadcaster.Enqueue(fetcherID, block)
 	}
 }
 
 func (sb *Backend) Cancel(block *types.Block) {
-	sb.commitChs.sendBlock(block)
-}
-
-// EnqueueBlock adds a block returned from consensus into fetcher queue
-func (sb *Backend) EnqueueBlock(block *types.Block) {
-	if sb.broadcaster != nil {
-		sb.broadcaster.Enqueue(fetcherID, block)
-	}
+	sb.commitChs.closeAndRemoveCommitChannel(block.Number().String())
 }
 
 func (sb *Backend) CurrentHeadBlock() *types.Block {
@@ -329,5 +354,26 @@ func (sb *Backend) CurrentHeadBlock() *types.Block {
 
 // ValidatorsByChainReader returns val-set from snapshot
 func (sb *Backend) ValidatorsByChainReader(blockNumber *big.Int, chain consensus.ChainReader) tendermint.ValidatorSet {
-	return sb.getValSet(chain, blockNumber)
+	valSet, err := sb.valSetInfo.GetValSet(chain, blockNumber)
+	if err != nil {
+		log.Error("failed to get validator set", "error", err, "block", blockNumber.Int64())
+	}
+	return valSet
+}
+
+// VerifyProposalBlock verify post-processor state of proposal block (txs, Root, receipt).
+// If success, the result will be send to the pending tasks of miner
+func (sb *Backend) VerifyProposalBlock(block *types.Block) error {
+	//if block from this node, there is no need to verify state
+	if block.Coinbase() == sb.Address() {
+		return nil
+	}
+	//verify txs, stateRoot and receipt
+	if sb.verifyAndSubmitBlock == nil {
+		return errors.New("no verify block hook")
+	}
+	if err := sb.verifyAndSubmitBlock(block); err != nil {
+		return err
+	}
+	return nil
 }

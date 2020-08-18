@@ -26,6 +26,24 @@ func TestValidatorSet(t *testing.T) {
 	testMajorityFormulation(t)
 }
 
+func TestDefaultSet_GetNeighbor(t *testing.T) {
+	var (
+		addresses = []common.Address{
+			common.HexToAddress("0x0"),
+			common.HexToAddress("0x1"),
+			common.HexToAddress("0x2"),
+			common.HexToAddress("0x3"),
+		}
+		valSet      = newDefaultSet(addresses, tendermint.RoundRobin, 0)
+		neighbors   = valSet.GetNeighbors(addresses[0])
+		expectedLen = 2
+	)
+
+	require.Equal(t, expectedLen, len(neighbors))
+	require.True(t, neighbors[addresses[1]])
+	require.True(t, neighbors[addresses[2]])
+}
+
 func testMajorityFormulation(t *testing.T) {
 	var expectedMajority = map[int]int{
 		1: 1, 2: 2, 3: 3, 4: 3, 5: 4, 6: 5, 7: 5,

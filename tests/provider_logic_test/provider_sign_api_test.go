@@ -55,7 +55,7 @@ func prepareNewContract(hasProvider bool) *common.Address {
 	var (
 		tx           *types.Transaction
 		providerAddr = common.HexToAddress(providerAddrStr)
-		ownerAddr    = common.HexToAddress(senderAddrStr)
+		ownerAddr    = common.HexToAddress(ownerAddrStr)
 		sender       = common.HexToAddress(senderAddrStr)
 	)
 

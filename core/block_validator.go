@@ -64,6 +64,12 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	if hash := types.DeriveSha(block.Transactions()); hash != header.TxHash {
 		return fmt.Errorf("transaction root hash mismatch: have %x, want %x", hash, header.TxHash)
 	}
+
+	for _, tx := range block.Transactions() {
+		if tx.GasPrice().Cmp(v.config.GasPrice) != 0 {
+			return fmt.Errorf("transaction gas price and chainConfig gas price mismatch: has %s want %s", tx.GasPrice(), v.config.GasPrice)
+		}
+	}
 	if !v.bc.HasBlockAndState(block.ParentHash(), block.NumberU64()-1) {
 		if !v.bc.HasBlock(block.ParentHash(), block.NumberU64()-1) {
 			return consensus.ErrUnknownAncestor

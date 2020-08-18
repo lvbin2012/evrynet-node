@@ -21,7 +21,9 @@ func NewFlusher(s syncer) func() {
 // NewLogger creates a new logger instance from cli.Context
 // TODO: define Logger depend on flag
 func NewLogger(_ *cli.Context) (*zap.Logger, error) {
-	return zap.NewDevelopment()
+	cfg := zap.NewDevelopmentConfig()
+	cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
+	return cfg.Build(zap.AddStacktrace(zap.ErrorLevel))
 }
 
 // NewSugaredLogger creates a new sugared logger and a flush function. The flush function should be

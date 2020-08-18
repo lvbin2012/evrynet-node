@@ -188,6 +188,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.NoDiscoverFlag,
 			utils.DiscoveryV5Flag,
 			utils.NetrestrictFlag,
+			utils.NodeKeyFromKeystoreFlag,
 			utils.NodeKeyFileFlag,
 			utils.NodeKeyHexFlag,
 		},
@@ -198,7 +199,6 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MiningEnabledFlag,
 			utils.MinerThreadsFlag,
 			utils.MinerNotifyFlag,
-			utils.MinerGasPriceFlag,
 			utils.MinerGasTargetFlag,
 			utils.MinerGasLimitFlag,
 			utils.MinerEtherbaseFlag,
@@ -242,7 +242,6 @@ var AppHelpFlagGroups = []flagGroup{
 		Flags: []cli.Flag{
 			utils.MinerLegacyThreadsFlag,
 			utils.MinerLegacyGasTargetFlag,
-			utils.MinerLegacyGasPriceFlag,
 			utils.MinerLegacyEtherbaseFlag,
 			utils.MinerLegacyExtraDataFlag,
 		},
@@ -259,6 +258,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.TendermintTimeoutPrecommitDeltaFlag,
 			utils.TendermintTimeoutCommitFlag,
 			utils.TendermintFaultyModeFlag,
+			utils.TendermintSCUseEVMCallerFlag,
 		},
 	},
 	{

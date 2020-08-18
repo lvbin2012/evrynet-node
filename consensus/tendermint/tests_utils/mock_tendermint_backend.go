@@ -1,23 +1,21 @@
 package tests_utils
 
 import (
-	"testing"
-
-	"github.com/Evrynetlabs/evrynet-node/core"
-	"github.com/Evrynetlabs/evrynet-node/params"
-
 	"crypto/ecdsa"
 	"math/big"
 	"sync"
+	"testing"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/validator"
+	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/event"
 	"github.com/Evrynetlabs/evrynet-node/log"
+	"github.com/Evrynetlabs/evrynet-node/params"
 )
 
 type MockBackend struct {
@@ -63,6 +61,19 @@ func (mb *MockBackend) VerifyProposalHeader(header *types.Header) error {
 	return nil
 }
 
+func (mb *MockBackend) VerifyProposalBlock(block *types.Block) error {
+	var (
+		txs     = block.Transactions()
+		txsHash = types.DeriveSha(txs)
+	)
+
+	// Verify txs hash
+	if txsHash != block.Header().TxHash {
+		return tendermint.ErrMismatchTxhashes
+	}
+	return nil
+}
+
 // EventMux implements tendermint.Backend.EventMux
 func (mb *MockBackend) EventMux() *event.TypeMux {
 	return mb.tendermintEventMux
@@ -81,9 +92,9 @@ func (mb *MockBackend) Address() common.Address {
 
 // Broadcast implements tendermint.Backend.Broadcast
 // It sends message to its validator by calling gossiping, and send message to itself by eventMux
-func (mb *MockBackend) Broadcast(valSet tendermint.ValidatorSet, blockNumber *big.Int, payload []byte) error {
+func (mb *MockBackend) Broadcast(valSet tendermint.ValidatorSet, blockNumber *big.Int, round int64, msgType uint64, payload []byte) error {
 	// send to others
-	if err := mb.Gossip(valSet, blockNumber, payload); err != nil {
+	if err := mb.Gossip(valSet, blockNumber, round, msgType, payload); err != nil {
 		return err
 	}
 	// send to self
@@ -101,7 +112,7 @@ func (mb *MockBackend) Broadcast(valSet tendermint.ValidatorSet, blockNumber *bi
 // It sends message to its validators only, not itself.
 // The validators must be able to connected through Peer.
 // It will return MockBackend.ErrNoBroadcaster if no broadcaster is set for MockBackend
-func (mb *MockBackend) Gossip(valSet tendermint.ValidatorSet, _ *big.Int, payload []byte) error {
+func (mb *MockBackend) Gossip(valSet tendermint.ValidatorSet, _ *big.Int, _ int64, _ uint64, payload []byte) error {
 	for _, validator := range valSet.List() {
 		if validator.Address() == mb.address {
 			continue
@@ -144,23 +155,12 @@ func (mb *MockBackend) Commit(block *types.Block) {
 	log.Error("not implemented")
 }
 
-// EnqueueBlock adds a block returned from consensus into fetcher queue
-func (mb *MockBackend) EnqueueBlock(block *types.Block) {
-	log.Error("not implemented")
-}
-
 func (mb *MockBackend) CurrentHeadBlock() *types.Block {
 	return mb.currentBlock()
 }
 
 func (mb *MockBackend) Cancel(block *types.Block) {
 	log.Error("not implemented")
-}
-
-// ValidatorsByChainReader returns val-set from snapshot
-func (mb *MockBackend) ValidatorsByChainReader(blockNumber *big.Int, chain consensus.ChainReader) tendermint.ValidatorSet {
-	log.Error("not implemented")
-	return validator.NewSet(nil, 0, int64(0))
 }
 
 func MustCreateAndStartNewBackend(t *testing.T, nodePrivateKey *ecdsa.PrivateKey, genesisHeader *types.Header, validators []common.Address) (tendermint.Backend, *core.TxPool) {

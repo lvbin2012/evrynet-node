@@ -50,6 +50,13 @@ type ChainReader interface {
 	GetBlock(hash common.Hash, number uint64) *types.Block
 }
 
+// FullChainReader extends ChainReader with function StateAt to get validators for tendermint consensus
+type FullChainReader interface {
+	ChainReader
+	// StateAt returns a new mutable state based on a particular point in time.
+	StateAt(hash common.Hash) (*state.StateDB, error)
+}
+
 // Engine is an algorithm agnostic consensus engine.
 // Note: Prepare, Finalize and FinalizeAndAssemple are used in order to
 // populate all of the necessary header fields including the state root.
@@ -83,22 +90,22 @@ type Engine interface {
 
 	// Prepare initializes the consensus fields of a block header according to the
 	// rules of a particular engine. The changes are executed inline.
-	Prepare(chain ChainReader, header *types.Header) error
+	Prepare(chain FullChainReader, header *types.Header) error
 
 	// Finalize runs any post-transaction state modifications (e.g. block rewards)
 	// but does not assemble the block.
 	//
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	Finalize(chain ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-		uncles []*types.Header)
+	Finalize(chain FullChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+		uncles []*types.Header) error
 
 	// FinalizeAndAssemble runs any post-transaction state modifications (e.g. block
 	// rewards) and assembles the final block.
 	//
 	// Note: The block header and state database might be updated to reflect any
 	// consensus rules that happen at finalization (e.g. block rewards).
-	FinalizeAndAssemble(chain ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+	FinalizeAndAssemble(chain FullChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 		uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error)
 
 	// Seal generates a new sealing request for the given input block and pushes
@@ -153,7 +160,7 @@ type Tendermint interface {
 	Engine
 
 	// Start starts the engine
-	Start(chain ChainReader, currentBlock func() *types.Block) error
+	Start(chain FullChainReader, currentBlock func() *types.Block, verifyAndSubmitBlock func(*types.Block) error) error
 
 	// Stop stops the engine
 	Stop() error

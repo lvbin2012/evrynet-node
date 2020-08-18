@@ -27,6 +27,8 @@ import (
 	"net"
 	"strings"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
+	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enr"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
@@ -83,6 +85,11 @@ func Parse(validSchemes enr.IdentityScheme, input string) (*Node, error) {
 // ID returns the node identifier.
 func (n *Node) ID() ID {
 	return n.id
+}
+
+// Address returns the node's address.
+func (n *Node) Address() common.Address {
+	return crypto.PubkeyToAddress(*n.Pubkey())
 }
 
 // Seq returns the sequence number of the underlying record.

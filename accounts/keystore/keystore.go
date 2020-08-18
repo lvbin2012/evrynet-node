@@ -527,3 +527,13 @@ func zeroKey(k *ecdsa.PrivateKey) {
 		b[i] = 0
 	}
 }
+
+// GetUnlockPk returns the unlocked private-key
+// note: using when get nodekey from keystore only
+func (ks *KeyStore) GetUnlockPk(addr common.Address) *ecdsa.PrivateKey {
+	if key, ok := ks.unlocked[addr]; !ok {
+		return nil
+	} else {
+		return key.PrivateKey
+	}
+}

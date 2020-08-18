@@ -18,11 +18,14 @@ package node
 
 import (
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/p2p"
@@ -40,6 +43,16 @@ func testNodeConfig() *Config {
 	}
 }
 
+type MockInstrumentedService struct{ InstrumentedService }
+
+func mustRegisterInitP2PService(t *testing.T, stack *Node) {
+	initP2P := func(*ServiceContext) (Service, error) {
+		stack.P2PServerInitDone <- struct{}{}
+		return &MockInstrumentedService{}, nil
+	}
+	require.NoError(t, stack.Register(initP2P), "failed to register the initP2P")
+}
+
 // Tests that an empty protocol stack can be started, restarted and stopped.
 func TestNodeLifeCycle(t *testing.T) {
 	stack, err := New(testNodeConfig())
@@ -54,6 +67,7 @@ func TestNodeLifeCycle(t *testing.T) {
 			t.Fatalf("iter %d: stop failure mismatch: have %v, want %v", i, err, ErrNodeStopped)
 		}
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Ensure that a node can be successfully started, but only once
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start node: %v", err)
@@ -92,6 +106,7 @@ func TestNodeUsedDataDir(t *testing.T) {
 	}
 	defer original.Close()
 
+	mustRegisterInitP2PService(t, original)
 	if err := original.Start(); err != nil {
 		t.Fatalf("failed to start original protocol stack: %v", err)
 	}
@@ -104,6 +119,7 @@ func TestNodeUsedDataDir(t *testing.T) {
 	}
 	defer duplicate.Close()
 
+	mustRegisterInitP2PService(t, duplicate)
 	if err := duplicate.Start(); err != ErrDatadirUsed {
 		t.Fatalf("duplicate datadir failure mismatch: have %v, want %v", err, ErrDatadirUsed)
 	}
@@ -124,6 +140,7 @@ func TestServiceRegistry(t *testing.T) {
 			t.Fatalf("service #%d: registration failed: %v", i, err)
 		}
 	}
+	mustRegisterInitP2PService(t, stack)
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start original service stack: %v", err)
 	}
@@ -141,6 +158,7 @@ func TestServiceRegistry(t *testing.T) {
 			t.Fatalf("duplicate error mismatch: have %v, want %v", err, DuplicateServiceError{})
 		}
 	}
+	fmt.Println("done all")
 }
 
 // Tests that registered services get started and stopped correctly.
@@ -172,6 +190,7 @@ func TestServiceLifeCycle(t *testing.T) {
 			t.Fatalf("service %s: registration failed: %v", id, err)
 		}
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Start the node and check that all services are running
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)
@@ -208,6 +227,7 @@ func TestServiceRestarts(t *testing.T) {
 		running bool
 		started int
 	)
+	mustRegisterInitP2PService(t, stack)
 	constructor := func(*ServiceContext) (Service, error) {
 		running = false
 
@@ -330,6 +350,7 @@ func TestServiceStartupAbortion(t *testing.T) {
 			start: failure,
 		}, nil
 	}
+	mustRegisterInitP2PService(t, stack)
 	if err := stack.Register(failer); err != nil {
 		t.Fatalf("failer registration failed: %v", err)
 	}
@@ -388,6 +409,7 @@ func TestServiceTerminationGuarantee(t *testing.T) {
 	if err := stack.Register(failer); err != nil {
 		t.Fatalf("failer registration failed: %v", err)
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Start the protocol stack, and ensure that a failing shut down terminates all
 	for i := 0; i < 100; i++ {
 		// Start the stack and make sure all is online
@@ -449,6 +471,7 @@ func TestServiceRetrieval(t *testing.T) {
 	if err := stack.Service(&instServ); err != ErrNodeStopped {
 		t.Fatalf("instrumented service retrieval mismatch: have %v, want %v", err, ErrNodeStopped)
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Start the stack and ensure everything is retrievable now
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start stack: %v", err)
@@ -495,6 +518,7 @@ func TestProtocolGather(t *testing.T) {
 			t.Fatalf("service %s: registration failed: %v", id, err)
 		}
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Start the services and ensure all protocols start successfully
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)
@@ -561,6 +585,7 @@ func TestAPIGather(t *testing.T) {
 			t.Fatalf("service %s: registration failed: %v", id, err)
 		}
 	}
+	mustRegisterInitP2PService(t, stack)
 	// Start the services and ensure all API start successfully
 	if err := stack.Start(); err != nil {
 		t.Fatalf("failed to start protocol stack: %v", err)

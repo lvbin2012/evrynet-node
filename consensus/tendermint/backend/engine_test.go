@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"crypto/ecdsa"
 	"math/big"
 	"testing"
 	"time"
@@ -11,7 +12,9 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/tests_utils"
+	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/utils"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/crypto/secp256k1"
@@ -32,7 +35,7 @@ func TestSimulateSubscribeAndReceiveToSeal(t *testing.T) {
 	assert.NoError(t, err)
 
 	//create New test backend and newMockChain
-	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader)
+	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader, validators)
 
 	// without seal
 	block := tests_utils.MakeBlockWithoutSeal(genesisHeader)
@@ -63,7 +66,7 @@ func TestAuthor(t *testing.T) {
 	assert.NoError(t, err)
 
 	//create New test backend and newMockChain
-	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader)
+	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader, validators)
 
 	block := tests_utils.MakeBlockWithSeal(be, genesisHeader)
 	header := block.Header()
@@ -86,7 +89,7 @@ func TestPrepare(t *testing.T) {
 	assert.NoError(t, err)
 
 	//create New test backend and newMockChain
-	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader)
+	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader, validators)
 
 	block := tests_utils.MakeBlockWithoutSeal(genesisHeader)
 	header := block.Header()
@@ -113,11 +116,11 @@ func TestVerifySeal(t *testing.T) {
 	assert.NoError(t, err)
 
 	//create New test backend and newMockChain
-	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader)
+	be := mustCreateAndStartNewBackend(t, nodePK, genesisHeader, validators)
 
 	// cannot verify genesis
 	err = be.VerifySeal(be.chain, genesisHeader)
-	assert.Equal(t, errUnknownBlock, err)
+	assert.Equal(t, tendermint.ErrUnknownBlock, err)
 
 	block := tests_utils.MakeBlockWithSeal(be, genesisHeader)
 	err = be.VerifySeal(be.chain, block.Header())
@@ -125,7 +128,7 @@ func TestVerifySeal(t *testing.T) {
 }
 
 // TestPrepareExtra
-// 0xd8c094000000000000000000000000000000000000000080c0
+// 0xc280c0 (empty tendermint extra)
 func TestPrepareExtra(t *testing.T) {
 	var (
 		nodePKString = "bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1"
@@ -138,14 +141,16 @@ func TestPrepareExtra(t *testing.T) {
 	nodePK, err := crypto.HexToECDSA(nodePKString)
 	assert.NoError(t, err)
 
+	cfg := tendermint.DefaultConfig
+	cfg.FixedValidators = validators
 	//create New test backend and newMockChain
-	chain, engine := mustStartTestChainAndBackend(nodePK, genesisHeader)
+	chain, engine := mustStartTestChainAndBackend(nodePK, genesisHeader, cfg)
 	assert.NotNil(t, chain)
 	assert.NotNil(t, engine)
 	assert.Equal(t, true, engine.coreStarted)
 
 	vanity := make([]byte, types.TendermintExtraVanity)
-	data := hexutil.MustDecode("0xd8c094000000000000000000000000000000000000000080c0")
+	data := hexutil.MustDecode("0xc380c080")
 	expectedResult := append(vanity, data...)
 
 	header := &types.Header{
@@ -161,27 +166,113 @@ func TestPrepareExtra(t *testing.T) {
 
 	header.Extra = engine.prepareExtra(header)
 	assert.Equal(t, expectedResult, header.Extra)
+}
 
+// TestBackend_VerifyHeaders tests a case when both transition block is in ChainReader and transition block is not in ChainReader
+func TestBackend_VerifyHeaders(t *testing.T) {
+	t.Parallel()
 	var (
-		candidate = ProposalValidator{
-			address: common.HexToAddress("123456"),
-			vote:    true,
-		}
-		newCandidate = ProposalValidator{
-			address: common.HexToAddress("654321"),
-			vote:    true,
-		}
+		config        = tendermint.DefaultConfig
+		epochSize     = 5
+		nodePKString  = "bb047e5940b6d83354d9432db7c449ac8fca2248008aaa7271369880f9f11cc1"
+		nodeAddr      = common.HexToAddress("0x70524D664ffE731100208a0154E556f9bb679AE6")
+		nodePKString2 = "ce900e4057ef7253ce737dccf3979ec4e74a19d595e8cc30c6c5ea92dfdd37f1"
+		nodeAddr2     = common.HexToAddress("0x560089aB68dc224b250f9588b3DB540D87A66b7a")
+		nodePKString3 = "e74f3525fb69f193b51d33f4baf602c4572d81ede57907c61a62eaf9ed95374a"
+		nodeAddr3     = common.HexToAddress("0x954e4BF2C68F13D97C45db0e02645D145dB6911f")
 	)
 
-	// will attach a candidate to voting
-	require.NoError(t, engine.proposedValidator.setProposedValidator(candidate.address, candidate.vote))
-	header.Extra = engine.prepareExtra(header)
-	candidateAddr, _ := getModifiedValidator(*header)
-	assert.Equal(t, candidate.address, candidateAddr)
+	pk, _ := crypto.HexToECDSA(nodePKString)
+	pk2, _ := crypto.HexToECDSA(nodePKString2)
+	pk3, _ := crypto.HexToECDSA(nodePKString3)
 
-	// the candidate will be repplaced by new candidate when call setProposedValidator and old candidate have not processed yet
-	require.NoError(t, engine.proposedValidator.setProposedValidator(newCandidate.address, newCandidate.vote))
-	header.Extra = engine.prepareExtra(header)
-	newCandidateAddr, _ := getModifiedValidator(*header)
-	assert.Equal(t, newCandidate.address, newCandidateAddr)
+	config.Epoch = uint64(epochSize)
+	stakingSC := common.HexToAddress("0x11")
+	config.StakingSCAddress = &stakingSC
+	config.FixedValidators = nil
+	be := New(config, pk).(*Backend)
+	// create genesis headers
+	header0 := &types.Header{
+		Number:     big.NewInt(0),
+		Root:       common.HexToHash("0x0"),
+		ParentHash: common.HexToHash("0x0"),
+	}
+	extra, _ := tests_utils.PrepareExtra(header0)
+	header0.Extra = extra
+	require.NoError(t, utils.WriteValSet(header0, []common.Address{nodeAddr}))
+
+	createHeader := func(nodePK *ecdsa.PrivateKey, number int64, parent common.Hash, validators []common.Address) *types.Header {
+		addr := crypto.PubkeyToAddress(*(nodePK.Public().(*ecdsa.PublicKey)))
+		header := &types.Header{
+			Coinbase:   addr,
+			Number:     big.NewInt(number),
+			ParentHash: parent,
+			Root:       common.BytesToHash(big.NewInt(number).Bytes()),
+			GasLimit:   0,
+			GasUsed:    0,
+			Difficulty: big.NewInt(1),
+			MixDigest:  types.TendermintDigest,
+		}
+		extra, _ := tests_utils.PrepareExtra(header)
+		header.Extra = extra
+		if validators != nil {
+			require.NoError(t, utils.WriteValSet(header, validators))
+		}
+
+		hash := utils.SigHash(header).Bytes()
+		seal, err := crypto.Sign(crypto.Keccak256(hash), nodePK)
+		require.NoError(t, err)
+		require.NoError(t, utils.WriteSeal(header, seal))
+
+		commitHash := utils.PrepareCommittedSeal(header.Hash())
+		committedSeal, err := crypto.Sign(crypto.Keccak256(commitHash), nodePK)
+		if err != nil {
+			panic(err)
+		}
+		tests_utils.AppendCommittedSeal(header, committedSeal)
+		return header
+	}
+	hash := header0.Hash()
+
+	var (
+		chainHeaders   = []*types.Header{header0}
+		verifiedHeader []*types.Header
+	)
+
+	//create header for epoch 0
+	for i := 0; i < epochSize; i++ {
+		var header *types.Header
+		if i != epochSize-1 {
+			header = createHeader(pk, int64(i+1), hash, nil)
+		} else {
+			header = createHeader(pk, int64(i+1), hash, []common.Address{nodeAddr2})
+		}
+		hash = header.Hash()
+		chainHeaders = append(chainHeaders, header)
+	}
+	//create header for epoch 1
+	for i := 0; i < epochSize; i++ {
+		var header *types.Header
+		if i != epochSize-1 {
+			header = createHeader(pk2, int64(i+epochSize+1), hash, nil)
+		} else {
+			header = createHeader(pk2, int64(i+epochSize+1), hash, []common.Address{nodeAddr3})
+		}
+		hash = header.Hash()
+		verifiedHeader = append(verifiedHeader, header)
+	}
+	// create 1 header for epoch 2
+	finalizeHeader := createHeader(pk3, int64(2*epochSize+1), hash, nil)
+	verifiedHeader = append(verifiedHeader, finalizeHeader)
+
+	chainReader := tests_utils.NewHeadersMockChainReader(chainHeaders)
+	//verify header if transition block is in ChainReader
+	require.NoError(t, be.VerifyHeader(chainReader, verifiedHeader[0], true))
+	//verify header if transition block is not in ChainReader
+	abort, results := be.VerifyHeaders(chainReader, verifiedHeader, nil)
+	defer close(abort)
+	for i := 0; i < len(verifiedHeader); i++ {
+		re := <-results
+		require.NoError(t, re)
+	}
 }

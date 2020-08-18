@@ -30,6 +30,7 @@ func newTestCore(backend tendermint.Backend, config *tendermint.Config) *core {
 		blockFinalize:  new(event.TypeMux),
 		futureMessages: queue.NewPriorityQueue(0, true),
 		sentMsgStorage: NewMsgStorage(),
+		rebroadcast:    false,
 	}
 }
 
@@ -134,11 +135,10 @@ func TestVerifyProposal(t *testing.T) {
 		}
 
 		msgPayLoadWithoutSignature, err := rlp.EncodeToBytes(&message{
-			Code:          msg.Code,
-			Address:       msg.Address,
-			Msg:           msg.Msg,
-			Signature:     []byte{},
-			CommittedSeal: msg.CommittedSeal,
+			Code:      msg.Code,
+			Address:   msg.Address,
+			Msg:       msg.Msg,
+			Signature: []byte{},
 		})
 		require.NoError(t, err)
 

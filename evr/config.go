@@ -31,12 +31,11 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/evr/downloader"
 	"github.com/Evrynetlabs/evrynet-node/evr/gasprice"
 	"github.com/Evrynetlabs/evrynet-node/miner"
-	"github.com/Evrynetlabs/evrynet-node/params"
 )
 
 // DefaultConfig contains default settings for use on the Evrynet main net.
 var DefaultConfig = Config{
-	SyncMode: downloader.FastSync,
+	SyncMode: downloader.FullSync,
 	Ethash: ethash.Config{
 		CacheDir:       "ethash",
 		CachesInMem:    2,
@@ -45,7 +44,6 @@ var DefaultConfig = Config{
 		DatasetsOnDisk: 2,
 	},
 	NetworkId:      1,
-	GasPrice:       big.NewInt(params.GasPriceConfig),
 	LightPeers:     100,
 	DatabaseCache:  512,
 	TrieCleanCache: 256,
@@ -54,14 +52,12 @@ var DefaultConfig = Config{
 	Miner: miner.Config{
 		GasFloor: 8000000,
 		GasCeil:  8000000,
-		GasPrice: big.NewInt(params.GasPriceConfig),
 		Recommit: 3 * time.Second,
 	},
 	TxPool: core.DefaultTxPoolConfig,
 	GPO: gasprice.Config{
 		Blocks:     20,
 		Percentile: 60,
-		GasPrice:   big.NewInt(params.GasPriceConfig),
 	},
 
 	Tendermint: *tendermint.DefaultConfig,

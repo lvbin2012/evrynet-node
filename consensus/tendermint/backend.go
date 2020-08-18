@@ -23,11 +23,11 @@ type Backend interface {
 
 	// Gossip sends a message to all validators (exclude self)
 	// these message are send via p2p network interface.
-	Gossip(valSet ValidatorSet, blockNumber *big.Int, payload []byte) error
+	Gossip(valSet ValidatorSet, blockNumber *big.Int, round int64, msgType uint64, payload []byte) error
 
 	// Broadcast sends a message to all validators (including self)
 	// It will call gossip and post an identical event to its EventMux().
-	Broadcast(valSet ValidatorSet, blockNumber *big.Int, payload []byte) error
+	Broadcast(valSet ValidatorSet, blockNumber *big.Int, round int64, msgType uint64, payload []byte) error
 
 	// Multicast sends a message to a group of given address
 	// returns error if sending is failed, or not found the targets address
@@ -49,16 +49,12 @@ type Backend interface {
 	//Cancel send the consensus block back to miner if it is invalid for consensus.
 	Cancel(block *types.Block)
 
-	//EnqueueBlock adds the block returned from consensus into fetcher queue to update the chain to that specific block.
-	EnqueueBlock(block *types.Block)
-
-	// ValidatorsByChainReader returns val-set from snapshot
-	// this function supports to get validator's addresses in case a miner not run yet.
-	// for reason because when the miner not run then chaỉn-reader in core not initialized.
-	ValidatorsByChainReader(blockNumber *big.Int, chain consensus.ChainReader) ValidatorSet
-
 	// VerifyProposalHeader checks whether a header conforms to the consensus rules of a
 	// given engine. Verifying the seal may be done optionally here, or explicitly
 	// via the VerifySeal method.
 	VerifyProposalHeader(header *types.Header) error
+
+	// VerifyProposalBlock verify post-processor state of proposal block (txs, Root, receipt).
+	// If success, the result will be send to the pending tasks of miner
+	VerifyProposalBlock(block *types.Block) error
 }

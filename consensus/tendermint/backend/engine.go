@@ -8,31 +8,25 @@ import (
 	"time"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
-	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/utils"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/validator"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
+	"github.com/Evrynetlabs/evrynet-node/core/state/staking"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
+	"github.com/Evrynetlabs/evrynet-node/core/vm"
 	"github.com/Evrynetlabs/evrynet-node/log"
-	"github.com/Evrynetlabs/evrynet-node/params"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 	"github.com/Evrynetlabs/evrynet-node/rpc"
 )
 
 var (
-	// TendermintBlockReward tempo fix the Block reward in wei for successfully mining a block
-	// TODO: will modify after
-	TendermintBlockReward = big.NewInt(5e+18)
+	validatorRewardPercentage int64 = 50
+	voterRewardPercentage     int64 = 50
 
 	defaultDifficulty = big.NewInt(1)
 	now               = time.Now
-
-	// Magic nonce number to vote on adding a new validator
-	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff")
-	// Magic nonce number to vote on removing a validator.
-	nonceDropVote = hexutil.MustDecode("0x0000000000000000")
 )
 
 const (
@@ -41,35 +35,6 @@ const (
 )
 
 var (
-	// errInvalidSignature is returned when given signature is not signed by given
-	// address.
-	errInvalidSignature = errors.New("invalid signature")
-	// errUnknownBlock is returned when the list of validators is requested for a block
-	// that is not part of the local blockchain.
-	errUnknownBlock = errors.New("unknown block")
-	// errUnauthorized is returned if a header is signed by a non authorized entity.
-	errUnauthorized = errors.New("unauthorized")
-	// errInvalidDifficulty is returned if the difficulty of a block is not 1
-	errInvalidDifficulty = errors.New("invalid difficulty")
-	// errInvalidExtraDataFormat is returned when the extra data format is incorrect
-	errInvalidExtraDataFormat = errors.New("invalid extra data format")
-	// errInvalidMixDigest is returned if a block's mix digest is not Tendermint digest.
-	errInvalidMixDigest = errors.New("invalid Tendermint mix digest")
-	// errInvalidCommittedSeals is returned if the committed seal is not signed by any of parent validators.
-	errInvalidCommittedSeals = errors.New("invalid committed seals")
-	// errInvalidVotingChain is returned if an authorization list is attempted to
-	// be modified via out-of-range or non-contiguous headers.
-	errInvalidVotingChain = errors.New("invalid voting chain")
-	// errCoinBaseInvalid is returned if the value of coin base is not equals proposer's address in header
-	errCoinBaseInvalid = errors.New("invalid coin base address")
-	// errInvalidUncleHash is returned if a block contains an non-empty uncle list.
-	errInvalidUncleHash = errors.New("non empty uncle hash")
-	// errInvalidVote is returned if a nonce value is something else that the two
-	// allowed constants of 0x00..0 or 0xff..f.
-	errInvalidVote = errors.New("vote nonce not 0x0000000000000000 or 0xffffffffffffffff")
-	// errInvalidCandidate is return if the extra data's modifiedValidator is empty or nil
-	errInvalidCandidate = errors.New("candidate for validator is invalid")
-	// peerWaitDuration is the duration to wait for 2f+1 peer before starting
 	peerWaitDuration = 2 * time.Second
 )
 
@@ -87,20 +52,22 @@ func (sb *Backend) Seal(chain consensus.ChainReader, block *types.Block, results
 	// update the block header timestamp and signature and propose the block to core engine
 	header := block.Header()
 	blockNumber := header.Number.Uint64()
-
+	if blockNumber == 0 {
+		return errors.New("cannot Seal block 0")
+	}
 	// validate address of the validator
-	// get snapshot
-	snap, err := sb.snapshot(chain, blockNumber-1, header.ParentHash, nil)
+	valSet, err := sb.valSetInfo.GetValSet(chain, big.NewInt(int64(blockNumber)))
 	if err != nil {
 		return err
 	}
+
 	if err = sb.addProposalSeal(header); err != nil {
 		return err
 	}
 	block = block.WithSeal(header)
 	// checks the address must stored in snapshot
-	if _, v := snap.ValSet.GetByAddress(sb.address); v == nil {
-		return errUnauthorized
+	if _, v := valSet.GetByAddress(sb.address); v == nil {
+		return tendermint.ErrUnauthorized
 	}
 
 	// update seal to header of the block
@@ -120,59 +87,31 @@ func (sb *Backend) Seal(chain consensus.ChainReader, block *types.Block, results
 		return
 	}
 
-	blockNumberStr := block.Number().String()
-
-	ch := sb.commitChs.createCommitChannelAndCloseIfExist(blockNumberStr)
-	//TODO: clear previous data of proposal
+	ch := sb.commitChs.createCommitChannelAndCloseIfExist(block.Number().String())
 	// post block into tendermint engine
 	go func(block *types.Block) {
-		//nolint:errcheck
+		//nolint:tendermint.Errheck
 		sb.EventMux().Post(tendermint.NewBlockEvent{
 			Block: block,
 		})
 	}(block)
 	// miner won't be able to interrupt a sealing task
 	// a sealing task can only exist when core consensus agreed upon a block
-	go func(blockNumberStr string) {
-		//TODO: DO we need timeout for consensus?
-		for bl := range ch {
-			// remove lock whether Seal is success or not
-			sb.proposedValidator.removeStick()
-			if bl.Number().String() != blockNumberStr {
-				log.Warn("committing.. Received a different block number than the sealing block number", "received", bl.Number().String(), "expected", blockNumberStr)
-			}
-			//this step is to stop other go routine wait for a block
-			sb.commitChs.closeAndRemoveCommitChannel(bl.Number().String())
-
-			if bl == nil {
-				log.Error("committing... Received nil ")
+	go func(ch <-chan *types.Block) {
+		select {
+		case bl, ok := <-ch:
+			if ok {
+				//this step is to stop other go routine wait for a block
+				sb.commitChs.closeAndRemoveCommitChannel(bl.Number().String())
+				log.Info("committing... returned block to miner", "block_hash", bl.Hash(), "number", bl.Number())
+				results <- bl
 				return
 			}
-
-			//we only posted the block back to the miner if and only if the block is ours
-			if bl.Coinbase() == sb.address {
-				log.Info("committing... returned block to miner", "block_hash", bl.Hash(), "number", bl.Number())
-
-				// clear pending proposed validator if sealing Successfully
-				if bl.Number().Int64() == sb.proposedValidator.getStickBlock() {
-					// get proposedValidator from the extra-data of block-header
-					proposedValidator, _ := getModifiedValidator(*bl.Header())
-					// compares if the current proposedValidator is not changed
-					if reflect.DeepEqual(proposedValidator, sb.proposedValidator.address) {
-						// removes pending ProposedValidator
-						sb.proposedValidator.clearPendingProposedValidator()
-					}
-				}
-				results <- bl
-			} else {
-				log.Info("committing... not this node's block, exit and let downloader sync the block from proposer...", "block_hash", block.Hash(), "number", block.Number())
-			}
+		case <-sb.closingBackgroundThreadsCh:
+			log.Trace("interrupt commit channel")
 			return
-			//case <-stop:
-			//log.Warn("committing... refused to exit because the sealing task might be the finalize block. The seal only exit when core commit a block", "number", block.Number())
-
 		}
-	}(blockNumberStr)
+	}(ch)
 	return nil
 }
 
@@ -195,30 +134,35 @@ func (sb *Backend) tryStartCore() bool {
 		return false
 	}
 
-	//TODO: clear previous data of proposal
 	if err := sb.core.Start(); err != nil {
 		log.Error("failed to start tendermint core", "error", err)
 		return false
 	}
 	sb.coreStarted = true
-	go sb.gossipLoop()
 	// trigger dequeue msg loop
 	go func() {
-		sb.dequeueMsgTriggering <- struct{}{}
+		select {
+		case sb.dequeueMsgTriggering <- struct{}{}:
+		case <-sb.closingBackgroundThreadsCh:
+			log.Trace("interrupt trigger dequeue loop when starting core")
+			return
+		}
 	}()
 	return true
 }
 
 // Start implements consensus.Tendermint.Start
-func (sb *Backend) Start(chain consensus.ChainReader, currentBlock func() *types.Block) error {
+func (sb *Backend) Start(chain consensus.FullChainReader, currentBlock func() *types.Block, verifyAndSubmitBlock func(*types.Block) error) error {
 	sb.mutex.Lock()
 	if sb.coreStarted {
+		sb.mutex.Unlock()
 		return tendermint.ErrStartedEngine
 	}
 
 	//set chain reader
 	sb.chain = chain
 	sb.currentBlock = currentBlock
+	sb.verifyAndSubmitBlock = verifyAndSubmitBlock
 	if sb.commitChs != nil {
 		sb.commitChs.closeAndRemoveAllChannels()
 	}
@@ -243,7 +187,6 @@ func (sb *Backend) Start(chain consensus.ChainReader, currentBlock func() *types
 			}
 		}
 	}
-
 }
 
 // Stop implements consensus.Tendermint.Stop
@@ -256,7 +199,7 @@ func (sb *Backend) Stop() error {
 		case sb.controlChan <- struct{}{}:
 		default:
 		}
-		return tendermint.ErrStoppedEngine
+		return nil
 	}
 	if err := sb.core.Stop(); err != nil {
 		return err
@@ -270,7 +213,7 @@ func (sb *Backend) Stop() error {
 // block, which may be different from the header's coinbase if a consensus
 // engine is based on signatures.
 func (sb *Backend) Author(header *types.Header) (common.Address, error) {
-	return blockProposer(header)
+	return sb.blockProposer(header)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of a
@@ -285,6 +228,26 @@ func (sb *Backend) VerifyProposalHeader(header *types.Header) error {
 	if sb.chain == nil {
 		return errors.New("no chain reader ")
 	}
+	// verify valSet in header is match with valSet from stateDB
+	if header.Number.Uint64()%sb.config.Epoch == 0 {
+		parent := sb.chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
+		if parent == nil {
+			return tendermint.ErrUnknownParent
+		}
+		validators, err := sb.getNextValidatorSet(sb.chain, parent)
+		if err != nil {
+			return err
+		}
+		// get validators's address from the extra-data
+		valSetInHeader, err := utils.GetValSetAddresses(header)
+		if err != nil {
+			log.Info("No validators in the extra-data", err)
+			return err
+		}
+		if !reflect.DeepEqual(validators, valSetInHeader) {
+			return tendermint.ErrMismatchValSet
+		}
+	}
 	return sb.verifyHeader(sb.chain, header, nil)
 }
 
@@ -294,7 +257,7 @@ func (sb *Backend) VerifyProposalHeader(header *types.Header) error {
 // a batch of new headers.
 func (sb *Backend) verifyHeader(chain consensus.ChainReader, header *types.Header, parents []*types.Header) error {
 	if header.Number == nil {
-		return errUnknownBlock
+		return tendermint.ErrUnknownBlock
 	}
 
 	// Don't waste time checking blocks from the future
@@ -304,16 +267,16 @@ func (sb *Backend) verifyHeader(chain consensus.ChainReader, header *types.Heade
 
 	// Ensure that the extra data format is satisfied
 	if _, err := types.ExtractTendermintExtra(header); err != nil {
-		return errInvalidExtraDataFormat
+		return tendermint.ErrInvalidExtraDataFormat
 	}
 
 	// Ensure that the mix digest is zero as we don't have fork protection currently
 	if header.MixDigest != types.TendermintDigest {
-		return errInvalidMixDigest
+		return tendermint.ErrInvalidMixDigest
 	}
 	// Ensure that the block's difficulty is meaningful (may not be correct at this point)
 	if header.Difficulty == nil || header.Difficulty.Cmp(defaultDifficulty) != 0 {
-		return errInvalidDifficulty
+		return tendermint.ErrInvalidDifficulty
 	}
 
 	return sb.verifyCascadingFields(chain, header, parents)
@@ -344,18 +307,60 @@ func (sb *Backend) verifyCascadingFields(chain consensus.ChainReader, header *ty
 		//	return errInvalidTimestamp
 		log.Warn("block time difference is too small", "different in ms", header.Time-sb.config.BlockPeriod)
 	}
-
-	// get snap shoot to prepare for the verify proposal and committed seal
-	snap, err := sb.snapshot(chain, blockNumber-1, header.ParentHash, parents)
+	// get val-sets to prepare for the verify proposal and committed seal
+	valSet, err := sb.getValSetFromChain(chain, header, parents)
 	if err != nil {
 		return err
 	}
-
-	if err := sb.verifyProposalSeal(header, snap); err != nil {
+	if err := sb.verifyProposalSeal(header, valSet); err != nil {
 		return err
 	}
 
-	return sb.verifyCommittedSeals(header, snap)
+	return sb.verifyCommittedSeals(header, valSet)
+}
+
+// getValSetFromChain returns the valset deprived from ChainReader and parents Headers
+func (sb *Backend) getValSetFromChain(chain consensus.ChainReader, header *types.Header, parents []*types.Header) (tendermint.ValidatorSet, error) {
+	var (
+		blockNumber   = header.Number.Uint64()
+		checkpoint    = utils.GetCheckpointNumber(sb.config.Epoch, header.Number.Uint64())
+		hash          = header.ParentHash
+		number        = header.Number.Uint64() - 1
+		currentHeader = header
+	)
+	// if type of validator set is fixed, then use valsetInfo to get it
+	if len(sb.config.FixedValidators) > 0 {
+		return sb.valSetInfo.GetValSet(chain, big.NewInt(int64(blockNumber)))
+	}
+	// check if chain contains transition block, get it from historical data
+	if chain.CurrentHeader().Number.Uint64() >= checkpoint {
+		return sb.valSetInfo.GetValSet(chain, big.NewInt(int64(blockNumber)))
+	}
+	// check if parent headers contains transition block
+	for {
+		if len(parents) != 0 {
+			currentHeader = parents[len(parents)-1]
+			if currentHeader.Hash() != hash || currentHeader.Number.Uint64() != number {
+				return nil, consensus.ErrUnknownAncestor
+			}
+			parents = parents[:len(parents)-1]
+		} else {
+			currentHeader = chain.GetHeader(hash, number)
+			if currentHeader == nil {
+				return nil, consensus.ErrUnknownAncestor
+			}
+		}
+		if number%sb.config.Epoch == 0 {
+			validators, err := utils.GetValSetAddresses(currentHeader)
+			if err != nil {
+				return nil, err
+			}
+			return validator.NewSet(validators, sb.config.ProposerPolicy, int64(blockNumber)), nil
+		}
+		number, hash = number-1, currentHeader.ParentHash
+	}
+	// if the parents does not contain the transition block, return an error
+	return nil, tendermint.ErrUnknownBlock
 }
 
 // VerifyHeaders is similar to VerifyHeader, but verifies a batch of headers
@@ -383,7 +388,7 @@ func (sb *Backend) VerifyHeaders(chain consensus.ChainReader, headers []*types.H
 // rules of a given engine.
 func (sb *Backend) VerifyUncles(chain consensus.ChainReader, block *types.Block) error {
 	if len(block.Uncles()) > 0 {
-		return errInvalidUncleHash
+		return tendermint.ErrInvalidUncleHash
 	}
 	return nil
 }
@@ -394,21 +399,21 @@ func (sb *Backend) VerifySeal(chain consensus.ChainReader, header *types.Header)
 	// get parent header and ensure the signer is in parent's validator set
 	blockNumber := header.Number.Uint64()
 	if blockNumber == 0 {
-		return errUnknownBlock
+		return tendermint.ErrUnknownBlock
 	}
 
-	// get snap shoot to prepare for the verify proposal
-	snap, err := sb.snapshot(chain, blockNumber-1, header.ParentHash, nil)
+	// get valsets to prepare for the verify proposal
+	valset, err := sb.valSetInfo.GetValSet(chain, big.NewInt(int64(blockNumber)))
 	if err != nil {
 		return err
 	}
 
-	return sb.verifyProposalSeal(header, snap)
+	return sb.verifyProposalSeal(header, valset)
 }
 
 // Prepare initializes the consensus fields of a block header according to the
 // rules of a particular engine. The changes are executed inline.
-func (sb *Backend) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (sb *Backend) Prepare(chain consensus.FullChainReader, header *types.Header) error {
 	// set coinbase with the proposer's address
 	header.Coinbase = sb.Address()
 	// use the same difficulty and mixDigest for all blocks
@@ -442,7 +447,9 @@ func (sb *Backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 		header.Time = headerTime.Uint64()
 	}
 
-	//TODO: modify valset data if epoch is reached.
+	if err := sb.addValSetToHeader(chain, header, parent); err != nil {
+		log.Error("failed to add val set to header", "err", err)
+	}
 
 	return nil
 }
@@ -451,14 +458,18 @@ func (sb *Backend) Prepare(chain consensus.ChainReader, header *types.Header) er
 //
 // Note, the block header and state database might be updated to reflect any
 // consensus rules that happen at finalization (e.g. block rewards).
-func (sb *Backend) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header) {
+func (sb *Backend) Finalize(chain consensus.FullChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+	uncles []*types.Header) error {
 	// Accumulate any block rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header)
+	if err := sb.accumulateRewards(chain, state, header); err != nil {
+		log.Error("failed to accumulateRewards", "err", err)
+		return err
+	}
 
 	// Since there is a change in stateDB, its trie must be update
 	// In case block reached EIP158 hash, the state will attempt to delete empty object as EIP158 sepcification
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	return nil
 }
 
 // FinalizeAndAssemble runs any post-transaction state modifications (e.g. block rewards)
@@ -466,10 +477,13 @@ func (sb *Backend) Finalize(chain consensus.ChainReader, header *types.Header, s
 //
 // Note, the block header and state database might be updated to reflect any
 // consensus rules that happen at finalization (e.g. block rewards).
-func (sb *Backend) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+func (sb *Backend) FinalizeAndAssemble(chain consensus.FullChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	// Accumulate any block rewards and commit the final state root
-	accumulateRewards(chain.Config(), state, header)
+	if err := sb.accumulateRewards(chain, state, header); err != nil {
+		log.Error("failed to accumulateRewards", "err", err)
+		return nil, err
+	}
 
 	// No block rewards, so the state remains as is and uncles are dropped
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
@@ -499,161 +513,35 @@ func (sb *Backend) APIs(chain consensus.ChainReader) []rpc.API {
 	}}
 }
 
+// Close terminates any background threads maintained by the consensus engine.
 func (sb *Backend) Close() error {
-	log.Warn("Close: implement me")
-	//TODO: Research & Implement
+	close(sb.closingBackgroundThreadsCh)
+
 	return nil
 }
 
-// snapshot retrieves the authorization snapshot at a given point in time.
-func (sb *Backend) snapshot(chain consensus.ChainReader, number uint64, hash common.Hash, parents []*types.Header) (*Snapshot, error) {
-	// Search for a snapshot in memory or on disk for checkpoints
-	var (
-		headers []*types.Header
-		snap    *Snapshot
-	)
-	// Loop and try to find a valid snapshot that contain the block hash we need, otherwise a list of headers and a
-	// most recent snapshot then apply the headers onto that snapshot to get the snapshot we need
-	for snap == nil {
-		// If an in-memory snapshot was found, use that
-		//TODO: get from cached if the snapshot is existed
-
-		// If an on-disk checkpoint snapshot can be found, use that
-		if number%checkpointInterval == 0 {
-			s, err := loadSnapshot(sb.config.Epoch, sb.db, hash)
-			if err != nil {
-				log.Warn("cannot load snapshot from db", "hash", hash, "error", err)
-				// check if the snapshot is corrupted
-				genesis := chain.GetHeaderByNumber(0)
-				if _, err := loadSnapshot(sb.config.Epoch, sb.db, genesis.Hash()); err != nil {
-					break
-				}
-			} else {
-				log.Debug("Loaded voting snapshot form disk", "number", number, "hash", hash)
-				snap = s
-				break
-			}
-		}
-		// If we're at block zero, make a snapshot
-		if number == 0 {
-			log.Debug("creating snapshot at block 0")
-			genesis := chain.GetHeaderByNumber(0)
-			if err := sb.VerifyHeader(chain, genesis, false); err != nil {
-				return nil, err
-			}
-			extra, err := types.ExtractTendermintExtra(genesis)
-			if err != nil {
-				return nil, err
-			}
-			snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(extra.Validators, sb.config.ProposerPolicy, int64(0)))
-			if err := snap.store(sb.db); err != nil {
-				return nil, err
-			}
-			log.Trace("Stored genesis voting snapshot to disk")
-			break
-		}
-		// No snapshot for this header, gather the header and move backward
-		var header *types.Header
-		if len(parents) > 0 {
-			// If we have explicit parents, pick from there (enforced)
-			header = parents[len(parents)-1]
-			if header.Hash() != hash || header.Number.Uint64() != number {
-				return nil, consensus.ErrUnknownAncestor
-			}
-			parents = parents[:len(parents)-1]
-		} else {
-			// No explicit parents (or no more left), reach out to the database
-			header = chain.GetHeader(hash, number)
-			if header == nil {
-				return nil, consensus.ErrUnknownAncestor
-			}
-		}
-		headers = append(headers, header)
-		number, hash = number-1, header.ParentHash
-	}
-
-	if snap == nil {
-		for i := uint64(0); i <= number; i += checkpointInterval {
-			header := chain.GetHeaderByNumber(i)
-			s, err := loadSnapshot(sb.config.Epoch, sb.db, header.Hash())
-			if err == nil {
-				snap = s
-				continue
-			}
-			log.Debug("can not find snapshot, create new snapshot by apply a batch of headers", "block", i, "hash", header.Hash())
-			if i == 0 {
-				log.Debug("creating snapshot at block 0")
-				genesis := chain.GetHeaderByNumber(0)
-				if err := sb.VerifyHeader(chain, genesis, false); err != nil {
-					return nil, err
-				}
-				extra, err := types.ExtractTendermintExtra(genesis)
-				if err != nil {
-					return nil, err
-				}
-				snap = newSnapshot(sb.config.Epoch, 0, genesis.Hash(), validator.NewSet(extra.Validators, sb.config.ProposerPolicy, int64(0)))
-			} else {
-				var batch []*types.Header
-				for j := i - checkpointInterval + 1; j <= i; j++ {
-					header := chain.GetHeaderByNumber(j)
-					//if err := sb.VerifyHeader(chain, header, false); err != nil {
-					//	return nil, err
-					//}
-					batch = append(batch, header)
-				}
-				if snap, err = snap.apply(batch); err != nil {
-					return nil, err
-				}
-			}
-			if err := snap.store(sb.db); err != nil {
-				return nil, err
-			}
-			log.Trace("Stored genesis voting snapshot to disk")
-		}
-	}
-	//revert the headers's array index , i.e, block n..1 become 1..n
-	for i := 0; i < len(headers)/2; i++ {
-		headers[i], headers[len(headers)-1-i] = headers[len(headers)-1-i], headers[i]
-	}
-	// apply the list of headers found on top of it
-	snap, err := snap.apply(headers)
-	if err != nil {
-		return nil, err
-	}
-	//TODO: add to cached for snapshot
-
-	// If we've generated a new checkpoint snapshot, save to disk
-	if snap.Number%checkpointInterval == 0 && len(headers) > 0 {
-		if err = snap.store(sb.db); err != nil {
-			return nil, err
-		}
-		log.Trace("Stored voting snapshot to disk", "number", snap.Number, "hash", snap.Hash)
-	}
-	return snap, err
-}
-
 // verifyProposalSeal checks proposal seal is signed by validator
-func (sb *Backend) verifyProposalSeal(header *types.Header, snap *Snapshot) error {
+func (sb *Backend) verifyProposalSeal(header *types.Header, valSet tendermint.ValidatorSet) error {
 	// resolve the authorization key and check against signers
-	signer, err := blockProposer(header)
+	signer, err := sb.blockProposer(header)
 	if err != nil {
 		log.Error("proposal seal is invalid", "error", err)
 		return err
 	}
 	// compare with coin base that contain the address of proposer.
 	if signer != header.Coinbase {
-		return errCoinBaseInvalid
+		return tendermint.ErrCoinBaseInvalid
 	}
 
 	// Signer should be in the validator set of previous block's extraData.
-	if _, v := snap.ValSet.GetByAddress(signer); v == nil {
-		return errUnauthorized
+	if _, v := valSet.GetByAddress(signer); v == nil {
+		return tendermint.ErrUnauthorized
 	}
 	return nil
 }
 
 // verifyCommittedSeals checks whether every committed seal is signed by one of the parent's validators
-func (sb *Backend) verifyCommittedSeals(header *types.Header, snap *Snapshot) error {
+func (sb *Backend) verifyCommittedSeals(header *types.Header, valSet tendermint.ValidatorSet) error {
 	extra, err := types.ExtractTendermintExtra(header)
 	if err != nil {
 		return err
@@ -663,7 +551,7 @@ func (sb *Backend) verifyCommittedSeals(header *types.Header, snap *Snapshot) er
 		return tendermint.ErrEmptyCommittedSeals
 	}
 
-	vals := snap.ValSet.Copy()
+	vals := valSet.Copy()
 	// Check whether the committed seals are generated by parent's validators
 	validSeal := 0
 	proposalSeal := utils.PrepareCommittedSeal(header.Hash())
@@ -673,28 +561,32 @@ func (sb *Backend) verifyCommittedSeals(header *types.Header, snap *Snapshot) er
 		addr, err := utils.GetSignatureAddress(proposalSeal, seal)
 		if err != nil {
 			log.Error("not a valid address", "err", err)
-			return errInvalidSignature
+			return tendermint.ErrInvalidSignature
 		}
 		// Every validator can have only one seal. If more than one seals are signed by a
 		// validator, the validator cannot be found and errInvalidCommittedSeals is returned.
 		if vals.RemoveValidator(addr) {
 			validSeal++
 		} else {
-			return errInvalidCommittedSeals
+			return tendermint.ErrInvalidCommittedSeals
 		}
 	}
 
 	// The length of validSeal should be larger or equal than min majority (num validator - maximum faulty)
-	if validSeal < snap.ValSet.MinMajority() {
-		return errInvalidCommittedSeals
+	if validSeal < valSet.MinMajority() {
+		return tendermint.ErrInvalidCommittedSeals
 	}
 
 	return nil
 }
 
 // blockProposer extracts the Evrynet account address from a signed header.
-func blockProposer(header *types.Header) (common.Address, error) {
-	//TODO: check if existed in the cached
+func (sb *Backend) blockProposer(header *types.Header) (common.Address, error) {
+	if value, known := sb.blockProposerCache.Get(header.Number.Uint64()); known {
+		if proposer, ok := value.(common.Address); ok {
+			return proposer, nil
+		}
+	}
 
 	// Retrieve the signature from the header extra-data
 	extra, err := types.ExtractTendermintExtra(header)
@@ -705,44 +597,67 @@ func blockProposer(header *types.Header) (common.Address, error) {
 	if err != nil {
 		return addr, err
 	}
-	//TODO: will be caching address
+
+	sb.blockProposerCache.Add(header.Number.Uint64(), addr)
 	return addr, nil
 }
 
-// AccumulateRewards credits the coinbase of the given block with the proposing
-// reward.
-func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header) {
-	// Accumulate the rewards for the proposer
-	reward := new(big.Int).Set(TendermintBlockReward)
-
-	state.AddBalance(header.Coinbase, reward)
-}
-
-func (sb *Backend) getValSet(chainReader consensus.ChainReader, blockNumber *big.Int) tendermint.ValidatorSet {
+// addValSetToHeader Add validator set back to the tendermint extra.
+func (sb *Backend) addValSetToHeader(chainReader consensus.FullChainReader, header *types.Header, parent *types.Header) error {
 	var (
-		previousBlock uint64
-		header        *types.Header
-		err           error
-		snap          *Snapshot
+		blockNumber = header.Number.Uint64()
+		epoch       = sb.config.Epoch
 	)
 
-	// check if blockNumber is zero
-	if blockNumber.Cmp(big.NewInt(0)) == 0 {
-		previousBlock = 0
-	} else {
-		previousBlock = uint64(blockNumber.Int64() - 1)
+	if blockNumber%epoch != 0 {
+		// ignore if this block is not the end of epoch
+		return nil
 	}
-	header = chainReader.GetHeaderByNumber(previousBlock)
-	if header == nil {
-		log.Error("cannot get valSet since previousBlock is not available", "block_number", blockNumber)
-		return validator.NewSet(nil, sb.config.ProposerPolicy, int64(0))
-	}
-	snap, err = sb.snapshot(chainReader, previousBlock, header.Hash(), nil)
+
+	validators, err := sb.getNextValidatorSet(chainReader, parent)
 	if err != nil {
-		log.Error("cannot load snapshot", "error", err)
-		return validator.NewSet(nil, sb.config.ProposerPolicy, int64(0))
+		return err
 	}
-	return snap.ValSet
+
+	log.Info("sets the val-set back to extra-data", "number", blockNumber)
+	return utils.WriteValSet(header, validators)
+}
+
+func (sb *Backend) getNextValidatorSet(chainReader consensus.FullChainReader, header *types.Header) ([]common.Address, error) {
+	if validators, known := sb.computedValSetCache.Get(header.Number.Uint64()); known {
+		if addresses, ok := validators.([]common.Address); ok {
+			return addresses, nil
+		}
+	}
+	start := time.Now()
+	stateDB, err := chainReader.StateAt(header.Root)
+	if err != nil {
+		return nil, err
+	}
+
+	stakingCaller := sb.getStakingCaller(chainReader, stateDB, header)
+	validators, err := stakingCaller.GetValidators(sb.stakingContractAddr)
+	if err != nil {
+		return nil, err
+	}
+	sb.computedValSetCache.Add(header.Number.Uint64(), validators)
+	log.Info("found new val set", "number", header.Number.Uint64(), "elapsed", common.PrettyDuration(time.Since(start)),
+		"valset", common.PrettyAddresses(validators))
+	return validators, nil
+}
+
+func (sb *Backend) getStakingCaller(chainReader consensus.FullChainReader, stateDB *state.StateDB, header *types.Header) staking.StakingCaller {
+	if sb.config.UseEVMCaller {
+		log.Info("using the EVM caller to get validators", "number", header.Number.Uint64())
+		return staking.NewEVMStakingCaller(stateDB,
+			staking.NewChainContextWrapper(sb, chainReader.GetHeader),
+			header,
+			chainReader.Config(),
+			vm.Config{})
+	} else {
+		log.Info("using the StateDB caller to get validators", "number", header.Number.Uint64())
+		return staking.NewStateDbStakingCaller(stateDB, sb.config.IndexStateVariables)
+	}
 }
 
 func (sb *Backend) prepareExtra(header *types.Header) []byte {
@@ -750,6 +665,7 @@ func (sb *Backend) prepareExtra(header *types.Header) []byte {
 		tdm     *types.TendermintExtra
 		payload []byte
 		buf     bytes.Buffer
+		err     error
 	)
 
 	if len(header.Extra) < types.TendermintExtraVanity {
@@ -757,26 +673,11 @@ func (sb *Backend) prepareExtra(header *types.Header) []byte {
 	}
 	buf.Write(header.Extra[:types.TendermintExtraVanity])
 
-	// Add validator voting to header
-	valAddr, vote, isStick := sb.proposedValidator.getPendingProposedValidator()
-	if !reflect.DeepEqual(valAddr, common.Address{}) && !isStick {
-		if vote {
-			copy(header.Nonce[:], nonceAuthVote)
-		} else {
-			copy(header.Nonce[:], nonceDropVote)
-		}
+	tdm = &types.TendermintExtra{}
+	payload, err = rlp.EncodeToBytes(&tdm)
 
-		tdm = &types.TendermintExtra{
-			ModifiedValidator: valAddr,
-		}
-		payload, _ = rlp.EncodeToBytes(&tdm)
-
-		//lock validator
-		sb.proposedValidator.stickValidator(header.Number.Int64())
-	} else {
-		tdm = &types.TendermintExtra{}
-		payload, _ = rlp.EncodeToBytes(&tdm)
+	if err != nil {
+		log.Error("failed to encode payload to Tendermint extra", "error", err)
 	}
-
 	return append(buf.Bytes(), payload...)
 }

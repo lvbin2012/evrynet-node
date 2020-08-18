@@ -791,19 +791,6 @@ web3._extend({
 	property: 'tendermint',
 	methods: [
 		new web3._extend.Method({
-			name: 'proposeValidator',
-			call: 'tendermint_proposeValidator',
-			params: 2 
-		}),
-		new web3._extend.Method({
-			name: 'clearPendingProposedValidator',
-			call: 'tendermint_clearPendingProposedValidator'		
-		}),
-		new web3._extend.Method({
-			name: 'getPendingProposedValidator',
-			call: 'tendermint_getPendingProposedValidator'						
-		}),
-		new web3._extend.Method({
 			name: 'getValidators',
 			call: 'tendermint_getValidators',
 			params: 1,

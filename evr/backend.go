@@ -111,10 +111,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if !config.SyncMode.IsValid() {
 		return nil, fmt.Errorf("invalid sync mode %d", config.SyncMode)
 	}
-	if config.Miner.GasPrice == nil || config.Miner.GasPrice.Cmp(common.Big0) <= 0 {
-		log.Warn("Sanitizing invalid miner gas price", "provided", config.Miner.GasPrice, "updated", DefaultConfig.Miner.GasPrice)
-		config.Miner.GasPrice = new(big.Int).Set(DefaultConfig.Miner.GasPrice)
-	}
 	if config.NoPruning && config.TrieDirtyCache > 0 {
 		config.TrieCleanCache += config.TrieDirtyCache
 		config.TrieDirtyCache = 0
@@ -132,11 +128,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
-	//rewrite gas price
-	chainConfig.GasPrice = config.GasPrice
-	config.GPO.GasPrice = config.GasPrice
-	config.Miner.GasPrice = config.GasPrice
-
 	evr := &Evrynet{
 		config:         config,
 		chainDb:        chainDb,
@@ -145,7 +136,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 		engine:         CreateConsensusEngine(ctx, chainConfig, config, config.Miner.Notify, config.Miner.Noverify, chainDb),
 		shutdownChan:   make(chan bool),
 		networkID:      config.NetworkId,
-		gasPrice:       config.GasPrice,
+		gasPrice:       chainConfig.GasPrice,
 		etherbase:      config.Miner.Etherbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
@@ -207,9 +198,6 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 
 	evr.APIBackend = &EvrAPIBackend{ctx.ExtRPCEnabled(), evr, nil}
 	gpoParams := config.GPO
-	if gpoParams.Default == nil {
-		gpoParams.Default = config.Miner.GasPrice
-	}
 	evr.APIBackend.gpo = gasprice.NewOracle(evr.APIBackend, gpoParams)
 
 	return evr, nil
@@ -242,8 +230,11 @@ func CreateConsensusEngine(ctx *node.ServiceContext, chainConfig *params.ChainCo
 	if chainConfig.Tendermint != nil {
 		config.Tendermint.ProposerPolicy = tendermint.ProposerPolicy(chainConfig.Tendermint.ProposerPolicy)
 		config.Tendermint.Epoch = chainConfig.Tendermint.Epoch
+		config.Tendermint.StakingSCAddress = chainConfig.Tendermint.StakingSCAddress
+		config.Tendermint.FixedValidators = chainConfig.Tendermint.FixedValidators
+		config.Tendermint.BlockReward = chainConfig.Tendermint.BlockReward
 		log.Info("Create Tendermint consensus engine")
-		return tendermintBackend.New(&config.Tendermint, ctx.NodeKey(), tendermintBackend.WithDB(db))
+		return tendermintBackend.New(&config.Tendermint, ctx.NodeKey())
 	}
 
 	// Otherwise assume proof-of-work

@@ -26,6 +26,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/internal/testlog"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enode"
@@ -69,9 +70,9 @@ func runDialTest(t *testing.T, test dialtest) {
 			test.init.taskDone(task, vtime)
 		}
 
-		new := test.init.newTasks(running, pm(round.peers), vtime)
+		new := test.init.newTasks(running, pm(round.peers), nil, vtime)
 		if !sametasks(new, round.new) {
-			t.Errorf("ERROR round %d: got %v\nwant %v\nstate: %v\nrunning: %v",
+			t.Errorf("ERROR round %d: \ngot %v\nwant %v\nstate: %v\nrunning: %v",
 				i, spew.Sdump(new), spew.Sdump(round.new), spew.Sdump(test.init), spew.Sdump(running))
 		}
 		t.Logf("round %d new tasks: %s", i, strings.TrimSpace(spew.Sdump(new)))
@@ -84,15 +85,19 @@ func runDialTest(t *testing.T, test dialtest) {
 
 type fakeTable []*enode.Node
 
-func (t fakeTable) Self() *enode.Node                     { return new(enode.Node) }
-func (t fakeTable) Close()                                {}
-func (t fakeTable) LookupRandom() []*enode.Node           { return nil }
-func (t fakeTable) Resolve(*enode.Node) *enode.Node       { return nil }
-func (t fakeTable) ReadRandomNodes(buf []*enode.Node) int { return copy(buf, t) }
+func (t fakeTable) Self() *enode.Node                                          { return new(enode.Node) }
+func (t fakeTable) Close()                                                     {}
+func (t fakeTable) LookupRandom() []*enode.Node                                { return nil }
+func (t fakeTable) Resolve(*enode.Node) *enode.Node                            { return nil }
+func (t fakeTable) ReadRandomNodes(buf []*enode.Node) int                      { return copy(buf, t) }
+func (t fakeTable) ReadDiscoveredNodes(buf map[common.Address]*enode.Node) int { return 0 }
 
 // This test checks that dynamic dials are launched from discovery results.
 func TestDialStateDynDial(t *testing.T) {
-	config := &Config{Logger: testlog.Logger(t, log.LvlTrace)}
+	config := &Config{
+		Logger:     testlog.Logger(t, log.LvlTrace),
+		PrivateKey: newkey(),
+	}
 	runDialTest(t, dialtest{
 		init: newDialState(enode.ID{}, fakeTable{}, 5, config),
 		rounds: []round{
@@ -229,6 +234,7 @@ func TestDialStateDynDial(t *testing.T) {
 // Tests that bootnodes are dialed if no peers are connectd, but not otherwise.
 func TestDialStateDynDialBootnode(t *testing.T) {
 	config := &Config{
+		PrivateKey: newkey(),
 		BootstrapNodes: []*enode.Node{
 			newNode(uintID(1), nil),
 			newNode(uintID(2), nil),
@@ -329,7 +335,10 @@ func TestDialStateDynDialFromTable(t *testing.T) {
 	}
 
 	runDialTest(t, dialtest{
-		init: newDialState(enode.ID{}, table, 10, &Config{Logger: testlog.Logger(t, log.LvlTrace)}),
+		init: newDialState(enode.ID{}, table, 10, &Config{
+			PrivateKey: newkey(),
+			Logger:     testlog.Logger(t, log.LvlTrace),
+		}),
 		rounds: []round{
 			// 5 out of 8 of the nodes returned by ReadRandomNodes are dialed.
 			{
@@ -435,7 +444,10 @@ func TestDialStateNetRestrict(t *testing.T) {
 	restrict.Add("127.0.2.0/24")
 
 	runDialTest(t, dialtest{
-		init: newDialState(enode.ID{}, table, 10, &Config{NetRestrict: restrict}),
+		init: newDialState(enode.ID{}, table, 10, &Config{
+			NetRestrict: restrict,
+			PrivateKey:  newkey(),
+		}),
 		rounds: []round{
 			{
 				new: []task{
@@ -450,6 +462,7 @@ func TestDialStateNetRestrict(t *testing.T) {
 // This test checks that static dials are launched.
 func TestDialStateStaticDial(t *testing.T) {
 	config := &Config{
+		PrivateKey: newkey(),
 		StaticNodes: []*enode.Node{
 			newNode(uintID(1), nil),
 			newNode(uintID(2), nil),
@@ -537,6 +550,7 @@ func TestDialStateStaticDial(t *testing.T) {
 // This test checks that past dials are not retried for some time.
 func TestDialStateCache(t *testing.T) {
 	config := &Config{
+		PrivateKey: newkey(),
 		StaticNodes: []*enode.Node{
 			newNode(uintID(1), nil),
 			newNode(uintID(2), nil),
@@ -615,8 +629,9 @@ func TestDialStateCache(t *testing.T) {
 
 func TestDialResolve(t *testing.T) {
 	config := &Config{
-		Logger: testlog.Logger(t, log.LvlTrace),
-		Dialer: TCPDialer{&net.Dialer{Deadline: time.Now().Add(-5 * time.Minute)}},
+		PrivateKey: newkey(),
+		Logger:     testlog.Logger(t, log.LvlTrace),
+		Dialer:     TCPDialer{&net.Dialer{Deadline: time.Now().Add(-5 * time.Minute)}},
 	}
 	resolved := newNode(uintID(1), net.IP{127, 0, 55, 234})
 	table := &resolveMock{answer: resolved}
@@ -625,7 +640,7 @@ func TestDialResolve(t *testing.T) {
 	// Check that the task is generated with an incomplete ID.
 	dest := newNode(uintID(1), nil)
 	state.addStatic(dest)
-	tasks := state.newTasks(0, nil, time.Time{})
+	tasks := state.newTasks(0, nil, nil, time.Time{})
 	if !reflect.DeepEqual(tasks, []task{&dialTask{flags: staticDialedConn, dest: dest}}) {
 		t.Fatalf("expected dial task, got %#v", tasks)
 	}
@@ -678,7 +693,8 @@ func (t *resolveMock) Resolve(n *enode.Node) *enode.Node {
 	return t.answer
 }
 
-func (t *resolveMock) Self() *enode.Node                     { return new(enode.Node) }
-func (t *resolveMock) Close()                                {}
-func (t *resolveMock) LookupRandom() []*enode.Node           { return nil }
-func (t *resolveMock) ReadRandomNodes(buf []*enode.Node) int { return 0 }
+func (t *resolveMock) Self() *enode.Node                                          { return new(enode.Node) }
+func (t *resolveMock) Close()                                                     {}
+func (t *resolveMock) LookupRandom() []*enode.Node                                { return nil }
+func (t *resolveMock) ReadRandomNodes(buf []*enode.Node) int                      { return 0 }
+func (t *resolveMock) ReadDiscoveredNodes(buf map[common.Address]*enode.Node) int { return 0 }

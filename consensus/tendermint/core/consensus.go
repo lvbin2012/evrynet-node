@@ -64,6 +64,13 @@ func (c *core) enterNewRound(blockNumber *big.Int, round int64) {
 
 	c.enterPropose(blockNumber, round)
 
+	// handle future proposal if not nil
+	if _, ok := c.futureProposals[round]; ok {
+		if err := c.handleMsgLocked(c.futureProposals[round]); err != nil {
+			c.getLogger().Errorw("failed to handle msg from next round", "err", err)
+		}
+	}
+
 }
 func (c *core) getDefaultProposal(logger *zap.SugaredLogger, round int64) *Proposal {
 	proposal := c.defaultDecideProposal(logger, round)
@@ -149,10 +156,6 @@ func (c *core) enterPropose(blockNumber *big.Int, round int64) {
 		Step:        RoundStepPropose,
 	})
 
-	if i, _ := c.valSet.GetByAddress(c.backend.Address()); i == -1 {
-		logger.Infow("this node is not a validator of this round", "address", c.backend.Address())
-		return
-	}
 	//if we are proposer, find the latest block we're having to propose
 	if c.valSet.IsProposer(c.backend.Address()) {
 		logger.Infow("this node is proposer of this round", "node_address", c.backend.Address())
@@ -255,7 +258,7 @@ func (c *core) enterPrevoteWait(blockNumber *big.Int, round int64) {
 		sBlockNumber = state.BlockNumber()
 		sRound       = state.Round()
 		sStep        = state.Step()
-		logger       = c.getLogger().With("input_block_number", blockNumber, "input_round", round, "input_step", RoundStepPrevote)
+		logger       = c.getLogger().With("input_block_number", blockNumber, "input_round", round, "input_step", RoundStepPrevoteWait)
 	)
 
 	if sBlockNumber.Cmp(blockNumber) != 0 || round < sRound || (sRound == round && RoundStepPrevoteWait <= sStep) {
@@ -611,6 +614,12 @@ func (c *core) startNewRound() {
 	default:
 		needInitializeTimeout = false
 	}
+	// if this is not a validator, core stays at NewHeightStep
+	if i, _ := c.valSet.GetByAddress(c.backend.Address()); i == -1 {
+		c.getLogger().Warnw("this node is not a validator of this round, skipping consensus process", "address", c.backend.Address())
+		needInitializeTimeout = false
+	}
+
 	if needInitializeTimeout {
 		//We have to copy blockNumber out since it's pointer, and the use of ScheduleTimeout
 		timeOutBlock := big.NewInt(0).Set(state.BlockNumber())

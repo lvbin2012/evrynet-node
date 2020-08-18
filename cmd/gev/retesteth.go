@@ -215,7 +215,7 @@ func (e *NoRewardEngine) VerifySeal(chain consensus.ChainReader, header *types.H
 	return e.inner.VerifySeal(chain, header)
 }
 
-func (e *NoRewardEngine) Prepare(chain consensus.ChainReader, header *types.Header) error {
+func (e *NoRewardEngine) Prepare(chain consensus.FullChainReader, header *types.Header) error {
 	return e.inner.Prepare(chain, header)
 }
 
@@ -228,17 +228,18 @@ func (e *NoRewardEngine) accumulateRewards(config *params.ChainConfig, state *st
 	state.AddBalance(header.Coinbase, reward)
 }
 
-func (e *NoRewardEngine) Finalize(chain consensus.ChainReader, header *types.Header, statedb *state.StateDB, txs []*types.Transaction,
-	uncles []*types.Header) {
+func (e *NoRewardEngine) Finalize(chain consensus.FullChainReader, header *types.Header, statedb *state.StateDB, txs []*types.Transaction,
+	uncles []*types.Header) error {
 	if e.rewardsOn {
-		e.inner.Finalize(chain, header, statedb, txs, uncles)
+		return e.inner.Finalize(chain, header, statedb, txs, uncles)
 	} else {
 		e.accumulateRewards(chain.Config(), statedb, header, uncles)
 		header.Root = statedb.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+		return nil
 	}
 }
 
-func (e *NoRewardEngine) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, statedb *state.StateDB, txs []*types.Transaction,
+func (e *NoRewardEngine) FinalizeAndAssemble(chain consensus.FullChainReader, header *types.Header, statedb *state.StateDB, txs []*types.Transaction,
 	uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	if e.rewardsOn {
 		return e.inner.FinalizeAndAssemble(chain, header, statedb, txs, uncles, receipts)

@@ -3,7 +3,10 @@ package test
 //These contants required test environment. The params bellow are the address on testNode
 const (
 	// this is just a random address to run negative test
-	normalAddress                  = "0x7e8A370FD68DeBe1f6B5f3537061F1069BAC783C"
+	normalAddress = "0x7e8A370FD68DeBe1f6B5f3537061F1069BAC783C"
+
+	ownerPK                        = "ce900e4057ef7253ce737dccf3979ec4e74a19d595e8cc30c6c5ea92dfdd37f1"
+	ownerAddrStr                   = "0x560089ab68dc224b250f9588b3db540d87a66b7a"
 	senderPK                       = "0BC15BA68AAEC11F2638BC7C98BBA3E17A1D1F4BD5C27BB6043BA68D7F262962"
 	senderAddrStr                  = "0x608fe17b82cdc38bcda9aba3bf1e90d61b412248"
 	contractAddrStrWithoutProvider = "0x7Dadf7b6c9C828afd6E814cDb3e820f9F3261e49"
@@ -29,4 +32,6 @@ const (
 	ethRPCEndpoint = "http://localhost:22001"
 
 	getReceiptMaxRetries = 20
+
+	chainId = 15
 )

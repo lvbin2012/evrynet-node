@@ -53,6 +53,7 @@ func ExampleService() {
 	// the factory method approach is to support service restarts without relying on the
 	// individual implementations' support for such operations.
 	constructor := func(context *node.ServiceContext) (node.Service, error) {
+		stack.P2PServerInitDone <- struct{}{}
 		return new(SampleService), nil
 	}
 	if err := stack.Register(constructor); err != nil {

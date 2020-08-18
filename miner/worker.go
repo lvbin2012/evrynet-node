@@ -267,7 +267,7 @@ func (w *worker) pendingBlock() *types.Block {
 func (w *worker) start() {
 	if tendermint, ok := w.engine.(consensus.Tendermint); ok {
 		log.Info("Start Tendermint worker")
-		err := tendermint.Start(w.chain, w.chain.CurrentBlock)
+		err := tendermint.Start(w.chain, w.chain.CurrentBlock, w.VerifyAndSubmitPendingBlock)
 		if err != nil {
 			log.Error("Failed to start Tendermint engine", "err", err)
 			return
@@ -360,7 +360,12 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 
 		case head := <-w.chainHeadCh:
 			if h, ok := w.engine.(consensus.Handler); ok {
-				h.HandleNewChainHead(head.Block.Number())
+				headBlkNumber := new(big.Int).Set(head.Block.Number())
+				if headBlkNumber.Cmp(w.chain.CurrentBlock().Number()) < 0 {
+					log.Warn("head block number is smaller than current block of chain, replace it", "head_block", headBlkNumber, "chain_block", w.chain.CurrentBlock().Number())
+					headBlkNumber = new(big.Int).Set(w.chain.CurrentBlock().Number())
+				}
+				_ = h.HandleNewChainHead(headBlkNumber)
 			}
 			clearPending(head.Block.NumberU64())
 			timestamp = time.Now().Unix()
@@ -976,6 +981,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	s := w.current.state.Copy()
 	block, err := w.engine.FinalizeAndAssemble(w.chain, w.current.header, s, w.current.txs, uncles, w.current.receipts)
 	if err != nil {
+		log.Error("failed to FinalizeAndAssemble", "err", err)
 		return err
 	}
 	if w.isRunning() {
@@ -1002,5 +1008,44 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	if update {
 		w.updateSnapshot()
 	}
+	return nil
+}
+
+//VerifyAndSubmitPendingBlock verifies if the block is valid, then submit it to pending task
+func (w *worker) VerifyAndSubmitPendingBlock(block *types.Block) error {
+	start := time.Now()
+	curHeader := w.chain.CurrentHeader()
+	if err := w.chain.Validator().ValidateBody(block); err != nil {
+		return err
+	}
+	// get current stateDB
+	stateDB, err := w.chain.StateAt(curHeader.Root)
+	if err != nil {
+		return err
+	}
+	// insert txs to stateDB
+	receipts, _, usedGas, err := w.chain.Processor().Process(block, stateDB, *w.chain.GetVMConfig())
+	if err != nil {
+		return err
+	}
+	// check if pending root, receipts and usedGas matched with block header
+	if err := w.chain.Validator().ValidateState(block, stateDB, receipts, usedGas); err != nil {
+		return err
+	}
+
+	task := &task{
+		receipts:  receipts,
+		block:     block,
+		state:     stateDB,
+		createdAt: time.Now(),
+	}
+	w.pendingMu.Lock()
+	w.pendingTasks[w.engine.SealHash(block.Header())] = task
+	w.pendingMu.Unlock()
+	log.Info("Verify and submit pending task", "number", block.Number(), "hash", block.Hash(),
+		"uncles", len(block.Uncles()), "txs", len(block.Transactions()), "gas", block.GasUsed(),
+		"elapsed", common.PrettyDuration(time.Since(start)),
+		"root", block.Root())
+
 	return nil
 }

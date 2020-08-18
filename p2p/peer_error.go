@@ -69,7 +69,8 @@ const (
 	DiscUnexpectedIdentity
 	DiscSelf
 	DiscReadTimeout
-	DiscSubprotocolError = 0x10
+	DiscSubprotocolError
+	DiscNonValidator
 )
 
 var discReasonToString = [...]string{
@@ -86,6 +87,7 @@ var discReasonToString = [...]string{
 	DiscSelf:                "connected to self",
 	DiscReadTimeout:         "read timeout",
 	DiscSubprotocolError:    "subprotocol error",
+	DiscNonValidator:        "non-validator",
 }
 
 func (d DiscReason) String() string {

@@ -33,7 +33,7 @@ func TestHandleMsg(t *testing.T) {
 	)
 
 	//create New test backend and newMockChain
-	be := mustCreateAndStartNewBackend(t, nodePrivateKey, genesisHeader)
+	be := mustCreateAndStartNewBackend(t, nodePrivateKey, genesisHeader, validators)
 
 	// generate one msg
 	data := []byte("data1")
@@ -111,7 +111,7 @@ func (m *mockCore) SetBlockForProposal(block *types.Block) {
 func TestBackend_HandleMsg(t *testing.T) {
 	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
 
-	be, _, blockchain, err := createBlockchainAndBackendFromGenesis()
+	be, blockchain, _, err := createBlockchainAndBackendFromGenesis(FixedValidators)
 	require.NoError(t, err)
 	mockCore := NewMockCore(be)
 	be.core = mockCore
@@ -125,7 +125,7 @@ func TestBackend_HandleMsg(t *testing.T) {
 		require.NoError(t, err)
 	}
 	// start core
-	require.NoError(t, be.Start(blockchain, blockchain.CurrentBlock))
+	require.NoError(t, be.Start(blockchain, blockchain.CurrentBlock, nil))
 	// trigger to  dequeue and replay msg
 	_, err = be.HandleMsg(common.Address{}, makeMsg(consensus.TendermintMsg, []byte(strconv.FormatInt(int64(count), 10))))
 	count += 1
@@ -134,10 +134,69 @@ func TestBackend_HandleMsg(t *testing.T) {
 	// immediately stop core
 	require.NoError(t, be.Stop())
 
-	require.NoError(t, be.Start(blockchain, blockchain.CurrentBlock))
+	require.NoError(t, be.Start(blockchain, blockchain.CurrentBlock, nil))
 	_, err = be.HandleMsg(common.Address{}, makeMsg(consensus.TendermintMsg, []byte(strconv.FormatInt(int64(count), 10))))
 	require.NoError(t, err)
 
 	time.Sleep(time.Millisecond * 16)
 	require.Equal(t, int64(numMsg+2), mockCore.numMsg)
+}
+
+// test double start-stop is not blocking
+func TestBackend_StartStop(t *testing.T) {
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
+
+	be, blockchain, _, err := createBlockchainAndBackendFromGenesis(FixedValidators)
+	require.NoError(t, err)
+	mockCore := NewMockCore(be)
+	be.core = mockCore
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-time.After(time.Second * 10):
+			panic("timeout")
+		case <-done:
+			return
+		}
+	}()
+
+	require.NoError(t, be.Start(blockchain, blockchain.CurrentBlock, nil))
+	require.Error(t, be.Start(blockchain, blockchain.CurrentBlock, nil))
+	require.NoError(t, be.Stop())
+	require.NoError(t, be.Stop())
+	close(done)
+}
+
+// test dequeue message loop does not work when close backend
+func TestBackend_StartClose(t *testing.T) {
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlTrace, log.StreamHandler(os.Stderr, log.TerminalFormat(false))))
+
+	be, blockchain, _, err := createBlockchainAndBackendFromGenesis(FixedValidators)
+	require.NoError(t, err)
+	mockCore := NewMockCore(be)
+	be.core = mockCore
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-time.After(time.Second * 10):
+			panic("timeout")
+		case <-done:
+			return
+		}
+	}()
+
+	require.NoError(t, be.Start(blockchain, blockchain.CurrentBlock, nil))
+	require.Error(t, be.Start(blockchain, blockchain.CurrentBlock, nil))
+	require.NoError(t, be.Close())
+
+	// Do not log out any "replay msg started" when backend receive message
+	_, err = be.HandleMsg(common.Address{}, makeMsg(consensus.TendermintMsg, []byte("data1")))
+	require.NoError(t, err)
+
+	// Do not log out any "replay msg started" when backend receive message
+	_, err = be.HandleMsg(common.Address{}, makeMsg(consensus.TendermintMsg, []byte("data2")))
+	require.NoError(t, err)
+	time.Sleep(2 * time.Second)
+
+	close(done)
 }

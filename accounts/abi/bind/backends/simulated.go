@@ -33,6 +33,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/core/bloombits"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
+	"github.com/Evrynetlabs/evrynet-node/core/state/staking"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/core/vm"
 	"github.com/Evrynetlabs/evrynet-node/event"
@@ -67,7 +68,9 @@ type SimulatedBackend struct {
 // for testing purposes.
 func NewSimulatedBackend(alloc core.GenesisAlloc, gasLimit uint64) *SimulatedBackend {
 	database := rawdb.NewMemoryDatabase()
-	genesis := core.Genesis{Config: params.AllEthashProtocolChanges, GasLimit: gasLimit, Alloc: alloc}
+	chainConfig := *params.AllEthashProtocolChanges
+	chainConfig.GasPrice = big.NewInt(1)
+	genesis := core.Genesis{Config: &chainConfig, GasLimit: gasLimit, Alloc: alloc}
 	genesis.MustCommit(database)
 	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, ethash.NewFaker(), vm.Config{}, nil)
 
@@ -158,6 +161,24 @@ func (b *SimulatedBackend) StorageAt(ctx context.Context, contract common.Addres
 	return val[:], nil
 }
 
+// ForEachStorageAt returns func to read all keys, values in the storage
+func (b *SimulatedBackend) ForEachStorageAt(contract common.Address, blockNumber *big.Int, f func(key, val common.Hash) bool) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if blockNumber != nil && blockNumber.Cmp(b.blockchain.CurrentBlock().Number()) != 0 {
+		return errBlockNumberUnsupported
+	}
+	statedb, err := b.blockchain.State()
+	if err != nil {
+		return err
+	}
+	if err = statedb.ForEachStorage(contract, f); err != nil {
+		return err
+	}
+	return nil
+}
+
 // TransactionReceipt returns the receipt of a transaction.
 func (b *SimulatedBackend) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	receipt, _, _, _ := rawdb.ReadReceipt(b.database, txHash, b.config)
@@ -229,7 +250,7 @@ func (b *SimulatedBackend) PendingNonceAt(ctx context.Context, account common.Ad
 // SuggestGasPrice implements ContractTransactor.SuggestGasPrice. Since the simulated
 // chain doesn't have miners, we just return a gas price of 1 for any call.
 func (b *SimulatedBackend) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
-	return big.NewInt(1), nil
+	return b.config.GasPrice, nil
 }
 
 // EstimateGas executes the requested code against the currently pending block/state and
@@ -424,22 +445,45 @@ func (b *SimulatedBackend) AdjustTime(adjustment time.Duration) error {
 	return nil
 }
 
+//GetStakingCaller returns staking caller for testing
+func (b *SimulatedBackend) GetStakingCaller(indexCfg *staking.IndexConfigs) (staking.StakingCaller, error) {
+	state, err := b.blockchain.State()
+	if err != nil {
+		return nil, err
+	}
+
+	if indexCfg != nil {
+		return staking.NewStateDbStakingCaller(state, indexCfg), nil
+	}
+
+	header := b.blockchain.CurrentHeader()
+	return staking.NewEVMStakingCaller(state, b.blockchain, header, b.config, vm.Config{}), nil
+}
+
+// CurrentStateDb returns the current stateDB for testing
+func (b *SimulatedBackend) CurrentStateDb() (*state.StateDB, error) {
+	return b.blockchain.State()
+}
+
 // callmsg implements core.Message to allow passing it as a transaction simulator.
 type callmsg struct {
 	ethereum.CallMsg
 }
 
-func (m callmsg) GasPayer() common.Address  { return m.CallMsg.From }
-func (m callmsg) Owner() *common.Address    { return nil }
-func (m callmsg) Provider() *common.Address { return nil }
-func (m callmsg) From() common.Address      { return m.CallMsg.From }
-func (m callmsg) Nonce() uint64             { return 0 }
-func (m callmsg) CheckNonce() bool          { return false }
-func (m callmsg) To() *common.Address       { return m.CallMsg.To }
-func (m callmsg) GasPrice() *big.Int        { return m.CallMsg.GasPrice }
-func (m callmsg) Gas() uint64               { return m.CallMsg.Gas }
-func (m callmsg) Value() *big.Int           { return m.CallMsg.Value }
-func (m callmsg) Data() []byte              { return m.CallMsg.Data }
+func (m callmsg) GasPayer() common.Address      { return m.CallMsg.From }
+func (m callmsg) Owner() *common.Address        { return nil }
+func (m callmsg) Provider() *common.Address     { return nil }
+func (m callmsg) From() common.Address          { return m.CallMsg.From }
+func (m callmsg) Nonce() uint64                 { return 0 }
+func (m callmsg) CheckNonce() bool              { return false }
+func (m callmsg) To() *common.Address           { return m.CallMsg.To }
+func (m callmsg) GasPrice() *big.Int            { return m.CallMsg.GasPrice }
+func (m callmsg) Gas() uint64                   { return m.CallMsg.Gas }
+func (m callmsg) Value() *big.Int               { return m.CallMsg.Value }
+func (m callmsg) Data() []byte                  { return m.CallMsg.Data }
+func (m callmsg) TxType() types.TransactionType { return types.NormalTxType }
+func (m callmsg) ExtraData() interface{}        { return nil }
+func (m callmsg) HasProviderSignature() bool    { return false }
 
 // filterBackend implements filters.Backend to support filtering for logs without
 // taking bloom-bits acceleration structures into account.

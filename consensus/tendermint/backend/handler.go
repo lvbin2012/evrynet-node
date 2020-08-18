@@ -37,16 +37,14 @@ func (sb *Backend) decode(msg p2p.Msg) ([]byte, common.Hash, error) {
 }
 
 func (sb *Backend) sendDataToCore(data []byte) error {
-	return sb.EventMux().Post(tendermint.MessageEvent{
-		Payload: data,
-	})
+	return sb.checkAndSendMsg(data)
 }
 
 func (sb *Backend) replayTendermintMsg() (done bool, err error) {
 	sb.mutex.RLock()
 	defer sb.mutex.RUnlock()
 	if !sb.coreStarted {
-		log.Info("core stopped. Exit replaying tenderming msg to core.")
+		log.Info("core stopped. Exit replaying tendermint msg to core.")
 		return true, nil
 	}
 	if sb.storingMsgs.GetLen() == 0 {
@@ -73,20 +71,24 @@ func (sb *Backend) replayTendermintMsg() (done bool, err error) {
 
 func (sb *Backend) dequeueMsgLoop() {
 	for {
-		// w8 signal to trigger dequeue msg
-		<-sb.dequeueMsgTriggering
-		log.Trace("replay msg started")
-	replayLoop:
-		for {
-			// replay message one by one to core until there is no more message
-			done, err := sb.replayTendermintMsg()
-			if err != nil {
-				log.Error("failed to replayTendermintMsg", "err", err)
-				break replayLoop
+		select {
+		case <-sb.dequeueMsgTriggering: // w8 signal to trigger dequeue msg
+			log.Trace("replay msg started")
+		replayLoop:
+			for {
+				// replay message one by one to core until there is no more message
+				done, err := sb.replayTendermintMsg()
+				if err != nil {
+					log.Error("failed to replayTendermintMsg", "err", err)
+					break replayLoop
+				}
+				if done {
+					break replayLoop
+				}
 			}
-			if done {
-				break replayLoop
-			}
+		case <-sb.closingBackgroundThreadsCh:
+			log.Trace("interrupt dequeue message loop")
+			return
 		}
 	}
 }
@@ -124,7 +126,12 @@ func (sb *Backend) HandleMsg(addr common.Address, msg p2p.Msg) (bool, error) {
 
 		// Trigger dequeue loop
 		go func() {
-			sb.dequeueMsgTriggering <- struct{}{}
+			select {
+			case sb.dequeueMsgTriggering <- struct{}{}:
+			case <-sb.closingBackgroundThreadsCh:
+				log.Trace("interrupt trigger dequeue loop when handling message")
+				return
+			}
 		}()
 		return true, nil
 	default:

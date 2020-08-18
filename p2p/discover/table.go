@@ -178,6 +178,27 @@ func (tab *Table) ReadRandomNodes(buf []*enode.Node) (n int) {
 	return i + 1
 }
 
+// ReadDiscoveredNodes fills the given slice with discovered nodes from the table. The results
+// are guaranteed to be unique for a single invocation, no node will appear twice.
+func (tab *Table) ReadDiscoveredNodes(buf map[common.Address]*enode.Node) (n int) {
+	if !tab.isInitDone() {
+		return 0
+	}
+	tab.mutex.Lock()
+	defer tab.mutex.Unlock()
+
+	// Find all non-empty buckets and get a fresh slice of their entries.
+	for _, b := range &tab.buckets {
+		if len(b.entries) > 0 {
+			for _, peer := range b.entries {
+				node := unwrapNode(peer)
+				buf[node.Address()] = node
+			}
+		}
+	}
+	return len(buf)
+}
+
 // getNode returns the node with the given ID or nil if it isn't in the table.
 func (tab *Table) getNode(id enode.ID) *enode.Node {
 	tab.mutex.Lock()
