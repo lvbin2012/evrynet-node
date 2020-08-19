@@ -213,7 +213,7 @@ func (sb *Backend) Stop() error {
 // block, which may be different from the header's coinbase if a consensus
 // engine is based on signatures.
 func (sb *Backend) Author(header *types.Header) (common.Address, error) {
-	return blockProposer(header)
+	return sb.blockProposer(header)
 }
 
 // VerifyHeader checks whether a header conforms to the consensus rules of a
@@ -523,7 +523,7 @@ func (sb *Backend) Close() error {
 // verifyProposalSeal checks proposal seal is signed by validator
 func (sb *Backend) verifyProposalSeal(header *types.Header, valSet tendermint.ValidatorSet) error {
 	// resolve the authorization key and check against signers
-	signer, err := blockProposer(header)
+	signer, err := sb.blockProposer(header)
 	if err != nil {
 		log.Error("proposal seal is invalid", "error", err)
 		return err
@@ -581,8 +581,12 @@ func (sb *Backend) verifyCommittedSeals(header *types.Header, valSet tendermint.
 }
 
 // blockProposer extracts the Evrynet account address from a signed header.
-func blockProposer(header *types.Header) (common.Address, error) {
-	//TODO: check if existed in the cached
+func (sb *Backend) blockProposer(header *types.Header) (common.Address, error) {
+	if value, known := sb.blockProposerCache.Get(header.Number.Uint64()); known {
+		if proposer, ok := value.(common.Address); ok {
+			return proposer, nil
+		}
+	}
 
 	// Retrieve the signature from the header extra-data
 	extra, err := types.ExtractTendermintExtra(header)
@@ -593,7 +597,8 @@ func blockProposer(header *types.Header) (common.Address, error) {
 	if err != nil {
 		return addr, err
 	}
-	//TODO: will be caching address
+
+	sb.blockProposerCache.Add(header.Number.Uint64(), addr)
 	return addr, nil
 }
 

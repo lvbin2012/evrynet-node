@@ -33,6 +33,7 @@ const (
 	initialBroadcastSleepTime    = time.Millisecond * 100
 	broadcastSleepTimeIncreament = time.Millisecond * 100
 	inMemoryValset               = 10
+	inMemoryProposer             = 100
 )
 
 var (
@@ -47,6 +48,7 @@ type Option func(b *Backend) error
 // The p2p communication, i.e, broadcaster is set separately by calling backend.SetBroadcaster
 func New(config *tendermint.Config, privateKey *ecdsa.PrivateKey, opts ...Option) consensus.Tendermint {
 	valSetCache, _ := lru.NewARC(inMemoryValset)
+	proposerCache, _ := lru.NewARC(inMemoryProposer)
 	be := &Backend{
 		config:                     config,
 		tendermintEventMux:         new(event.TypeMux),
@@ -59,6 +61,7 @@ func New(config *tendermint.Config, privateKey *ecdsa.PrivateKey, opts ...Option
 		closingBackgroundThreadsCh: make(chan struct{}),
 		controlChan:                make(chan struct{}),
 		computedValSetCache:        valSetCache,
+		blockProposerCache:         proposerCache,
 	}
 
 	if config.FixedValidators != nil && len(config.FixedValidators) > 0 {
@@ -118,6 +121,8 @@ type Backend struct {
 	valSetInfo          ValidatorSetInfo
 	stakingContractAddr common.Address // stakingContractAddr stores the address of staking smart-contract
 	computedValSetCache *lru.ARCCache  // computedValSetCache stores the valset is computed from stateDB
+
+	blockProposerCache *lru.ARCCache // blockProposerCache stores the address of proposal block
 }
 
 // EventMux implements tendermint.Backend.EventMux

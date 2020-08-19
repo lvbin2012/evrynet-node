@@ -131,6 +131,11 @@ type (
 		prev      bool
 		prevDirty bool
 	}
+
+	providersChange struct {
+		account *common.Address
+		prev    []common.Address
+	}
 )
 
 func (ch createObjectChange) revert(s *StateDB) {
@@ -231,4 +236,12 @@ func (ch addPreimageChange) revert(s *StateDB) {
 
 func (ch addPreimageChange) dirtied() *common.Address {
 	return nil
+}
+
+func (ch providersChange) revert(s *StateDB) {
+	s.getStateObject(*ch.account).setProvider(ch.prev)
+}
+
+func (ch providersChange) dirtied() *common.Address {
+	return ch.account
 }
