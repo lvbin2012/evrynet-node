@@ -388,3 +388,53 @@ func TestAddress_Value(t *testing.T) {
 		})
 	}
 }
+
+func TestAddressToEvryAddressString(t *testing.T) {
+	var tests = []struct {
+		Input    string
+		Prefix   byte
+		Expect   string
+		WantFail bool
+	}{
+		{"0x0000000000000000000000000000000000000000", 33, "EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9", false},
+		{"0x0000000000000000000000000000000000000011", 33, "EH9uVaqWRxHuzJbroqzX18yxmeWAULFYZT", false},
+		{"0x0000000000000000000000000000000000000011", 22, "EH9uVaqWRxHuzJbroqzX18yxmeWAULFYZT", true},
+	}
+	for i, test := range tests {
+		address := HexToAddress(test.Input)
+		evryAddressString := AddressToEvryAddressString(address, test.Prefix)
+		isEqual := strings.Compare(evryAddressString, test.Expect) == 0
+		if isEqual == test.WantFail {
+			t.Errorf("test #%d: unexpected, output: %s, expected: %s", i, evryAddressString, test.Expect)
+		}
+
+	}
+}
+
+func TestEvryAddressStringToAddress(t *testing.T) {
+	var tests = []struct {
+		EvryAddrssStr string
+		Expect        *big.Int
+		WantFail      bool
+	}{
+		{"EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9", new(big.Int).SetUint64(0), false},
+		{"EH9uVaqWRxHuzJbroqzX18yxmeWAopEdUM", new(big.Int).SetUint64(20), false},
+		{"EH9uVaqWRxHuzJbroqzX18yxmeWBLHhJUd", new(big.Int).SetUint64(25), false},
+		{"EH9uVaqWRxHuzJbroqzX18yxmeWBLHhJUd", new(big.Int).SetUint64(26), true},
+		{"EH9uVaqWRxHuzJbroqzX18yxmeWBLHhJUd", new(big.Int).SetUint64(25), true},
+		{"dH9uVaqWRxHuzJbroqzX18yxmeWBLHhJUd", new(big.Int).SetUint64(25), true},
+	}
+	for i, test := range tests {
+		addr, err := EvryAddressStringToAddressCheck(test.EvryAddrssStr)
+		if err != nil && !test.WantFail {
+			t.Errorf("test #%d: unexpected, error: %v", i, err)
+		}
+		res := new(big.Int).SetBytes(addr.Bytes())
+		isEqual := res.Cmp(test.Expect) == 0
+
+		if isEqual == test.WantFail {
+			t.Errorf("test #%d: unexpected, Output:%v, Expect:%v", i, res.Uint64(), test.Expect.Uint64())
+		}
+
+	}
+}

@@ -1040,8 +1040,9 @@ func makeDatabaseHandles() int {
 // a key index in the key store to an internal account representation.
 func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error) {
 	// If the specified account is a valid address, return it
-	if common.IsHexAddress(account) {
-		return accounts.Account{Address: common.HexToAddress(account)}, nil
+	address, err := common.EvryAddressStringToAddressCheck(account)
+	if err == nil {
+		return accounts.Account{Address: address}, nil
 	}
 	// Otherwise try to interpret the account as a keystore index
 	index, err := strconv.Atoi(account)
@@ -1251,7 +1252,11 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 			if trimmed := strings.TrimSpace(account); !common.IsHexAddress(trimmed) {
 				Fatalf("Invalid account in --txpool.locals: %s", trimmed)
 			} else {
-				cfg.Locals = append(cfg.Locals, common.HexToAddress(account))
+				if address, err := common.EvryAddressStringToAddressCheck(account); err == nil {
+					cfg.Locals = append(cfg.Locals, address)
+				} else {
+					Fatalf("Invalid account in --txpool.locals: %s", account)
+				}
 			}
 		}
 	}

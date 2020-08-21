@@ -20,15 +20,16 @@ import (
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
 	"reflect"
-	"strings"
 
 	"golang.org/x/crypto/sha3"
 
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
+	"github.com/Evrynetlabs/evrynet-node/crypto/base58"
 )
 
 // Lengths of hashes and addresses in bytes.
@@ -37,11 +38,18 @@ const (
 	HashLength = 32
 	// AddressLength is the expected length of the address
 	AddressLength = 20
+
+	// MaxProvider is the maximum of provider
+	MaxProvider        = 16
+	AddressPrefix byte = 33
 )
 
 var (
+	// only used in generate genesis file
 	hashT    = reflect.TypeOf(Hash{})
 	addressT = reflect.TypeOf(Address{})
+
+	ErrPrefixMismatch = errors.New("addressPrefix mismatch")
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.
@@ -230,7 +238,7 @@ func (a Address) Hex() string {
 
 // String implements fmt.Stringer.
 func (a Address) String() string {
-	return a.Hex()
+	return AddressToEvryAddressString(a)
 }
 
 // Format implements fmt.Formatter, forcing the byte slice to be formatted as is,
@@ -250,17 +258,23 @@ func (a *Address) SetBytes(b []byte) {
 
 // MarshalText returns the hex representation of a.
 func (a Address) MarshalText() ([]byte, error) {
-	return hexutil.Bytes(a[:]).MarshalText()
+	return []byte(AddressToEvryAddressString(a)), nil
 }
 
 // UnmarshalText parses a hash in hex syntax.
 func (a *Address) UnmarshalText(input []byte) error {
-	return hexutil.UnmarshalFixedText("Address", input, a[:])
+	res, err := EvryAddressStringToAddressCheck(string(input))
+	a.SetBytes(res.Bytes())
+	return err
 }
 
 // UnmarshalJSON parses a hash in hex syntax.
 func (a *Address) UnmarshalJSON(input []byte) error {
-	return hexutil.UnmarshalFixedJSON(addressT, input, a[:])
+	isString := len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"'
+	if !isString {
+		return &json.UnmarshalTypeError{Value: "non-string", Type: reflect.TypeOf("")}
+	}
+	return a.UnmarshalText(input[1 : len(input)-1])
 }
 
 // Scan implements Scanner for database/sql.
@@ -289,7 +303,10 @@ func (a *Address) UnmarshalGraphQL(input interface{}) error {
 	var err error
 	switch input := input.(type) {
 	case string:
-		*a = HexToAddress(input)
+		res, err := EvryAddressStringToAddressCheck(string(input))
+		if err == nil {
+			a.SetBytes(res.Bytes())
+		}
 	default:
 		err = fmt.Errorf("Unexpected type for Address: %v", input)
 	}
@@ -311,12 +328,15 @@ type UnprefixedAddress Address
 
 // UnmarshalText decodes the address from hex. The 0x prefix is optional.
 func (a *UnprefixedAddress) UnmarshalText(input []byte) error {
-	return hexutil.UnmarshalFixedUnprefixedText("UnprefixedAddress", input, a[:])
+	// pare json file does not need to checkPrefix
+	res, err := EvryAddressStringToAddressCheck(string(input))
+	copy(a[:], res[:])
+	return err
 }
 
 // MarshalText encodes the address as hex.
 func (a UnprefixedAddress) MarshalText() ([]byte, error) {
-	return []byte(hex.EncodeToString(a[:])), nil
+	return []byte(AddressToEvryAddressString(Address(a))), nil
 }
 
 // MixedcaseAddress retains the original string, which may or may not be
@@ -328,32 +348,38 @@ type MixedcaseAddress struct {
 
 // NewMixedcaseAddress constructor (mainly for testing)
 func NewMixedcaseAddress(addr Address) MixedcaseAddress {
-	return MixedcaseAddress{addr: addr, original: addr.Hex()}
+	return MixedcaseAddress{addr: addr, original: AddressToEvryAddressString(addr)}
 }
 
 // NewMixedcaseAddressFromString is mainly meant for unit-testing
-func NewMixedcaseAddressFromString(hexaddr string) (*MixedcaseAddress, error) {
-	if !IsHexAddress(hexaddr) {
-		return nil, fmt.Errorf("Invalid address")
+func NewMixedcaseAddressFromString(addrStr string) (*MixedcaseAddress, error) {
+	addr, err := EvryAddressStringToAddressCheck(addrStr)
+	if err != nil {
+		return nil, err
 	}
-	a := FromHex(hexaddr)
-	return &MixedcaseAddress{addr: BytesToAddress(a), original: hexaddr}, nil
+	return &MixedcaseAddress{addr: addr, original: addrStr}, nil
 }
 
 // UnmarshalJSON parses MixedcaseAddress
 func (ma *MixedcaseAddress) UnmarshalJSON(input []byte) error {
-	if err := hexutil.UnmarshalFixedJSON(addressT, input, ma.addr[:]); err != nil {
+	if err := json.Unmarshal(input, &ma.original); err != nil {
 		return err
 	}
-	return json.Unmarshal(input, &ma.original)
+	isString := len(input) >= 2 && input[0] == '"' && input[len(input)-1] == '"'
+	if isString {
+		input = input[1 : len(input)-1]
+	}
+	res, err := EvryAddressStringToAddressCheck(string(input))
+	copy(ma.addr[:], res[:])
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // MarshalJSON marshals the original value
 func (ma *MixedcaseAddress) MarshalJSON() ([]byte, error) {
-	if strings.HasPrefix(ma.original, "0x") || strings.HasPrefix(ma.original, "0X") {
-		return json.Marshal(fmt.Sprintf("0x%s", ma.original[2:]))
-	}
-	return json.Marshal(fmt.Sprintf("0x%s", ma.original))
+	return json.Marshal(ma.original)
 }
 
 // Address returns the address
@@ -371,10 +397,37 @@ func (ma *MixedcaseAddress) String() string {
 
 // ValidChecksum returns true if the address has valid checksum
 func (ma *MixedcaseAddress) ValidChecksum() bool {
-	return ma.original == ma.addr.Hex()
+	return ma.original == AddressToEvryAddressString(ma.addr)
 }
 
 // Original returns the mixed-case input string
 func (ma *MixedcaseAddress) Original() string {
 	return ma.original
+}
+
+// Evrynet-node address string changes to address(byte array which length is 20) with addressPrefix check
+func EvryAddressStringToAddressCheck(addressStr string) (addr Address, err error) {
+	result, version, err := base58.CheckDecode(addressStr)
+	if err != nil {
+		return addr, err
+	}
+	if version != AddressPrefix {
+		return addr, ErrPrefixMismatch
+	}
+	addr.SetBytes(result[:])
+	return addr, err
+}
+
+//  Address(byte array which length is 20) changes to Evrynet-node address string
+func AddressToEvryAddressString(address Address) string {
+	return base58.CheckEncode(address.Bytes(), AddressPrefix)
+}
+
+// Evrynet-node address string changes to address
+func EvryAddressStringToAddress(addressStr string) (addr Address, prefix byte, err error) {
+	result, prefix, err := base58.CheckDecode(addressStr)
+	if err == nil {
+		addr.SetBytes(result)
+	}
+	return addr, prefix, err
 }

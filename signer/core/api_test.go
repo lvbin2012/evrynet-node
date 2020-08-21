@@ -33,7 +33,6 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/internal/evrapi"
-	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 	"github.com/Evrynetlabs/evrynet-node/signer/core"
 	"github.com/Evrynetlabs/evrynet-node/signer/fourbyte"
@@ -343,7 +342,6 @@ func TestProviderSignTx(t *testing.T) {
 	methodSig := "test(uint)"
 	tx := mkTestTx(a)
 
-	log.Info("===============", tx.From.Address())
 	control.approveCh <- "Y"
 	control.inputCh <- "a_long_password"
 
