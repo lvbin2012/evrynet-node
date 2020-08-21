@@ -3919,15 +3919,16 @@ var outputPostFormatter = function(post){
 };
 
 var inputAddressFormatter = function (address) {
-    var iban = new Iban(address);
-    if (iban.isValid() && iban.isDirect()) {
-        return '0x' + iban.address();
-    } else if (utils.isStrictAddress(address)) {
-        return address;
-    } else if (utils.isAddress(address)) {
-        return '0x' + address;
-    }
-    throw new Error('invalid address');
+    return address;
+    // var iban = new Iban(address);
+    // if (iban.isValid() && iban.isDirect()) {
+    //     return '0x' + iban.address();
+    // } else if (utils.isStrictAddress(address)) {
+    //     return address;
+    // } else if (utils.isAddress(address)) {
+    //     return '0x' + address;
+    // }
+    // throw new Error('invalid address');
 };
 
 

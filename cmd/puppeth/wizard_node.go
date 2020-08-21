@@ -110,13 +110,18 @@ func (w *wizard) deployNode(boot bool) {
 				fmt.Printf("What address should the miner use?\n")
 				for {
 					if address := w.readAddress(); address != nil {
-						infos.etherbase = address.Hex()
+						infos.etherbase = common.AddressToEvryAddressString(*address)
 						break
 					}
 				}
 			} else {
 				fmt.Printf("What address should the miner use? (default = %s)\n", infos.etherbase)
-				infos.etherbase = w.readDefaultAddress(common.HexToAddress(infos.etherbase)).Hex()
+
+				defaultAddress, err := common.EvryAddressStringToAddressCheck(infos.etherbase)
+				if err != nil {
+					fmt.Println("Info.etherbase is illegal, you should input new, err:", err)
+				}
+				infos.etherbase = common.AddressToEvryAddressString(w.readDefaultAddress(defaultAddress))
 			}
 		} else if w.conf.Genesis.Config.Clique != nil || w.conf.Genesis.Config.Tendermint != nil {
 			// If a previous signer was already set, offer to reuse it

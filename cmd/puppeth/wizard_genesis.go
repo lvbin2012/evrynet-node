@@ -189,7 +189,8 @@ func (w *wizard) makeGenesis() {
 
 		for _, acc := range accs {
 			if _, ok := genesis.Alloc[acc.Address]; ok {
-				fmt.Printf("- Address %s already existed => Ignore\n", acc.Address.Hex())
+				fmt.Printf("- Address %s already existed => Ignore\n",
+					common.AddressToEvryAddressString(acc.Address))
 				continue
 			}
 			genesis.Alloc[acc.Address] = core.GenesisAccount{
@@ -215,7 +216,7 @@ func (w *wizard) makeGenesis() {
 			break
 		}
 		fmt.Println()
-		fmt.Println("Should the precompile-addresses (0x1 .. 0xff) be pre-funded with 1 wei? (advisable no)")
+		fmt.Println("Should the  precompile-addresses (0x1 .. 0xff) be pre-funded with 1 wei? (advisable no)")
 		if w.readDefaultYesNo(false) {
 			// Add a batch of precompile balances to avoid them getting deleted
 			for i := int64(0); i < 256; i++ {
