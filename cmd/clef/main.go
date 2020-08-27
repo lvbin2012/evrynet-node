@@ -644,7 +644,8 @@ func testExternalUI(api *core.SignerAPI) {
 	ctx = context.WithValue(ctx, "local", "main")
 	errs := make([]string, 0)
 
-	a := common.HexToAddress("0xdeadbeef000000000000000000000000deadbeef")
+	a, _ := common.EvryAddressStringToAddressCheck("EdTKeF2ugJwiN4su8qeq2VbDU1zMthLSMr")
+
 	addErr := func(errStr string) {
 		log.Info("Test error", "error", errStr)
 		errs = append(errs, errStr)
@@ -692,7 +693,7 @@ func testExternalUI(api *core.SignerAPI) {
 		cliqueHeader := types.Header{
 			common.HexToHash("0000H45H"),
 			common.HexToHash("0000H45H"),
-			common.HexToAddress("0000H45H"),
+			common.Address{},
 			common.HexToHash("0000H00H"),
 			common.HexToHash("0000H45H"),
 			common.HexToHash("0000H45H"),
@@ -718,7 +719,7 @@ func testExternalUI(api *core.SignerAPI) {
 		api.UI.ShowInfo("Please approve the next request for signing EIP-712 typed data")
 		time.Sleep(delay)
 		addr, _ := common.NewMixedcaseAddressFromString("EHAG23hA6q1vYjdB9Q88pnfYLchdKAiNeU")
-		data := `{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"test","type":"uint8"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":"1","verifyingContract":"0xCCCcccccCCCCcCCCCCCcCcCccCcCCCcCcccccccC"},"message":{"from":{"name":"Cow","test":"3","wallet":"0xcD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826"},"to":{"name":"Bob","wallet":"0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB","test":"2"},"contents":"Hello, Bob!"}}`
+		data := `{"types":{"EIP712Domain":[{"name":"name","type":"string"},{"name":"version","type":"string"},{"name":"chainId","type":"uint256"},{"name":"verifyingContract","type":"address"}],"Person":[{"name":"name","type":"string"},{"name":"test","type":"uint8"},{"name":"wallet","type":"address"}],"Mail":[{"name":"from","type":"Person"},{"name":"to","type":"Person"},{"name":"contents","type":"string"}]},"primaryType":"Mail","domain":{"name":"Ether Mail","version":"1","chainId":"1","verifyingContract":"EbpngUGwQ6fR3T7XdP4NbEoPg3ugbofgeN"},"message":{"from":{"name":"Cow","test":"3","wallet":"Ebricr1hUkgTx8n4a3zNQBrbRnmzVHdaGf"},"to":{"name":"Bob","wallet":"EaGYkPzKV5xxTMa4E5yDdEKGmMHtQVHX5f","test":"2"},"contents":"Hello, Bob!"}}`
 		//_, err := api.SignData(ctx, accounts.MimetypeTypedData, *addr, hexutil.Encode([]byte(data)))
 		var typedData core.TypedData
 		err := json.Unmarshal([]byte(data), &typedData)

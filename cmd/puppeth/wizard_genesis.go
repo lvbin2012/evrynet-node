@@ -205,7 +205,7 @@ func (w *wizard) makeGenesis() {
 			// Read the address of the account to fund
 			if address := w.readAddress(); address != nil {
 				if _, ok := genesis.Alloc[*address]; ok {
-					fmt.Printf("- Address %s already existed. Please input another one.\n", address.Hex())
+					fmt.Printf("- Address %s already existed. Please input another one.\n", address.String())
 					continue
 				}
 				genesis.Alloc[*address] = core.GenesisAccount{
@@ -222,7 +222,7 @@ func (w *wizard) makeGenesis() {
 			for i := int64(0); i < 256; i++ {
 				addr := common.BigToAddress(big.NewInt(i))
 				if _, ok := genesis.Alloc[addr]; ok {
-					fmt.Printf("- Account %d (address: %s) already existed => Ignore\n", i, addr.Hex())
+					fmt.Printf("- Account %d (address: %s) already existed => Ignore\n", i, addr.String())
 					continue
 				}
 				genesis.Alloc[addr] = core.GenesisAccount{Balance: big.NewInt(1)}

@@ -112,7 +112,7 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 	u := new(uuid.UUID)
 	*u = uuid.Parse(keyJSON.Id)
 	k.Id = *u
-	addr, err := hex.DecodeString(keyJSON.Address)
+	addr, err := common.EvryAddressStringToAddressCheck(keyJSON.Address)
 	if err != nil {
 		return err
 	}
@@ -121,7 +121,7 @@ func (k *Key) UnmarshalJSON(j []byte) (err error) {
 		return err
 	}
 
-	k.Address = common.BytesToAddress(addr)
+	k.Address = addr
 	k.PrivateKey = privkey
 
 	return nil

@@ -178,8 +178,6 @@ func (h UnprefixedHash) MarshalText() ([]byte, error) {
 	return []byte(hex.EncodeToString(h[:])), nil
 }
 
-/////////// Address
-
 // Address represents the 20 byte address of an Evrynet account.
 type Address [AddressLength]byte
 
@@ -421,13 +419,4 @@ func EvryAddressStringToAddressCheck(addressStr string) (addr Address, err error
 //  Address(byte array which length is 20) changes to Evrynet-node address string
 func AddressToEvryAddressString(address Address) string {
 	return base58.CheckEncode(address.Bytes(), AddressPrefix)
-}
-
-// Evrynet-node address string changes to address
-func EvryAddressStringToAddress(addressStr string) (addr Address, prefix byte, err error) {
-	result, prefix, err := base58.CheckDecode(addressStr)
-	if err == nil {
-		addr.SetBytes(result)
-	}
-	return addr, prefix, err
 }

@@ -167,7 +167,7 @@ func (ch suicideChange) dirtied() *common.Address {
 	return ch.account
 }
 
-var ripemd = common.HexToAddress("0000000000000000000000000000000000000003")
+var ripemd, _ = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeW8pZptqN")
 
 func (ch touchChange) revert(s *StateDB) {
 }

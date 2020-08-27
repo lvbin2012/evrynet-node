@@ -36,16 +36,18 @@ import (
 // The values in those tests are from the Transaction Tests
 // at github.com/ethereum/tests.
 var (
+	a, _    = common.EvryAddressStringToAddressCheck("EJ1Sm7ZPs136zds7axDPJ2LCGQtSi8B2AN")
+	b, _    = common.EvryAddressStringToAddressCheck("Ea3jXjtJ3BqZneXsUKFhENkHDVT9y3TT1t")
 	emptyTx = NewTransaction(
 		0,
-		common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"),
+		a,
 		big.NewInt(0), 0, big.NewInt(0),
 		nil,
 	)
 
 	rightvrsTx, _ = NewTransaction(
 		3,
-		common.HexToAddress("b94f5374fce5edbc8e2a8697c15331677e6ebf0b"),
+		b,
 		big.NewInt(10),
 		2000,
 		big.NewInt(1),
@@ -66,13 +68,14 @@ func TestTransactionCompatibility(t *testing.T) {
 	unsignedEtherHashString := "0x32d0ec31372e18e22e4af25a00926e344c16473978dce150112a89d0bdf5795a"
 	signedEthereHashString := "0x4aba6ccfa807932610b108dcb0f0c5491781bfb0d408e9909a967c6793a9c9ed"
 
-	evrTx := NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
+	to, _ := common.EvryAddressStringToAddressCheck("EJ1Sm7ZPs136zds7axDPJ2LCGQtSi8B2AN")
+	evrTx := NewTransaction(0, to, big.NewInt(1000), 0, big.NewInt(100), common.FromHex("123"))
 	//unsigned version should be hashed to the same hash
 	assert.Equal(t, evrTx.Hash().String(), unsignedEtherHashString)
 
 	evrSignedTx := signTx(t, evrTx)
 	//signed Tx should be hashed to the same hash
-	assert.Equal(t, 	 evrSignedTx.Hash().String(), signedEthereHashString)
+	assert.Equal(t, evrSignedTx.Hash().String(), signedEthereHashString)
 }
 
 func TestTransactionSigHash(t *testing.T) {
@@ -251,17 +254,19 @@ func TestTransactionJSON(t *testing.T) {
 
 func TestTransaction_AsMessage(t *testing.T) {
 	var (
-		chainID      = params.AllEthashProtocolChanges.ChainID
-		err          error
-		payload      = "0x608060405260d0806100126000396000f30060806040526004361060525763ffffffff7c01000000000000000000000000000000000000000000000000000000006000350416633fb5c1cb811460545780638381f58a14605d578063f2c9ecd8146081575b005b60526004356093565b348015606857600080fd5b50606f6098565b60408051918252519081900360200190f35b348015608c57600080fd5b50606f609e565b600055565b60005481565b600054905600a165627a7a723058209573e4f95d10c1e123e905d720655593ca5220830db660f0641f3175c1cdb86e0029"
-		contractAddr = common.HexToAddress("0x02")
-		signer       = NewEIP155Signer(chainID)
+		chainID         = params.AllEthashProtocolChanges.ChainID
+		err             error
+		payload         = "0x608060405260d0806100126000396000f30060806040526004361060525763ffffffff7c01000000000000000000000000000000000000000000000000000000006000350416633fb5c1cb811460545780638381f58a14605d578063f2c9ecd8146081575b005b60526004356093565b348015606857600080fd5b50606f6098565b60408051918252519081900360200190f35b348015608c57600080fd5b50606f609e565b600055565b60005481565b600054905600a165627a7a723058209573e4f95d10c1e123e905d720655593ca5220830db660f0641f3175c1cdb86e0029"
+		contractAddr, _ = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeW8hGraaK")
+		to1, _          = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdYvGRyE")
+		to2, _          = common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdfucv31")
+		signer          = NewEIP155Signer(chainID)
 	)
-	tx := NewTransaction(uint64(0), common.HexToAddress("0x0101"), big.NewInt(100), 21000, big.NewInt(params.GasPriceConfig), nil)
+	tx := NewTransaction(uint64(0), to1, big.NewInt(100), 21000, big.NewInt(params.GasPriceConfig), nil)
 	tx, err = SignTx(tx, signer, testKey)
 	require.NoError(t, err)
 
-	txWithProvider := NewTransaction(uint64(0), common.HexToAddress("0x0102"), big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
+	txWithProvider := NewTransaction(uint64(0), to2, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
 	txWithProvider, err = SignTx(txWithProvider, signer, testKey2)
 	require.NoError(t, err)
 	txWithProvider, err = ProviderSignTx(txWithProvider, signer, testKey)

@@ -125,7 +125,7 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]*RPCTransac
 		for _, tx := range txs {
 			dump[fmt.Sprintf("%d", tx.Nonce())] = newRPCPendingTransaction(tx)
 		}
-		content["pending"][account.Hex()] = dump
+		content["pending"][account.String()] = dump
 	}
 	// Flatten the queued transactions
 	for account, txs := range queue {
@@ -133,7 +133,7 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]*RPCTransac
 		for _, tx := range txs {
 			dump[fmt.Sprintf("%d", tx.Nonce())] = newRPCPendingTransaction(tx)
 		}
-		content["queued"][account.Hex()] = dump
+		content["queued"][account.String()] = dump
 	}
 	return content
 }
@@ -159,7 +159,7 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 	// Define a formatter to flatten a transaction into a string
 	var format = func(tx *types.Transaction) string {
 		if to := tx.To(); to != nil {
-			return fmt.Sprintf("%s: %v wei + %v gas × %v wei", tx.To().Hex(), tx.Value(), tx.Gas(), tx.GasPrice())
+			return fmt.Sprintf("%s: %v wei + %v gas × %v wei", tx.To().String(), tx.Value(), tx.Gas(), tx.GasPrice())
 		}
 		return fmt.Sprintf("contract creation: %v wei + %v gas × %v wei", tx.Value(), tx.Gas(), tx.GasPrice())
 	}
@@ -169,7 +169,7 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 		for _, tx := range txs {
 			dump[fmt.Sprintf("%d", tx.Nonce())] = format(tx)
 		}
-		content["pending"][account.Hex()] = dump
+		content["pending"][account.String()] = dump
 	}
 	// Flatten the queued transactions
 	for account, txs := range queue {
@@ -177,7 +177,7 @@ func (s *PublicTxPoolAPI) Inspect() map[string]map[string]map[string]string {
 		for _, tx := range txs {
 			dump[fmt.Sprintf("%d", tx.Nonce())] = format(tx)
 		}
-		content["queued"][account.Hex()] = dump
+		content["queued"][account.String()] = dump
 	}
 	return content
 }
@@ -1525,9 +1525,9 @@ func SubmitTransaction(ctx context.Context, b Backend, tx *types.Transaction) (c
 			return common.Hash{}, err
 		}
 		addr := crypto.CreateAddress(from, tx.Nonce())
-		log.Info("Submitted contract creation", "fullhash", tx.Hash().Hex(), "contract", addr.Hex())
+		log.Info("Submitted contract creation", "fullhash", tx.Hash().Hex(), "contract", addr.String())
 	} else {
-		log.Info("Submitted transaction", "fullhash", tx.Hash().Hex(), "recipient", tx.To())
+		log.Info("Submitted transaction", "fullhash", tx.Hash().Hex(), "recipient", tx.To().String())
 	}
 	return tx.Hash(), nil
 }

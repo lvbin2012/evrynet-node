@@ -57,8 +57,10 @@ var (
 
 func TestToFilterArg(t *testing.T) {
 	blockHashErr := fmt.Errorf("cannot specify both BlockHash and FromBlock/ToBlock")
+
+	address, _ := common.EvryAddressStringToAddressCheck("EcRhd3AvnF4cMN82WaPoytZrizvi77jquf")
 	addresses := []common.Address{
-		common.HexToAddress("0xD36722ADeC3EdCB29c8e7b5a47f352D701393462"),
+		address,
 	}
 	blockHash := common.HexToHash(
 		"0xeb94bb7d78b73657a9d7a99792413f50c0a45c51fc62bdcb08a53f18e9a2b4eb",
@@ -355,11 +357,13 @@ func TestGetTransactionByHash(t *testing.T) {
 		err     error
 		payload = "0x608060405260d0806100126000396000f30060806040526004361060525763ffffffff7c01000000000000000000000000000000000000000000000000000000006000350416633fb5c1cb811460545780638381f58a14605d578063f2c9ecd8146081575b005b60526004356093565b348015606857600080fd5b50606f6098565b60408051918252519081900360200190f35b348015608c57600080fd5b50606f609e565b600055565b60005481565b600054905600a165627a7a723058209573e4f95d10c1e123e905d720655593ca5220830db660f0641f3175c1cdb86e0029"
 	)
-	tx := types.NewTransaction(uint64(0), common.HexToAddress("0x0101"), big.NewInt(100), 21000, big.NewInt(params.GasPriceConfig), nil)
+	to1, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdYvGRyE")
+	to2, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdfucv31")
+	tx := types.NewTransaction(uint64(0), to1, big.NewInt(100), 21000, big.NewInt(params.GasPriceConfig), nil)
 	tx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), testKey)
 	require.NoError(t, err)
 
-	txWithProvider := types.NewTransaction(uint64(0), common.HexToAddress("0x0102"), big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
+	txWithProvider := types.NewTransaction(uint64(0), to2, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
 	txWithProvider, err = types.SignTx(txWithProvider, types.NewEIP155Signer(chainID), testKey2)
 	require.NoError(t, err)
 	txWithProvider, err = types.ProviderSignTx(txWithProvider, types.NewEIP155Signer(chainID), testKey)
@@ -370,8 +374,9 @@ func TestGetTransactionByHash(t *testing.T) {
 	creationContractTx, err = types.SignTx(creationContractTx, types.NewEIP155Signer(chainID), testKey)
 	require.NoError(t, err)
 
-	owner := common.HexToAddress("0x01")
-	provider := common.HexToAddress("0x02")
+	owner, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeW8fmHkiJ")
+	provider, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeW8hGraaK")
+
 	opts := types.CreateAccountOption{
 		OwnerAddress:    &owner,
 		ProviderAddress: &provider,
@@ -425,7 +430,8 @@ func TestReplayAttackWithProviderAddress(t *testing.T) {
 		providerAddr = testAddr
 	)
 	//Create atx and sign it with senderKey
-	txWithProvider := types.NewTransaction(uint64(0), common.HexToAddress("0x0102"), big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
+	to, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdfucv31")
+	txWithProvider := types.NewTransaction(uint64(0), to, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
 	txWithProvider, err = types.SignTx(txWithProvider, types.NewEIP155Signer(chainID), senderKey)
 	require.NoError(t, err)
 	txWithProvider, err = types.ProviderSignTx(txWithProvider, types.NewEIP155Signer(chainID), providerKey)
@@ -436,7 +442,7 @@ func TestReplayAttackWithProviderAddress(t *testing.T) {
 
 	var fSigner = &fakeSigner{pv: pv, pr: pr, ps: ps, base: types.NewEIP155Signer(chainID)}
 
-	replayTx := types.NewTransaction(uint64(0), common.HexToAddress("0x0102"), big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
+	replayTx := types.NewTransaction(uint64(0), to, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
 	//sign the message with the copied signature from the sender
 	replayTx, err = types.SignTx(replayTx, fSigner, senderKey)
 	require.NoError(t, err)

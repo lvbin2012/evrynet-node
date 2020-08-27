@@ -16,14 +16,14 @@ import (
 
 func TestModifyProviders(t *testing.T) {
 	var (
-		senderAddr     = common.HexToAddress(senderAddrStr)
-		ownerAddr      = common.HexToAddress(ownerAddrStr)
-		providerAddr   = common.HexToAddress(providerAddrStr)
-		ownerKey, _    = crypto.HexToECDSA(ownerPK)
-		senderKey, _   = crypto.HexToECDSA(senderPK)
-		providerKey, _ = crypto.HexToECDSA(providerPK)
-		gasPrice       = big.NewInt(params.GasPriceConfig)
-		signer         = types.NewEIP155Signer(big.NewInt(chainId))
+		senderAddr, _   = common.EvryAddressStringToAddressCheck(senderAddrStr)
+		ownerAddr, _    = common.EvryAddressStringToAddressCheck(ownerAddrStr)
+		providerAddr, _ = common.EvryAddressStringToAddressCheck(providerAddrStr)
+		ownerKey, _     = crypto.HexToECDSA(ownerPK)
+		senderKey, _    = crypto.HexToECDSA(senderPK)
+		providerKey, _  = crypto.HexToECDSA(providerPK)
+		gasPrice        = big.NewInt(params.GasPriceConfig)
+		signer          = types.NewEIP155Signer(big.NewInt(chainId))
 	)
 	contractAddr := prepareNewContract(true)
 	require.NotNil(t, contractAddr)
