@@ -40,8 +40,13 @@ const (
 	AddressLength = 20
 
 	// MaxProvider is the maximum of provider
-	MaxProvider        = 16
+	MaxProvider = 16
+
+	// AddressPrefix is the version of evrynet-node address
 	AddressPrefix byte = 33
+
+	// EvryEmptyAddress is the address of 0
+	EvryEmptyAddress = "EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9"
 )
 
 var (
