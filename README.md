@@ -195,10 +195,10 @@ populate the `alloc` field with account configs:
 
 ```json
 "alloc": {
-  "0x0000000000000000000000000000000000000001": {
+  "EH9uVaqWRxHuzJbroqzX18yxmeW8fmHkiJ": {
     "balance": "111111111"
   },
-  "0x0000000000000000000000000000000000000002": {
+  "EH9uVaqWRxHuzJbroqzX18yxmeW8hGraaK": {
     "balance": "222222222"
   }
 }
@@ -259,7 +259,7 @@ ones either). To start a `gev` instance for mining, run it with all your usual f
 by:
 
 ```shell
-$ gev <usual-flags> --mine --minerthreads=1 --etherbase=0x0000000000000000000000000000000000000000
+$ gev <usual-flags> --mine --minerthreads=1 --etherbase=EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9
 ```
 
 Which will start mining blocks and transactions on a single CPU thread, crediting all
