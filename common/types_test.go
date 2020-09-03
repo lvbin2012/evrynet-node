@@ -117,9 +117,12 @@ func TestAddressUnmarshalJSON(t *testing.T) {
 		{`""`, true, nil},
 		{`"0x"`, true, nil},
 		{`"0x00"`, true, nil},
-		{`"0xG000000000000000000000000000000000000000"`, true, nil},
-		{`"0x0000000000000000000000000000000000000000"`, false, big.NewInt(0)},
-		{`"0x0000000000000000000000000000000000000010"`, false, big.NewInt(16)},
+		{`"0x0000000000000000000000000000000000000010"`, true, nil},
+		{`"0x0000000000000000000000000000000000000000"`, true, nil},
+		{`"EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9d"`, true, nil},
+		{`"EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9"`, false, big.NewInt(0)},
+		{`"EH9uVaqWRxHuzJbroqzX18yxmeWAGk5R72"`, false, big.NewInt(16)},
+		{`"DspJWUYDimq3AsTmnRfCX1iB99FDc7eWAR"`, true, nil},
 	}
 	for i, test := range tests {
 		var v Address
