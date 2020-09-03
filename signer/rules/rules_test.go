@@ -588,7 +588,7 @@ func TestSignData(t *testing.T) {
     return "Approve"
 }
 function ApproveSignData(r){
-    if( r.address.toLowerCase() == "0x694267f14675d7e1b9494fd8d72fefe1755710fa")
+    if( r.address == "ESkTzhS4rvGEaMdRoHjUs2Gekyvcx8286J")
     {
         if(r.message[0].value.indexOf("bazonk") >= 0){
             return "Approve"
@@ -604,7 +604,7 @@ function ApproveSignData(r){
 	}
 	message := "baz bazonk foo"
 	hash, rawdata := accounts.TextAndHash([]byte(message))
-	addr, _ := mixAddr("0x694267f14675d7e1b9494fd8d72fefe1755710fa")
+	addr, _ := mixAddr("ESkTzhS4rvGEaMdRoHjUs2Gekyvcx8286J")
 
 	fmt.Printf("address %v %v\n", addr.String(), addr.Original())
 
