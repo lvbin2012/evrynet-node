@@ -2087,6 +2087,17 @@ var fromDecimal = function (value) {
 };
 
 /**
+ * Just return input; used in tracer, will override in go
+ *
+ * @method toEvrAddr
+ * @param {string}
+ * @return {string}
+ */
+var toEvrAddr = function (val) {
+  return val;
+};
+
+/**
  * Auto converts any given value into it's hex representation.
  *
  * And even stringifys objects before.
@@ -2444,6 +2455,7 @@ module.exports = {
     padLeft: padLeft,
     padRight: padRight,
     toHex: toHex,
+    toEvrAddr:toEvrAddr,
     toDecimal: toDecimal,
     fromDecimal: fromDecimal,
     toUtf8: toUtf8,

@@ -136,7 +136,7 @@ func TestFinalizeBlock(t *testing.T) {
 					Address: validators[i],
 				}
 
-				assert.Equal(t, validators[i].Hex(), core.valSet.GetByIndex(int64(i)).String(), "The order voting must be the same")
+				assert.Equal(t, validators[i].String(), core.valSet.GetByIndex(int64(i)).String(), "The order voting must be the same")
 				switch tc.validatorVotes[i] {
 				case Block1:
 					ok, err := newMsgSet.AddVote(msg,
