@@ -43,7 +43,8 @@ const (
 	MaxProvider = 16
 
 	// AddressPrefix is the version of evrynet-node address
-	AddressPrefix byte = 33
+	AddressPrefix         byte = 33
+	EvrynodeAddressLength      = 34
 
 	// EvryEmptyAddress is the address of 0
 	EvryEmptyAddress = "EH9uVaqWRxHuzJbroqzX18yxmeW8XVJyV9"
@@ -54,7 +55,8 @@ var (
 	hashT    = reflect.TypeOf(Hash{})
 	addressT = reflect.TypeOf(Address{})
 
-	ErrPrefixMismatch = errors.New("addressPrefix mismatch")
+	ErrPrefixMismatch       = errors.New("addressPrefix mismatch")
+	ErrWrongLengthOfAddress = errors.New("the length of evrynode address should be 34")
 )
 
 // Hash represents the 32 byte Keccak256 hash of arbitrary data.
@@ -410,6 +412,9 @@ func (ma *MixedcaseAddress) Original() string {
 
 // Evrynet-node address string changes to address(byte array which length is 20) with addressPrefix check
 func EvryAddressStringToAddressCheck(addressStr string) (addr Address, err error) {
+	if len(addressStr) != EvrynodeAddressLength {
+		return addr, ErrWrongLengthOfAddress
+	}
 	result, version, err := base58.CheckDecode(addressStr)
 	if err != nil {
 		return addr, err
