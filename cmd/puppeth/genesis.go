@@ -1,18 +1,18 @@
-// Copyright 2017 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2017 The evrynet-node Authors
+// This file is part of evrynet-node.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// evrynet-node is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// evrynet-node is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with evrynet-node. If not, see <http://www.gnu.org/licenses/>.
 
 package main
 
@@ -91,10 +91,10 @@ type alethGenesisSpecLinearPricing struct {
 	Word uint64 `json:"word"`
 }
 
-// newAlethGenesisSpec converts a go-ethereum genesis block into a Aleth-specific
+// newAlethGenesisSpec converts a evrynet-node genesis block into a Aleth-specific
 // chain specification format.
 func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSpec, error) {
-	// Only ethash is currently supported between go-ethereum and aleth
+	// Only ethash is currently supported between evrynet-node and aleth
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}
@@ -305,10 +305,10 @@ type parityChainSpecAltBnPairingPricing struct {
 	Pair uint64 `json:"pair"`
 }
 
-// newParityChainSpec converts a go-ethereum genesis block into a Parity specific
+// newParityChainSpec converts a evrynet-node genesis block into a Parity specific
 // chain specification format.
 func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []string) (*parityChainSpec, error) {
-	// Only ethash is currently supported between go-ethereum and Parity
+	// Only ethash is currently supported between evrynet-node and Parity
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}
@@ -465,10 +465,10 @@ type pyEvrynetGenesisSpec struct {
 	ParentHash common.Hash       `json:"parentHash"`
 }
 
-// newPyEvrynetGenesisSpec converts a go-ethereum genesis block into a Parity specific
+// newPyEvrynetGenesisSpec converts a evrynet-node genesis block into a Parity specific
 // chain specification format.
 func newPyEvrynetGenesisSpec(network string, genesis *core.Genesis) (*pyEvrynetGenesisSpec, error) {
-	// Only ethash is currently supported between go-ethereum and pyethereum
+	// Only ethash is currently supported between evrynet-node and pyethereum
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}

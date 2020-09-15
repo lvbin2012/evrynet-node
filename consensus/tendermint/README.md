@@ -1,4 +1,4 @@
-# Tendermint consensus for go-ethereum
+# Tendermint consensus for evrynet-node
 
 ## init
 -- TOBE written

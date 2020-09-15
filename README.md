@@ -4,13 +4,13 @@ Official Golang implementation of the Evrynet protocol.
 
 [![API Reference](
 https://camo.githubusercontent.com/915b7be44ada53c290eb157634330494ebe3e30a/68747470733a2f2f676f646f632e6f72672f6769746875622e636f6d2f676f6c616e672f6764646f3f7374617475732e737667
-)](https://godoc.org/github.com/ethereum/go-ethereum)
-[![Go Report Card](https://goreportcard.com/badge/github.com/ethereum/go-ethereum)](https://goreportcard.com/report/github.com/ethereum/go-ethereum)
-[![Travis](https://travis-ci.org/ethereum/go-ethereum.svg?branch=master)](https://travis-ci.org/ethereum/go-ethereum)
+)](https://godoc.org/github.com/Evrynetlabs/evrynet-node)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Evrynetlabs/evrynet-node)](https://goreportcard.com/report/github.com/Evrynetlabs/evrynet-node)
+[![Travis](https://travis-ci.org/Evrynetlabs/evrynet-node.svg?branch=master)](https://travis-ci.org/Evrynetlabs/evrynet-node)
 [![Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/nthXNEv)
 
 Automated builds are available for stable releases and the unstable master branch. Binary
-archives are published at https://geth.ethereum.org/downloads/.
+archives are published at https://gev.Evrynetlabs.org/downloads/.
 
 ## Building the source
 
@@ -40,8 +40,8 @@ directory.
 |   `abigen`    | Source code generator to convert Evrynet contract definitions into easy to use, compile-time type-safe Go packages. |
 |  `bootnode`   | Stripped down version of our Evrynet client implementation that only takes part in the network node discovery protocol, but does not run any of the higher level application protocols. It can be used as a lightweight bootstrap node to aid in finding peers in private networks.                                                                                                                                                                                                                                                                 |
 |     `evm`     | Developer utility version of the EVM (Evrynet Virtual Machine) that is capable of running bytecode snippets within a configurable environment and execution mode. Its purpose is to allow isolated, fine-grained debugging of EVM opcodes (e.g. `evm --code 60ff60ff --debug`).                                                                                                                                                                                                                                                                     |
-| `gethrpctest` | Developer utility tool to support our [ethereum/rpc-test](https://github.com/ethereum/rpc-tests) test suite which validates baseline conformity to the [Evrynet JSON RPC](https://github.com/Evrynetlabs/evrynet-node/wiki/JSON-RPC) specs. Please see the [test suite's readme](https://github.com/ethereum/rpc-tests/blob/master/README.md) for details.                                                                                                                                                                                                     |
-|   `rlpdump`   | Developer utility tool to convert binary RLP ([Recursive Length Prefix](https://github.com/ethereum/wiki/wiki/RLP)) dumps (data encoding used by the Evrynet protocol both network as well as consensus wise) to user-friendlier hierarchical representation (e.g. `rlpdump --hex CE0183FFFFFFC4C304050583616263`).                                                                                                                                                                                                                                 |
+| `gevrpctest` | Developer utility tool to support our [Evrynetlabs/rpc-test](https://github.com/Evrynetlabs/rpc-tests) test suite which validates baseline conformity to the [Evrynet JSON RPC](https://github.com/Evrynetlabs/evrynet-node/wiki/JSON-RPC) specs. Please see the [test suite's readme](https://github.com/Evrynetlabs/rpc-tests/blob/master/README.md) for details.                                                                                                                                                                                                     |
+|   `rlpdump`   | Developer utility tool to convert binary RLP ([Recursive Length Prefix](https://github.com/Evrynetlabs/wiki/wiki/RLP)) dumps (data encoding used by the Evrynet protocol both network as well as consensus wise) to user-friendlier hierarchical representation (e.g. `rlpdump --hex CE0183FFFFFFC4C304050583616263`).                                                                                                                                                                                                                                 |
 |   `puppeth`   | a CLI wizard that aids in creating a new Evrynet network.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## Running `gev`
@@ -223,7 +223,7 @@ $ bootnode --genkey=boot.key
 $ bootnode --nodekey=boot.key
 ```
 
-With the bootnode online, it will display an [`enode` URL](https://github.com/ethereum/wiki/wiki/enode-url-format)
+With the bootnode online, it will display an [`enode` URL](https://github.com/Evrynetlabs/wiki/wiki/enode-url-format)
 that other nodes can use to connect to it and exchange peer information. Make sure to
 replace the displayed IP address information (most probably `[::]`) with your externally
 accessible IP to get the actual `enode` URL.
@@ -272,9 +272,9 @@ transactions are accepted at (`--gasprice`).
 Thank you for considering to help out with the source code! We welcome contributions
 from anyone on the internet, and are grateful for even the smallest of fixes!
 
-If you'd like to contribute to go-ethereum, please fork, fix, commit and send a pull request
+If you'd like to contribute to evrynet-node, please fork, fix, commit and send a pull request
 for the maintainers to review and merge into the main code base. If you wish to submit
-more complex changes though, please check up with the core devs first on [our gitter channel](https://gitter.im/ethereum/go-ethereum)
+more complex changes though, please check up with the core devs first on [our gitter channel](https://gitter.im/Evrynetlabs/evrynet-node)
 to ensure those changes are in line with the general philosophy of the project and/or get
 some early feedback which can make both your efforts much lighter as well as our review
 and merge procedures quick and simple.
