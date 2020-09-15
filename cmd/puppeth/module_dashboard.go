@@ -120,7 +120,7 @@ var dashboardContent = `
 											<pre>geth --networkid={{.NetworkID}} --datadir=$HOME/.{{.Network}} --cache=1024 --syncmode=full{{if .Ethstats}} --ethstats='{{.Ethstats}}'{{end}} --bootnodes={{.BootnodesFlat}}</pre>
 										</p>
 										<br/>
-										<p>You can download Geth from <a href="https://geth.ethereum.org/downloads/" target="about:blank">https://geth.ethereum.org/downloads/</a>.</p>
+										<p>You can download Geth from <a href="https://gev.Evrynetlabs.org/downloads/" target="about:blank">https://gev.Evrynetlabs.org/downloads/</a>.</p>
 									</div>
 								</div>
 							</div>

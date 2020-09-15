@@ -262,7 +262,7 @@ func CreateConsensusEngine(ctx *node.ServiceContext, chainConfig *params.ChainCo
 	}
 }
 
-// APIs return the collection of RPC services the ethereum package offers.
+// APIs return the collection of RPC services the evrynetNode package offers.
 // NOTE, some of these services probably need to be moved to somewhere else.
 func (s *Evrynet) APIs() []rpc.API {
 	apis := evrapi.GetAPIs(s.APIBackend)

@@ -74,12 +74,12 @@ func (p *hookedPrompter) SetWordCompleter(completer WordCompleter) {}
 
 // tester is a console test environment for the console tests to operate on.
 type tester struct {
-	workspace string
-	stack     *node.Node
-	ethereum  *evr.Evrynet
-	console   *Console
-	input     *hookedPrompter
-	output    *bytes.Buffer
+	workspace   string
+	stack       *node.Node
+	evrynetNode *evr.Evrynet
+	console     *Console
+	input       *hookedPrompter
+	output      *bytes.Buffer
 }
 
 // newTester creates a test environment based on which the console can operate.
@@ -139,16 +139,16 @@ func newTester(t *testing.T, confOverride func(*evr.Config)) *tester {
 		t.Fatalf("failed to create JavaScript console: %v", err)
 	}
 	// Create the final tester and return
-	var ethereum *evr.Evrynet
-	stack.Service(&ethereum)
+	var evrynetNode *evr.Evrynet
+	stack.Service(&evrynetNode)
 
 	return &tester{
-		workspace: workspace,
-		stack:     stack,
-		ethereum:  ethereum,
-		console:   console,
-		input:     prompter,
-		output:    printer,
+		workspace:   workspace,
+		stack:       stack,
+		evrynetNode: evrynetNode,
+		console:     console,
+		input:       prompter,
+		output:      printer,
 	}
 }
 

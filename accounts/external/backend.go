@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"sync"
 
-	ethereum "github.com/Evrynetlabs/evrynet-node"
+	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/accounts"
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
@@ -144,7 +144,7 @@ func (api *ExternalSigner) Derive(path accounts.DerivationPath, pin bool) (accou
 	return accounts.Account{}, fmt.Errorf("operation not supported on external signers")
 }
 
-func (api *ExternalSigner) SelfDerive(bases []accounts.DerivationPath, chain ethereum.ChainStateReader) {
+func (api *ExternalSigner) SelfDerive(bases []accounts.DerivationPath, chain evrynetNode.ChainStateReader) {
 	log.Error("operation SelfDerive not supported on external signers")
 }
 

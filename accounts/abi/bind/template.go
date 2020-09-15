@@ -68,7 +68,7 @@ import (
 	"math/big"
 	"strings"
 
-	ethereum "github.com/Evrynetlabs/evrynet-node"
+	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/accounts/abi"
 	"github.com/Evrynetlabs/evrynet-node/accounts/abi/bind"
 	"github.com/Evrynetlabs/evrynet-node/common"
@@ -80,7 +80,7 @@ import (
 var (
 	_ = big.NewInt
 	_ = strings.NewReader
-	_ = ethereum.NotFound
+	_ = evrynetNode.NotFound
 	_ = abi.U256
 	_ = bind.Bind
 	_ = common.Big1
@@ -319,7 +319,7 @@ var (
 			event    string              // Event name to use for unpacking event data
 
 			logs chan types.Log        // Log channel receiving the found contract events
-			sub  ethereum.Subscription // Subscription for errors, completion and termination
+			sub  evrynetNode.Subscription // Subscription for errors, completion and termination
 			done bool                  // Whether the subscription completed delivering logs
 			fail error                 // Occurred error to stop iteration
 		}

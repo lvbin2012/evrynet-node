@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the evrynet-node library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package ethereum defines interfaces for interacting with Evrynet.
+// Package evrynetNode defines interfaces for interacting with Evrynet.
 package evrynet
 
 import (

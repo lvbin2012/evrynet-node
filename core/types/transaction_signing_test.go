@@ -140,7 +140,7 @@ func TestChainId(t *testing.T) {
 }
 
 func TestEIP155SigningCompatible(t *testing.T) {
-	var ( // this value is got from signing by ethereum source code
+	var ( // this value is got from signing by evrynet source code
 		expectedV, _ = new(big.Int).SetString("71", 10)
 		expectedR, _ = new(big.Int).SetString("62873707122857357665543871915925550568730555762217611648458340453155819239571", 10)
 		expectedS, _ = new(big.Int).SetString("39748707077210856456616806995773321404126510975285671090303555280372005595386", 10)

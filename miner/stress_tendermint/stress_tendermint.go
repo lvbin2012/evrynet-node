@@ -92,15 +92,15 @@ func main() {
 	}()
 
 	var (
-		ethereum     *evr.Evrynet
+		evrynetNode     *evr.Evrynet
 		contractAddr *common.Address
 	)
-	if err := testNode.Service(&ethereum); err != nil {
+	if err := testNode.Service(&evrynetNode); err != nil {
 		panic(err)
 	}
 	// wait until testNode is synced
 	gasPrice := testNode.Server().ChainReader.Config().GasPrice
-	nonces := waitForSyncingAndStableNonces(ethereum, faucets, ethereum.BlockChain().CurrentHeader().Number.Uint64())
+	nonces := waitForSyncingAndStableNonces(evrynetNode, faucets, evrynetNode.BlockChain().CurrentHeader().Number.Uint64())
 	if TxMode(cfg.TxMode) == SmartContractMode {
 		if contractAddr, err = prepareNewContract(cfg.RPCEndpoint, faucets[0], nonces[0], gasPrice); err != nil {
 			panic(err)
@@ -108,7 +108,7 @@ func main() {
 		nonces[0]++
 	}
 
-	go reportLoop(ethereum.BlockChain(), cfg.TxMode)
+	go reportLoop(evrynetNode.BlockChain(), cfg.TxMode)
 	// Start injecting transactions from the faucet like crazy
 	for {
 		var txs types.Transactions
@@ -123,7 +123,7 @@ func main() {
 			nonces[index]++
 			txs = append(txs, tx)
 		}
-		errs := ethereum.TxPool().AddLocals(txs)
+		errs := evrynetNode.TxPool().AddLocals(txs)
 		for _, err := range errs {
 			if err != nil {
 				panic(err)
@@ -134,13 +134,13 @@ func main() {
 		rebroadcast := false
 	waitLoop:
 		for epoch := 0; ; epoch++ {
-			pend, _ := ethereum.TxPool().Stats()
+			pend, _ := evrynetNode.TxPool().Stats()
 			switch {
 			case pend < maxTxPoolSize:
 				break waitLoop
 			default:
 				if !rebroadcast {
-					forceBroadcastPendingTxs(ethereum)
+					forceBroadcastPendingTxs(evrynetNode)
 					rebroadcast = true
 				}
 				log.Info("tx pool is full, sleeping", "pending", pend)
@@ -151,15 +151,15 @@ func main() {
 }
 
 //forceBroadcastPendingTxs get pending from
-func forceBroadcastPendingTxs(ethereum *evr.Evrynet) {
+func forceBroadcastPendingTxs(evrynetNode *evr.Evrynet) {
 	// force rebroadcast
 	var txs types.Transactions
-	pendings, err := ethereum.TxPool().Pending()
+	pendings, err := evrynetNode.TxPool().Pending()
 	if err != nil {
 		panic(err)
 	}
 	for _, pendingTxs := range pendings {
-		ethereum.TxPool().State()
+		evrynetNode.TxPool().State()
 		if len(pendingTxs) > txsBatchSize {
 			txs = append(txs, pendingTxs[:txsBatchSize]...)
 		} else {
@@ -167,7 +167,7 @@ func forceBroadcastPendingTxs(ethereum *evr.Evrynet) {
 		}
 	}
 	go func() {
-		ethereum.GetPm().ForceBroadcastTxs(txs)
+		evrynetNode.GetPm().ForceBroadcastTxs(txs)
 	}()
 }
 
@@ -313,9 +313,9 @@ func makeNode(genesis *core.Genesis, enodes []*enode.Node) (*node.Node, error) {
 }
 
 // waitForSyncingAndStableNonces wait util the node is syncing and the nonces of given addresses are not change, also returns stable nonces
-func waitForSyncingAndStableNonces(ethereum *evr.Evrynet, faucets []*ecdsa.PrivateKey, initBlkNumber uint64) []uint64 {
-	bc := ethereum.BlockChain()
-	for !ethereum.Synced() || ethereum.BlockChain().CurrentHeader().Number.Uint64() == initBlkNumber {
+func waitForSyncingAndStableNonces(evrynetNode *evr.Evrynet, faucets []*ecdsa.PrivateKey, initBlkNumber uint64) []uint64 {
+	bc := evrynetNode.BlockChain()
+	for !evrynetNode.Synced() || evrynetNode.BlockChain().CurrentHeader().Number.Uint64() == initBlkNumber {
 		log.Warn("testNode is not synced, sleeping", "current_block", bc.CurrentHeader().Number)
 		time.Sleep(3 * time.Second)
 	}
@@ -326,13 +326,13 @@ func waitForSyncingAndStableNonces(ethereum *evr.Evrynet, faucets []*ecdsa.Priva
 		for i, faucet := range faucets {
 			addr := crypto.PubkeyToAddress(*(faucet.Public().(*ecdsa.PublicKey)))
 			log.Info("faucet addr", "addr", addr)
-			nonces[i] = ethereum.TxPool().State().GetNonce(addr)
+			nonces[i] = evrynetNode.TxPool().State().GetNonce(addr)
 		}
 		time.Sleep(time.Second * 10)
 		var diff = false
 		for i, faucet := range faucets {
 			addr := crypto.PubkeyToAddress(*(faucet.Public().(*ecdsa.PublicKey)))
-			tmp := ethereum.TxPool().State().GetNonce(addr)
+			tmp := evrynetNode.TxPool().State().GetNonce(addr)
 			if tmp != nonces[i] {
 				diff = true
 			}

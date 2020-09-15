@@ -193,7 +193,7 @@ class Footer extends Component<Props, State> {
 						<Typography type='caption' color='inherit'>
 							<span style={commonStyles.light}>{'Commit '}</span>
 							<a
-								href={`https://github.com/ethereum/evrynet-node/commit/${general.commit}`}
+								href={`https://github.com/Evrynetlabs/evrynet-node/commit/${general.commit}`}
 								target='_blank'
 								rel='noopener noreferrer'
 								style={styles.link}

@@ -2621,7 +2621,7 @@ var properties = function () {
             inputFormatter: utils.toDecimal
         }),
         new Property({
-            name: 'version.ethereum',
+            name: 'version.evrynetNode',
             getter: 'eth_protocolVersion',
             inputFormatter: utils.toDecimal
         }),
@@ -4509,7 +4509,7 @@ var Iban = function (iban) {
 };
 
 /**
- * This method should be used to create iban object from ethereum address
+ * This method should be used to create iban object from EvrynetNode address
  *
  * @method fromAddress
  * @param {String} address

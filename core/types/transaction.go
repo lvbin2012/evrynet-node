@@ -269,7 +269,7 @@ func isProtectedV(V *big.Int) bool {
 
 // EncodeRLP implements rlp.Encoder
 func (tx *Transaction) EncodeRLP(w io.Writer) error {
-	//if txdata doesn't involve with Evrynet fee scheme, encode it as Ethereum tx for backward compatibility
+	//if txdata doesn't involve with Evrynet fee scheme, encode it as Evrynet-Node tx for backward compatibility
 	if tx.data.isEthTxData() {
 		d := tx.data.toEthTxData()
 		return rlp.Encode(w, &d)

@@ -512,15 +512,15 @@ func newLesServerService(ctx *adapters.ServiceContext) (node.Service, error) {
 	config.SyncMode = downloader.FullSync
 	config.LightServ = testServerCapacity
 	config.LightPeers = testMaxClients
-	ethereum, err := evr.New(ctx.NodeContext, &config)
+	evrynetNode, err := evr.New(ctx.NodeContext, &config)
 	if err != nil {
 		return nil, err
 	}
 
-	server, err := NewLesServer(ethereum, &config)
+	server, err := NewLesServer(evrynetNode, &config)
 	if err != nil {
 		return nil, err
 	}
-	ethereum.AddLesServer(server)
-	return ethereum, nil
+	evrynetNode.AddLesServer(server)
+	return evrynetNode, nil
 }

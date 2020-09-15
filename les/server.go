@@ -51,7 +51,7 @@ const (
 type LesServer struct {
 	lesCommons
 
-	archiveMode bool // Flag whether the ethereum node runs in archive mode.
+	archiveMode bool // Flag whether the evrynetNode node runs in archive mode.
 
 	fcManager    *flowcontrol.ClientManager // nil if our node is client only
 	costTracker  *costTracker

@@ -23,7 +23,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common/math"
 )
 
-// Memory implements a simple memory model for the ethereum virtual machine.
+// Memory implements a simple memory model for the evrynetNode virtual machine.
 type Memory struct {
 	store       []byte
 	lastGasCost uint64

@@ -34,7 +34,7 @@ import (
 )
 
 // The values in those tests are from the Transaction Tests
-// at github.com/ethereum/tests.
+// at github.com/Evrynetlabs/tests.
 var (
 	a, _    = common.EvryAddressStringToAddressCheck("EJ1Sm7ZPs136zds7axDPJ2LCGQtSi8B2AN")
 	b, _    = common.EvryAddressStringToAddressCheck("Ea3jXjtJ3BqZneXsUKFhENkHDVT9y3TT1t")

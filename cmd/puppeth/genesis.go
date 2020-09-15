@@ -253,7 +253,7 @@ type parityChainSpec struct {
 			Evrynet struct {
 				Nonce   hexutil.Bytes `json:"nonce"`
 				MixHash hexutil.Bytes `json:"mixHash"`
-			} `json:"ethereum"`
+			} `json:"evrynet"`
 		} `json:"seal"`
 
 		Difficulty *hexutil.Big   `json:"difficulty"`
@@ -468,7 +468,7 @@ type pyEvrynetGenesisSpec struct {
 // newPyEvrynetGenesisSpec converts a evrynet-node genesis block into a Parity specific
 // chain specification format.
 func newPyEvrynetGenesisSpec(network string, genesis *core.Genesis) (*pyEvrynetGenesisSpec, error) {
-	// Only ethash is currently supported between evrynet-node and pyethereum
+	// Only ethash is currently supported between evrynet-node and pyevrynetnode
 	if genesis.Config.Ethash == nil {
 		return nil, errors.New("unsupported consensus engine")
 	}

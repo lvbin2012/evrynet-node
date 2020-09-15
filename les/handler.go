@@ -129,8 +129,8 @@ type ProtocolManager struct {
 	synced func() bool
 }
 
-// NewProtocolManager returns a new ethereum sub protocol manager. The Evrynet sub protocol manages peers capable
-// with the ethereum network.
+// NewProtocolManager returns a new evrynetNode sub protocol manager. The Evrynet sub protocol manages peers capable
+// with the evrynetNode network.
 func NewProtocolManager(
 	chainConfig *params.ChainConfig,
 	indexerConfig *light.IndexerConfig,

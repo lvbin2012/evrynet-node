@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"testing"
 
-	ethereum "github.com/Evrynetlabs/evrynet-node"
+	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/accounts/abi/bind"
 	"github.com/Evrynetlabs/evrynet-node/accounts/abi/bind/backends"
 	"github.com/Evrynetlabs/evrynet-node/common"
@@ -46,8 +46,8 @@ func TestSimulatedBackend(t *testing.T) {
 	if isPending {
 		t.Fatal("transaction should not be pending")
 	}
-	if err != ethereum.NotFound {
-		t.Fatalf("err should be `ethereum.NotFound` but received %v", err)
+	if err != evrynetNode.NotFound {
+		t.Fatalf("err should be `evrynetNode.NotFound` but received %v", err)
 	}
 
 	// generate a transaction and confirm you can retrieve it
