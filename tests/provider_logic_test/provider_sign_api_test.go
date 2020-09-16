@@ -18,7 +18,7 @@ import (
 //TestProviderSignTransaction will sign a transaction with both sender's Key and Providers's Key
 //Note that the account must be unlocked prior to run this test
 //The JSON rpc test can be call as
-//curl <rpcserver> -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_providerSignTransaction","params":["<raw_tx>", "<provider_address>"],"id":1}'
+//curl <rpcserver> -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"evr_providerSignTransaction","params":["<raw_tx>", "<provider_address>"],"id":1}'
 func TestProviderSignTransaction(t *testing.T) {
 	contractAddr := prepareNewContract(false)
 	assert.NotNil(t, contractAddr)

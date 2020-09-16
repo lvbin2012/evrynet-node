@@ -239,7 +239,7 @@ func makeNode(genesis *core.Genesis, enodes []*enode.Node) (*node.Node, error) {
 		NoUSB:    true,
 		HTTPHost: "127.0.0.1", //add an rpc for debug
 		HTTPPort: 22005,
-		HTTPModules: []string{"admin", "db", "eth", "debug", "miner", "net", "shh", "txpool",
+		HTTPModules: []string{"admin", "db", "evr", "debug", "miner", "net", "shh", "txpool",
 			"personal", "web3", "tendermint"},
 	}
 	// Start the node and configure a full Evrynet node on it

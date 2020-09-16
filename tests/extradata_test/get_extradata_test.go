@@ -15,8 +15,8 @@ import (
 // TestGetExtraData run unit test for the GetBlockSignerByNumber and GetBlockSignerByHash
 // expected get address of proposer and commit signers
 // you can run via curl with
-// curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_getBlockSignerByNumber","params":["0x5"],"id":1}' http://localhost:8545
-// curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"eth_getBlockSignerByHash","params":["0x4cddd578050781138591684e16674e7056ce89fb2706cf72b9f946e7e168d73b"],"id":1}' http://localhost:8545
+// curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"evr_getBlockSignerByNumber","params":["0x5"],"id":1}' http://localhost:8545
+// curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"evr_getBlockSignerByHash","params":["0x4cddd578050781138591684e16674e7056ce89fb2706cf72b9f946e7e168d73b"],"id":1}' http://localhost:8545
 func TestGetExtraData(t *testing.T) {
 	ethClient, err := evrclient.Dial("http://localhost:8454")
 	assert.NoError(t, err)

@@ -845,7 +845,7 @@ func retesteth(ctx *cli.Context) error {
 			Version:   "1.0",
 		},
 		{
-			Namespace: "eth",
+			Namespace: "evr",
 			Public:    true,
 			Service:   ethApi,
 			Version:   "1.0",
