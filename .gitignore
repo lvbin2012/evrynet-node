@@ -25,7 +25,7 @@ build/_vendor/pkg
 # used by the Makefile
 /build/_workspace/
 /build/bin/
-/geth*.zip
+/gev*.zip
 
 # travis
 profile.tmp
@@ -49,7 +49,6 @@ profile.cov
 
 /build/_workspace/*
 /build/bin/*
-go.sum
 *.log
 .idea/
 
@@ -61,18 +60,18 @@ go.sum
 /singlenode
 
 # Ignore data of test node
-/tests/test_nodes/*/geth.ipc
-/tests/test_nodes/*/data/geth/LOCK
-/tests/test_nodes/*/data/geth/transactions.rlp
-/tests/test_nodes/*/data/geth/chaindata/
-/tests/test_nodes/*/data/geth/lightchaindata/
-/tests/test_nodes/*/data/geth/nodes/
+/tests/test_nodes/*/gev.ipc
+/tests/test_nodes/*/data/gev/LOCK
+/tests/test_nodes/*/data/gev/transactions.rlp
+/tests/test_nodes/*/data/gev/chaindata/
+/tests/test_nodes/*/data/gev/lightchaindata/
+/tests/test_nodes/*/data/gev/nodes/
 
 /deploy/testnet/bootnode/bin
 /deploy/testnet/builder/bin
 /deploy/testnet/explorer/web
 /deploy/testnet/nodes/bin/gev
 
-/deploy/testnet/nodes/data/node_1/data
-/deploy/testnet/nodes/data/node_2/data
-/deploy/testnet/nodes/data/node_3/data
+/deploy/testnet/nodes/data/node_1/data/
+/deploy/testnet/nodes/data/node_2/data/
+/deploy/testnet/nodes/data/node_3/data/
