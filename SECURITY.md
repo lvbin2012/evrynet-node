@@ -11,7 +11,7 @@ Audit reports are published in the `docs` folder: https://github.com/Evrynetlabs
 
 | Scope | Date | Report Link |
 | ------- | ------- | ----------- |
-| `geth` | 20170425 | [pdf](https://github.com/Evrynetlabs/evrynet-node/blob/master/docs/audits/2017-04-25_Geth-audit_Truesec.pdf) |
+| `gev`  | 20170425 | [pdf](https://github.com/Evrynetlabs/evrynet-node/blob/master/docs/audits/2017-04-25_Geth-audit_Truesec.pdf) |
 | `clef` | 20180914 | [pdf](https://github.com/Evrynetlabs/evrynet-node/blob/master/docs/audits/2018-09-14_Clef-audit_NCC.pdf) |
 
 

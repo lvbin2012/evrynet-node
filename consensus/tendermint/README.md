@@ -14,12 +14,12 @@ when running normal ./gev command. Note that the influxDB instance has to be pre
 
 To achieve the requied metrics, table manipulation is required as metrics are collected as raw counter over time. The available metrics are in the following measurements:
 ```
-geth.eth/consensus/tendermint/in/packets.meter
-geth.eth/consensus/tendermint/in/traffic.meter
-geth.eth/consensus/tendermint/out/packets.meter
-geth.eth/consensus/tendermint/out/traffic.meter
-geth.eth/consensus/tendermint/proposalwait.timer
-geth.eth/consensus/tendermint/rounds.meter
+gev.eth/consensus/tendermint/in/packets.meter
+gev.eth/consensus/tendermint/in/traffic.meter
+gev.eth/consensus/tendermint/out/packets.meter
+gev.eth/consensus/tendermint/out/traffic.meter
+gev.eth/consensus/tendermint/proposalwait.timer
+gev.eth/consensus/tendermint/rounds.meter
 ```
 
 The other metrics (tx/blocks per second etc...) are available in normal Evrynet metrics

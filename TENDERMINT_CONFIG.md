@@ -10,10 +10,10 @@
     $ mkdir node1 node2
     ```  
 
-3. In each node’s working directory, create a data directory called `data`, and inside `data` create the `geth` directory   
+3. In each node’s working directory, create a data directory called `data`, and inside `data` create the `gev` directory
     ```shell
-    $ mkdir -p node1/data/geth
-    $ mkdir -p node2/data/geth
+    $ mkdir -p node1/data/gev
+    $ mkdir -p node2/data/gev
     ```
 
 4. Generate node key and copy it into folder `node1`, `node2`  
@@ -97,13 +97,13 @@
 
 8. To add accounts to the initial block, edit the `genesis.json` file in the lead node’s working directory and update the `alloc` field with the account(s) that were generated at previous step
 
-9. Next we need to distribute the files created in part 4, which currently reside in the lead node’s working directory, to all other nodes. To do so, place `genesis.json` in the working directory of all nodes, place `static-nodes.json` in the data folder of each node and place X/nodekey in node (X)’s data/geth directory  
+9. Next we need to distribute the files created in part 4, which currently reside in the lead node’s working directory, to all other nodes. To do so, place `genesis.json` in the working directory of all nodes, place `static-nodes.json` in the data folder of each node and place X/nodekey in node (X)’s data/gev directory
     ```shell
     $ cp node1/genesis.json node2
     $ cp node1/static-nodes.json node1/data/
     $ cp node1/static-nodes.json node2/data/
-    $ cp node1/nodekey node1/data/geth
-    $ cp node2/nodekey node2/data/geth
+    $ cp node1/nodekey node1/data/gev
+    $ cp node2/nodekey node2/data/gev
     ```
 
 10. Switch into working directory of lead node and initialize it. Repeat for every working directory X created in step 3. The resulting hash given by executing `gev init` must match for every node  
@@ -144,10 +144,10 @@
 
     ```shell
     See if the any gev nodes are running.
-    $ ps | grep geth
+    $ ps | grep gev
     
     Kill gev processes
-    $ killall -INT geth
+    $ killall -INT gev
     
     $ chmod +x startall.sh
     $ ./startall.sh

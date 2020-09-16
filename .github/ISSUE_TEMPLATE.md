@@ -6,7 +6,7 @@ For general questions please use the gitter channel or the Evrynet stack exchang
 
 #### System information
 
-Geth version: `geth version`
+Gev version: `gev version`
 OS & Version: Windows/Linux/OSX
 Commit hash : (if `develop`)
 

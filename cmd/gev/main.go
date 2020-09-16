@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with evrynet-node. If not, see <http://www.gnu.org/licenses/>.
 
-// geth is the official command-line client for Evrynet.
+// gev is the official command-line client for Evrynet.
 package main
 
 import (
@@ -48,7 +48,7 @@ import (
 )
 
 const (
-	clientIdentifier = "geth" // Client identifier to advertise over the network
+	clientIdentifier = "gev" // Client identifier to advertise over the network
 )
 
 var (
@@ -204,8 +204,8 @@ var (
 )
 
 func init() {
-	// Initialize the CLI app and start Geth
-	app.Action = geth
+	// Initialize the CLI app and start Gev
+	app.Action = gev
 	app.HideVersion = true // we have a command to print the version
 	app.Copyright = "Copyright 2013-2019 The evrynet-node Authors"
 	app.Commands = []cli.Command{
@@ -319,10 +319,10 @@ func main() {
 	}
 }
 
-// geth is the main entry point into the system if no special subcommand is ran.
+// gev is the main entry point into the system if no special subcommand is ran.
 // It creates a default node based on the command line arguments and runs it in
 // blocking mode, waiting for it to be shut down.
-func geth(ctx *cli.Context) error {
+func gev(ctx *cli.Context) error {
 	if args := ctx.Args(); len(args) > 0 {
 		return fmt.Errorf("invalid command: %q", args[0])
 	}

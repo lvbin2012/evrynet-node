@@ -7,7 +7,7 @@ addresses=`cat ${basedir}/accounts/addresses`
 privatekeys=${basedir}/accounts/privatekeys
 
 rm -rf ${basedir}/data
-mkdir -p ${basedir}/data/geth && cp $basedir/nodekey $basedir/data/geth/
+mkdir -p ${basedir}/data/gev && cp $basedir/nodekey $basedir/data/gev/
 
 echo "===========init node"
 gev --datadir ${basedir}/data init ${basedir}/one_node_genesis.json

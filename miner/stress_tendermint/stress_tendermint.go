@@ -227,7 +227,7 @@ func parseGenesis(fileName string) (*core.Genesis, error) {
 func makeNode(genesis *core.Genesis, enodes []*enode.Node) (*node.Node, error) {
 	// Define the basic configurations for the Evrynet node
 	config := &node.Config{
-		Name:    "geth",
+		Name:    "gev",
 		Version: params.Version,
 		DataDir: dataDir,
 

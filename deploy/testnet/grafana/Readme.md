@@ -23,7 +23,7 @@ $ docker-compose up -d geth-grafana geth-influxdb
 - login to admin site
 - config to connect to influxdb with parameters here:
   - endpoint: localhost:8086
-  - database: geth
+  - database: geb
   - user: test
   - password: test
 - create dashboard via import method (use EvryNet-dashboard.json)

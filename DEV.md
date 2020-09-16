@@ -15,7 +15,7 @@
         caps: ["eth/62", "eth/63"],
         enode: "enode://a9e3035cb6933a754455cfe4111e44d6f5711b484317122b0f0d38d4dc1938319c84b839aeedec35a9c9df1a9a54a365bd3380b470210cd9f45441f25a05c919@127.0.0.1:56064",
         id: "4b69bed7d5626bde523d80bc3ca5f11792bad2aa50816726b441fa306ddeab2f",
-        name: "Geth/v1.9.0-unstable/darwin-amd64/go1.12.4",
+        name: "Gev/v1.9.0-unstable/darwin-amd64/go1.12.4",
         network: {
           inbound: true,
           localAddress: "127.0.0.1:30301",
@@ -34,7 +34,7 @@
         caps: ["eth/62", "eth/63"],
         enode: "enode://65c13901b52771dd0a8c80d47118df32e5a5db44c93744ce47e64731c0fb68ab90635bf7b673a0e112ae3727e719caaee6923805d2b8ac767e2142dd00c2220b@127.0.0.1:56054",
         id: "5a2ab61fb351edd410e11dfb954e4bf2c68f13d97c45db0e02645d145db6911f",
-        name: "Geth/v1.9.0-unstable/darwin-amd64/go1.12.4",
+        name: "Gev/v1.9.0-unstable/darwin-amd64/go1.12.4",
         network: {
           inbound: true,
           localAddress: "127.0.0.1:30301",
@@ -53,7 +53,7 @@
         caps: ["eth/62", "eth/63"],
         enode: "enode://c696dc88658f5c32f51a9656e047b5dfab4f8247751eebde022fadee402e0e181085bcf79e3fc1dbe356538c9ea1a903dd3321566b4238374ad7250a421d908e@127.0.0.1:56058",
         id: "b5de3d9cea0a814642e90adf45f8b547a7f16730c0c8961a21b56c31d84ddb49",
-        name: "Geth/v1.9.0-unstable/darwin-amd64/go1.12.4",
+        name: "Gev/v1.9.0-unstable/darwin-amd64/go1.12.4",
         network: {
           inbound: true,
           localAddress: "127.0.0.1:30301",
