@@ -694,10 +694,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memor
 		input        = memory.Get(offset.Int64(), size.Int64())
 		gas          = contract.Gas
 	)
-	if interpreter.evm.ChainConfig().IsEIP150(interpreter.evm.BlockNumber) {
-		gas -= gas / 64
-	}
-
+	gas -= gas / 64
 	contract.UseGas(gas)
 	//TODO: this might related to contract creating contract case. Which we should consider adding owner/provider logic
 	res, addr, returnGas, suberr := interpreter.evm.Create(contract, input, gas, value)
@@ -730,7 +727,6 @@ func opCreate2(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memo
 		gas          = contract.Gas
 	)
 
-	// Apply EIP150
 	gas -= gas / 64
 	contract.UseGas(gas)
 	//TODO: this might related to contract creating contract case. Which we should consider adding owner/provider logic

@@ -24,56 +24,17 @@ import (
 )
 
 // Forks table defines supported forks and their chain config.
+// TODO change version name in future
 var Forks = map[string]*params.ChainConfig{
-	"EIP150": {
-		ChainID:        big.NewInt(1),
-		EIP150Block:    big.NewInt(0),
-	},
-	"EIP158": {
-		ChainID:        big.NewInt(1),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-	},
-	"Byzantium": {
-		ChainID:        big.NewInt(1),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		ByzantiumBlock: big.NewInt(0),
-	},
 	"Constantinople": {
 		ChainID:             big.NewInt(1),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(10000000),
 	},
 	"ConstantinopleFix": {
 		ChainID:             big.NewInt(1),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
-	},
-	"EIP158ToByzantiumAt5": {
-		ChainID:        big.NewInt(1),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		ByzantiumBlock: big.NewInt(5),
-	},
-	"ByzantiumToConstantinopleAt5": {
-		ChainID:             big.NewInt(1),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(5),
 	},
 }
 

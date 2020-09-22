@@ -123,7 +123,6 @@ type ChainParams struct {
 
 type CParamsParams struct {
 	AccountStartNonce          math.HexOrDecimal64   `json:"accountStartNonce"`
-	EIP150ForkBlock            *math.HexOrDecimal64  `json:"EIP150ForkBlock"`
 	EIP158ForkBlock            *math.HexOrDecimal64  `json:"EIP158ForkBlock"`
 	ByzantiumForkBlock         *math.HexOrDecimal64  `json:"byzantiumForkBlock"`
 	ConstantinopleForkBlock    *math.HexOrDecimal64  `json:"constantinopleForkBlock"`
@@ -308,16 +307,12 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		chainId.Set((*big.Int)(chainParams.Params.ChainID))
 	}
 	var (
-		eip150Block         *big.Int
 		eip155Block         *big.Int
 		eip158Block         *big.Int
 		byzantiumBlock      *big.Int
 		constantinopleBlock *big.Int
 		petersburgBlock     *big.Int
 	)
-	if chainParams.Params.EIP150ForkBlock != nil {
-		eip150Block = big.NewInt(int64(*chainParams.Params.EIP150ForkBlock))
-	}
 	if chainParams.Params.EIP158ForkBlock != nil {
 		eip158Block = big.NewInt(int64(*chainParams.Params.EIP158ForkBlock))
 		eip155Block = eip158Block
@@ -337,7 +332,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	genesis := &core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID:             chainId,
-			EIP150Block:         eip150Block,
 			EIP155Block:         eip155Block,
 			EIP158Block:         eip158Block,
 			ByzantiumBlock:      byzantiumBlock,

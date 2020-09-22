@@ -47,8 +47,6 @@ var (
 	MainnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(1),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		EIP150Block:         big.NewInt(2463000),
-		EIP150Hash:          common.HexToHash("0x2086799aeebeae135c246c65021c82b4e15a2c451340993aacfd2751886514f0"),
 		EIP155Block:         big.NewInt(2675000),
 		EIP158Block:         big.NewInt(2675000),
 		ByzantiumBlock:      big.NewInt(4370000),
@@ -70,8 +68,6 @@ var (
 	TestnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(3),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		EIP150Block:         big.NewInt(0),
-		EIP150Hash:          common.HexToHash("0x41941023680923e0fe4d74a34bdac8141f2540e3ae90623718e47d66d1ca4a2d"),
 		EIP155Block:         big.NewInt(10),
 		EIP158Block:         big.NewInt(10),
 		ByzantiumBlock:      big.NewInt(1700000),
@@ -93,8 +89,6 @@ var (
 	RinkebyChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(4),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		EIP150Block:         big.NewInt(2),
-		EIP150Hash:          common.HexToHash("0x9b095b36c15eaf13044373aef8ee0bd3a382a5abb92e402afa44b8249c3a90e9"),
 		EIP155Block:         big.NewInt(3),
 		EIP158Block:         big.NewInt(3),
 		ByzantiumBlock:      big.NewInt(1035301),
@@ -119,7 +113,6 @@ var (
 	GoerliChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(5),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		EIP150Block:         big.NewInt(0),
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
 		ByzantiumBlock:      big.NewInt(0),
@@ -145,17 +138,17 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Evrynet core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig),  big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil}
 
-	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig),  big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
-	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig),  big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(TendermintConfig)}
+	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
+	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(TendermintConfig)}
 	TestRules                 = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -180,10 +173,6 @@ type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
 
 	GasPrice *big.Int `json:"gasPrice"` // gasPrice identified the gasPrice for each transaction
-
-	// EIP150 implements the Gas price changes (https://github.com/ethereum/EIPs/issues/150)
-	EIP150Block *big.Int    `json:"eip150Block,omitempty"` // EIP150 HF block (nil = no fork)
-	EIP150Hash  common.Hash `json:"eip150Hash,omitempty"`  // EIP150 HF hash (needed for header only clients as only gas pricing changed)
 
 	EIP155Block *big.Int `json:"eip155Block,omitempty"` // EIP155 HF block
 	EIP158Block *big.Int `json:"eip158Block,omitempty"` // EIP158 HF block
@@ -245,10 +234,9 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v GasPrice:%v  EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v  PetersburgBlock: %v Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v GasPrice:%v  EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v  PetersburgBlock: %v Engine: %v}",
 		c.ChainID,
 		c.GasPrice,
-		c.EIP150Block,
 		c.EIP155Block,
 		c.EIP158Block,
 		c.ByzantiumBlock,
@@ -256,11 +244,6 @@ func (c *ChainConfig) String() string {
 		c.PetersburgBlock,
 		engine,
 	)
-}
-
-// IsEIP150 returns whether num is either equal to the EIP150 fork block or greater.
-func (c *ChainConfig) IsEIP150(num *big.Int) bool {
-	return isForked(c.EIP150Block, num)
 }
 
 // IsEIP155 returns whether num is either equal to the EIP155 fork block or greater.
@@ -307,8 +290,8 @@ func (c *ChainConfig) GasTable(num *big.Int) GasTable {
 		return GasTableConstantinople
 	case c.IsEIP158(num):
 		return GasTableEIP158
-	case c.IsEIP150(num):
-		return GasTableEIP150
+	//case c.IsEIP150(num):
+	//	return GasTableEIP150
 	default:
 		return GasTableHomestead
 	}
@@ -333,9 +316,6 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 }
 
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *ConfigCompatError {
-	if isForkIncompatible(c.EIP150Block, newcfg.EIP150Block, head) {
-		return newCompatError("EIP150 fork block", c.EIP150Block, newcfg.EIP150Block)
-	}
 	if isForkIncompatible(c.EIP155Block, newcfg.EIP155Block, head) {
 		return newCompatError("EIP155 fork block", c.EIP155Block, newcfg.EIP155Block)
 	}
@@ -422,7 +402,7 @@ func (err *ConfigCompatError) Error() string {
 // phases.
 type Rules struct {
 	ChainID                                     *big.Int
-	IsEIP150, IsEIP155, IsEIP158   bool
+	IsEIP155, IsEIP158                          bool
 	IsByzantium, IsConstantinople, IsPetersburg bool
 }
 
@@ -434,7 +414,6 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 	}
 	return Rules{
 		ChainID:          new(big.Int).Set(chainID),
-		IsEIP150:         c.IsEIP150(num),
 		IsEIP155:         c.IsEIP155(num),
 		IsEIP158:         c.IsEIP158(num),
 		IsByzantium:      c.IsByzantium(num),
