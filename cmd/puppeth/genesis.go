@@ -38,7 +38,6 @@ type alethGenesisSpec struct {
 	Params     struct {
 		AccountStartNonce       math2.HexOrDecimal64   `json:"accountStartNonce"`
 		MaximumExtraDataSize    hexutil.Uint64         `json:"maximumExtraDataSize"`
-		HomesteadForkBlock      hexutil.Uint64         `json:"homesteadForkBlock"`
 		DaoHardforkBlock        math2.HexOrDecimal64   `json:"daoHardforkBlock"`
 		EIP150ForkBlock         hexutil.Uint64         `json:"EIP150ForkBlock"`
 		EIP158ForkBlock         hexutil.Uint64         `json:"EIP158ForkBlock"`
@@ -108,7 +107,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.AllowFutureBlocks = false
 	spec.Params.DaoHardforkBlock = 0
 
-	spec.Params.HomesteadForkBlock = (hexutil.Uint64)(genesis.Config.HomesteadBlock.Uint64())
 	spec.Params.EIP150ForkBlock = (hexutil.Uint64)(genesis.Config.EIP150Block.Uint64())
 	spec.Params.EIP158ForkBlock = (hexutil.Uint64)(genesis.Config.EIP158Block.Uint64())
 
@@ -216,7 +214,6 @@ type parityChainSpec struct {
 				DurationLimit          *hexutil.Big      `json:"durationLimit"`
 				BlockReward            map[string]string `json:"blockReward"`
 				DifficultyBombDelays   map[string]string `json:"difficultyBombDelays"`
-				HomesteadTransition    hexutil.Uint64    `json:"homesteadTransition"`
 				EIP100bTransition      hexutil.Uint64    `json:"eip100bTransition"`
 			} `json:"params"`
 		} `json:"Ethash"`
@@ -325,10 +322,6 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.DifficultyBoundDivisor = (*hexutil.Big)(params.DifficultyBoundDivisor)
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
 	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.FrontierBlockReward)
-
-	// Homestead
-	spec.Engine.Ethash.Params.HomesteadTransition = hexutil.Uint64(genesis.Config.HomesteadBlock.Uint64())
-
 	// Tangerine Whistle : 150
 	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-608.md
 	spec.Params.EIP150Transition = hexutil.Uint64(genesis.Config.EIP150Block.Uint64())

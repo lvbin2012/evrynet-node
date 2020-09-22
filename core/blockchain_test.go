@@ -1327,7 +1327,7 @@ func TestEIP155Transition(t *testing.T) {
 		funds      = big.NewInt(1000000000)
 		deleteAddr = common.Address{1}
 		gspec      = &Genesis{
-			Config: &params.ChainConfig{ChainID: big.NewInt(1), EIP155Block: big.NewInt(2), HomesteadBlock: new(big.Int), GasPrice: big.NewInt(0)},
+			Config: &params.ChainConfig{ChainID: big.NewInt(1), EIP155Block: big.NewInt(2), GasPrice: big.NewInt(0)},
 			Alloc:  GenesisAlloc{address: {Balance: funds}, deleteAddr: {Balance: new(big.Int)}},
 		}
 		genesis = gspec.MustCommit(db)
@@ -1400,7 +1400,6 @@ func TestEIP155Transition(t *testing.T) {
 	config := &params.ChainConfig{
 		ChainID:        big.NewInt(2),
 		EIP155Block:    big.NewInt(2),
-		HomesteadBlock: new(big.Int),
 		GasPrice:       big.NewInt(0),
 	}
 	blocks, _ = GenerateChain(config, blocks[len(blocks)-1], ethash.NewFaker(), db, 4, func(i int, block *BlockGen) {
@@ -1436,7 +1435,6 @@ func TestEIP161AccountRemoval(t *testing.T) {
 		gspec   = &Genesis{
 			Config: &params.ChainConfig{
 				ChainID:        big.NewInt(1),
-				HomesteadBlock: new(big.Int),
 				EIP155Block:    new(big.Int),
 				EIP158Block:    big.NewInt(2),
 				GasPrice:       big.NewInt(0),
