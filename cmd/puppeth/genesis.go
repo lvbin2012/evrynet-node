@@ -38,7 +38,6 @@ type alethGenesisSpec struct {
 	Params     struct {
 		AccountStartNonce       math2.HexOrDecimal64   `json:"accountStartNonce"`
 		MaximumExtraDataSize    hexutil.Uint64         `json:"maximumExtraDataSize"`
-		EIP158ForkBlock         hexutil.Uint64         `json:"EIP158ForkBlock"`
 		ByzantiumForkBlock      hexutil.Uint64         `json:"byzantiumForkBlock"`
 		ConstantinopleForkBlock hexutil.Uint64         `json:"constantinopleForkBlock"`
 		MinGasLimit             hexutil.Uint64         `json:"minGasLimit"`
@@ -103,8 +102,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.AccountStartNonce = 0
 	spec.Params.TieBreakingGas = false
 	spec.Params.AllowFutureBlocks = false
-
-	spec.Params.EIP158ForkBlock = (hexutil.Uint64)(genesis.Config.EIP158Block.Uint64())
 
 	// Byzantium
 	if num := genesis.Config.ByzantiumBlock; num != nil {
@@ -225,8 +222,6 @@ type parityChainSpec struct {
 		MaxCodeSize              hexutil.Uint64       `json:"maxCodeSize"`
 		MaxCodeSizeTransition    hexutil.Uint64       `json:"maxCodeSizeTransition"`
 		EIP98Transition          hexutil.Uint64       `json:"eip98Transition"`
-		EIP161abcTransition      hexutil.Uint64       `json:"eip161abcTransition"`
-		EIP161dTransition        hexutil.Uint64       `json:"eip161dTransition"`
 		EIP140Transition         hexutil.Uint64       `json:"eip140Transition"`
 		EIP211Transition         hexutil.Uint64       `json:"eip211Transition"`
 		EIP214Transition         hexutil.Uint64       `json:"eip214Transition"`
@@ -315,8 +310,6 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.DifficultyBoundDivisor = (*hexutil.Big)(params.DifficultyBoundDivisor)
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
 	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.FrontierBlockReward)
-	spec.Params.EIP161abcTransition = hexutil.Uint64(genesis.Config.EIP158Block.Uint64())
-	spec.Params.EIP161dTransition = hexutil.Uint64(genesis.Config.EIP158Block.Uint64())
 
 	// Byzantium
 	if num := genesis.Config.ByzantiumBlock; num != nil {
