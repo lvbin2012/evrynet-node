@@ -46,9 +46,8 @@ var PrecompiledContractsHomestead = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{4}): &dataCopy{},
 }
 
-// PrecompiledContractsConstantinople contains the default set of pre-compiled Evrynet
-// TODO rename in futrure, just name in latest version Constantinople
-var PrecompiledContractsConstantinople = map[common.Address]PrecompiledContract{
+// PrecompiledContractsOmaha contains the default set of pre-compiled Evrynet
+var PrecompiledContractsOmaha = map[common.Address]PrecompiledContract{
 	common.BytesToAddress([]byte{1}): &ecrecover{},
 	common.BytesToAddress([]byte{2}): &sha256hash{},
 	common.BytesToAddress([]byte{3}): &ripemd160hash{},

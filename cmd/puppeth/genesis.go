@@ -20,7 +20,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
-	"math/big"
 	"strings"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
@@ -36,20 +35,19 @@ import (
 type alethGenesisSpec struct {
 	SealEngine string `json:"sealEngine"`
 	Params     struct {
-		AccountStartNonce       math2.HexOrDecimal64   `json:"accountStartNonce"`
-		MaximumExtraDataSize    hexutil.Uint64         `json:"maximumExtraDataSize"`
-		ConstantinopleForkBlock hexutil.Uint64         `json:"constantinopleForkBlock"`
-		MinGasLimit             hexutil.Uint64         `json:"minGasLimit"`
-		MaxGasLimit             hexutil.Uint64         `json:"maxGasLimit"`
-		TieBreakingGas          bool                   `json:"tieBreakingGas"`
-		GasLimitBoundDivisor    math2.HexOrDecimal64   `json:"gasLimitBoundDivisor"`
-		MinimumDifficulty       *hexutil.Big           `json:"minimumDifficulty"`
-		DifficultyBoundDivisor  *math2.HexOrDecimal256 `json:"difficultyBoundDivisor"`
-		DurationLimit           *math2.HexOrDecimal256 `json:"durationLimit"`
-		BlockReward             *hexutil.Big           `json:"blockReward"`
-		NetworkID               hexutil.Uint64         `json:"networkID"`
-		ChainID                 hexutil.Uint64         `json:"chainID"`
-		AllowFutureBlocks       bool                   `json:"allowFutureBlocks"`
+		AccountStartNonce      math2.HexOrDecimal64   `json:"accountStartNonce"`
+		MaximumExtraDataSize   hexutil.Uint64         `json:"maximumExtraDataSize"`
+		MinGasLimit            hexutil.Uint64         `json:"minGasLimit"`
+		MaxGasLimit            hexutil.Uint64         `json:"maxGasLimit"`
+		TieBreakingGas         bool                   `json:"tieBreakingGas"`
+		GasLimitBoundDivisor   math2.HexOrDecimal64   `json:"gasLimitBoundDivisor"`
+		MinimumDifficulty      *hexutil.Big           `json:"minimumDifficulty"`
+		DifficultyBoundDivisor *math2.HexOrDecimal256 `json:"difficultyBoundDivisor"`
+		DurationLimit          *math2.HexOrDecimal256 `json:"durationLimit"`
+		BlockReward            *hexutil.Big           `json:"blockReward"`
+		NetworkID              hexutil.Uint64         `json:"networkID"`
+		ChainID                hexutil.Uint64         `json:"chainID"`
+		AllowFutureBlocks      bool                   `json:"allowFutureBlocks"`
 	} `json:"params"`
 
 	Genesis struct {
@@ -102,11 +100,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.TieBreakingGas = false
 	spec.Params.AllowFutureBlocks = false
 
-	// Constantinople
-	if num := genesis.Config.ConstantinopleBlock; num != nil {
-		spec.setConstantinople(num)
-	}
-
 	spec.Params.NetworkID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.ChainID = (hexutil.Uint64)(genesis.Config.ChainID.Uint64())
 	spec.Params.MaximumExtraDataSize = (hexutil.Uint64)(params.MaximumExtraDataSize)
@@ -116,7 +109,7 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.DifficultyBoundDivisor = (*math2.HexOrDecimal256)(params.DifficultyBoundDivisor)
 	spec.Params.GasLimitBoundDivisor = (math2.HexOrDecimal64)(params.GasLimitBoundDivisor)
 	spec.Params.DurationLimit = (*math2.HexOrDecimal256)(params.DurationLimit)
-	spec.Params.BlockReward = (*hexutil.Big)(ethash.FrontierBlockReward)
+	spec.Params.BlockReward = (*hexutil.Big)(ethash.OmahaBlockReward)
 
 	spec.Genesis.Nonce = (hexutil.Bytes)(make([]byte, 8))
 	binary.LittleEndian.PutUint64(spec.Genesis.Nonce[:], genesis.Nonce)
@@ -180,10 +173,6 @@ func (spec *alethGenesisSpec) setAccount(address common.Address, account core.Ge
 
 }
 
-func (spec *alethGenesisSpec) setConstantinople(num *big.Int) {
-	spec.Params.ConstantinopleForkBlock = hexutil.Uint64(num.Uint64())
-}
-
 // parityChainSpec is the chain specification format used by Parity.
 type parityChainSpec struct {
 	Name    string `json:"name"`
@@ -210,11 +199,6 @@ type parityChainSpec struct {
 		MaxCodeSize              hexutil.Uint64       `json:"maxCodeSize"`
 		MaxCodeSizeTransition    hexutil.Uint64       `json:"maxCodeSizeTransition"`
 		EIP98Transition          hexutil.Uint64       `json:"eip98Transition"`
-		EIP145Transition         hexutil.Uint64       `json:"eip145Transition"`
-		EIP1014Transition        hexutil.Uint64       `json:"eip1014Transition"`
-		EIP1052Transition        hexutil.Uint64       `json:"eip1052Transition"`
-		EIP1283Transition        hexutil.Uint64       `json:"eip1283Transition"`
-		EIP1283DisableTransition hexutil.Uint64       `json:"eip1283DisableTransition"`
 	} `json:"params"`
 
 	Genesis struct {
@@ -293,16 +277,8 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.MinimumDifficulty = (*hexutil.Big)(params.MinimumDifficulty)
 	spec.Engine.Ethash.Params.DifficultyBoundDivisor = (*hexutil.Big)(params.DifficultyBoundDivisor)
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
-	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.FrontierBlockReward)
-
-	// Constantinople
-	if num := genesis.Config.ConstantinopleBlock; num != nil {
-		spec.setConstantinople(num)
-	}
-	// ConstantinopleFix (remove eip-1283)
-	if num := genesis.Config.PetersburgBlock; num != nil {
-		spec.setConstantinopleFix(num)
-	}
+	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.OmahaBlockReward)
+	spec.Engine.Ethash.Params.DifficultyBombDelays["0x0"] = hexutil.EncodeUint64(2000000)
 
 	spec.Params.MaximumExtraDataSize = (hexutil.Uint64)(params.MaximumExtraDataSize)
 	spec.Params.MinGasLimit = (hexutil.Uint64)(params.MinGasLimit)
@@ -375,19 +351,6 @@ func (spec *parityChainSpec) setPrecompile(address byte, data *parityChainSpecBu
 	spec.Accounts[a].Builtin = data
 }
 
-func (spec *parityChainSpec) setConstantinople(num *big.Int) {
-	spec.Engine.Ethash.Params.BlockReward[hexutil.EncodeBig(num)] = hexutil.EncodeBig(ethash.ConstantinopleBlockReward)
-	spec.Engine.Ethash.Params.DifficultyBombDelays[hexutil.EncodeBig(num)] = hexutil.EncodeUint64(2000000)
-	n := hexutil.Uint64(num.Uint64())
-	spec.Params.EIP145Transition = n
-	spec.Params.EIP1014Transition = n
-	spec.Params.EIP1052Transition = n
-	spec.Params.EIP1283Transition = n
-}
-
-func (spec *parityChainSpec) setConstantinopleFix(num *big.Int) {
-	spec.Params.EIP1283DisableTransition = hexutil.Uint64(num.Uint64())
-}
 
 // pyEvrynetGenesisSpec represents the genesis specification format used by the
 // Python Evrynet implementation.

@@ -2,13 +2,6 @@
   "config": {
     "ethash":{},
     "chainId": 314158,
-    "homesteadBlock": 10000,
-    "eip150Block": 15000,
-    "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
-    "eip155Block": 23000,
-    "eip158Block": 23000,
-    "byzantiumBlock": 30000,
-    "constantinopleBlock": 40000
   },
   "nonce": "0x0",
   "timestamp": "0x59a4e76d",

@@ -50,11 +50,6 @@
     {
         "config": {
             "chainId": 15,
-            "homesteadBlock": 0,
-            "byzantiumBlock": 0,
-            "eip155Block": 0,
-            "eip158Block": 0,
-            "constantinopleBlock": 0,
             "tendermint": {
                 "epoch": 3000,
                 "policy": 0

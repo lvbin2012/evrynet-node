@@ -38,21 +38,9 @@ type GasTable struct {
 
 // Variables containing gas prices for different EvrynetNode phases.
 var (
-	// GasTableHomestead contain the gas prices for
-	// the homestead phase.
-	GasTableHomestead = GasTable{
-		ExtcodeSize: 20,
-		ExtcodeCopy: 20,
-		Balance:     20,
-		SLoad:       50,
-		Calls:       40,
-		Suicide:     0,
-		ExpByte:     10,
-	}
-
-	// GasTableConstantinople contain the gas re-prices for
-	// the constantinople phase.
-	GasTableConstantinople = GasTable{
+	// GasTableOmaha contain the gas re-prices for
+	// the omaha phase.
+	GasTableOmaha = GasTable{
 		ExtcodeSize: 700,
 		ExtcodeCopy: 700,
 		ExtcodeHash: 400,
