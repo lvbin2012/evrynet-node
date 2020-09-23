@@ -273,7 +273,7 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	}
 	spec.Engine.Ethash.Params.BlockReward = make(map[string]string)
 	spec.Engine.Ethash.Params.DifficultyBombDelays = make(map[string]string)
-	// Frontier
+
 	spec.Engine.Ethash.Params.MinimumDifficulty = (*hexutil.Big)(params.MinimumDifficulty)
 	spec.Engine.Ethash.Params.DifficultyBoundDivisor = (*hexutil.Big)(params.DifficultyBoundDivisor)
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
