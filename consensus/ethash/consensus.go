@@ -39,23 +39,15 @@ import (
 // Ethash proof-of-work protocol constants.
 var (
 	FrontierBlockReward       = big.NewInt(5e+18) // Block reward in wei for successfully mining a block
-	ByzantiumBlockReward      = big.NewInt(3e+18) // Block reward in wei for successfully mining a block upward from Byzantium
 	ConstantinopleBlockReward = big.NewInt(2e+18) // Block reward in wei for successfully mining a block upward from Constantinople
 	maxUncles                 = 2                 // Maximum number of uncles allowed in a single block
 	allowedFutureBlockTime    = 15 * time.Second  // Max time from current time allowed for blocks, before they're considered future blocks
 
 	// calcDifficultyConstantinople is the difficulty adjustment algorithm for Constantinople.
 	// It returns the difficulty that a new block should have when created at time given the
-	// parent block's time and difficulty. The calculation uses the Byzantium rules, but with
-	// bomb offset 5M.
-	// Specification EIP-1234: https://eips.ethereum.org/EIPS/eip-1234
+	// parent block's time and difficulty. The bomb offset 5M.
 	calcDifficultyConstantinople = makeDifficultyCalculator(big.NewInt(5000000))
 
-	// calcDifficultyByzantium is the difficulty adjustment algorithm. It returns
-	// the difficulty that a new block should have when created at time given the
-	// parent block's time and difficulty. The calculation uses the Byzantium rules.
-	// Specification EIP-649: https://eips.ethereum.org/EIPS/eip-649
-	calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -306,8 +298,6 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 	switch {
 	case config.IsConstantinople(next):
 		return calcDifficultyConstantinople(time, parent)
-	case config.IsByzantium(next):
-		return calcDifficultyByzantium(time, parent)
 	default:
 		return calcDifficultyFrontier(time, parent)
 	}
@@ -324,8 +314,6 @@ var (
 )
 
 // makeDifficultyCalculator creates a difficultyCalculator with the given bomb-delay.
-// the difficulty is calculated with Byzantium rules, which differs from Homestead in
-// how uncles affect the calculation
 func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *types.Header) *big.Int {
 	// Note, the calculations below looks at the parent number, which is 1 below
 	// the block number. Thus we remove one from the delay given
@@ -606,9 +594,6 @@ var (
 func accumulateRewards(config *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
 	// Select the correct block reward based on chain progression
 	blockReward := FrontierBlockReward
-	if config.IsByzantium(header.Number) {
-		blockReward = ByzantiumBlockReward
-	}
 	if config.IsConstantinople(header.Number) {
 		blockReward = ConstantinopleBlockReward
 	}

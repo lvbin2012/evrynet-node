@@ -34,7 +34,6 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	// wait until pass byzantium block
 	for {
 		block, err := ethClient.BlockByNumber(context.Background(), nil)
 		if err != nil {
