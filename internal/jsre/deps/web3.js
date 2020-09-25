@@ -2092,11 +2092,35 @@ var fromDecimal = function (value) {
  * Just return input; used in tracer, will override in go
  *
  * @method toEvrAddr
- * @param {String|Number|BigNumber|Object}
+ * @param {String|Number|BigNumber}
  * @return {string}
  */
 var toEvrAddr = function (val) {
-  return val;
+    var num = new BigNumber(val);
+    var byteArray = bigNumberToArray(num);
+    var index = byteArray.length;
+    while (index < 20){
+      byteArray.unshift(0);
+      index++;
+    }
+    byteArray.unshift(33);
+    var hexString = "";
+    for (var i = 0; i < byteArray.length; i++){
+        var tmp =byteArray[i].toString(16);
+        if (tmp.length === 1){
+            tmp = "0" + tmp;
+        }
+        hexString = hexString + tmp;
+    }
+    var input = CryptoJS.enc.Hex.parse(hexString);
+    var hash1 = sha256(input, {outputLength: 256});
+    var hash2 = sha256(hash1, {outputLength: 256}).toString();
+    for (var i = 0; i < 4; i++) {
+        var substr = hash2.substring(i * 2, i * 2 + 2);
+        var value = parseInt(substr, 16);
+        byteArray.push(value);
+    }
+    return encodeBase58(byteArray);
 };
 
 /**
@@ -2265,6 +2289,59 @@ var bigNumberToArray = function (val) {
 };
 
 /**
+ * convert byte array to BigNumber
+ *
+ * @method arrayToBigNumber
+ * @param {Array} byte Array
+ * @return {BigNumber}
+ */
+var arrayToBigNumber = function (val) {
+    if (!isArray(val)){
+        throw new Error("Input should be byte array");
+    }
+    var hexString = "";
+    for (var i = 0; i < val.length; i++) {
+         var tmp =val[i].toString(16);
+         if (tmp.length === 1){
+             tmp = "0" + tmp;
+         }
+         hexString = hexString + tmp;
+    }
+    return new BigNumber(hexString, 16);
+};
+
+/**
+ * encode byte array in base58
+ *
+ * @method encodeBase58
+ * @param {Array} byte Array
+ * @return {Base58 encode string}
+ */
+var encodeBase58 = function (plain) {
+    if (!isArray(plain)){
+        throw new Error("Input should be byte array");
+    }
+    var alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    var bigRadix = new BigNumber(58);
+    var x = arrayToBigNumber(plain);
+    var answer = '';
+    var zero = new BigNumber(0)
+    while (x.comparedTo(zero) > 0) {
+        var mod = new BigNumber(0);
+        mod = x.mod(bigRadix);
+        x = x.dividedToIntegerBy(bigRadix);
+        answer = alphabet.charAt(mod.toNumber()) + answer;
+    }
+    for (var i = 0; i < plain.length; i++) {
+        if (plain[i] != 0)
+            break;
+        answer = alphabet.charAt(0) + answer;
+    }
+    return answer;
+};
+
+
+/**
  * decode base58 encode string to byte array
  *
  * @method decodeBase58
@@ -2285,7 +2362,7 @@ var  decodeBase58 = function (encoded) {
             return new Array();
         }
         var scratch = new BigNumber(tmp);
-        scratch = scratch.mul(j)
+        scratch = scratch.mul(j);
         answer = answer.plus(scratch);
         j = j.mul(bigRadix);
     }
@@ -2327,10 +2404,10 @@ var isAddress = function (address) {
     var input = CryptoJS.enc.Hex.parse(hexString);
     var hash1 = sha256(input, {outputLength: 256});
     var hash2 = sha256(hash1, {outputLength: 256}).toString();
-    var checkStart = 21
+    var checkStart = 21;
     for (var i = 0; i < 4; i++) {
       var substr = hash2.substring(i * 2, i * 2 + 2);
-      var value = parseInt(substr, 16)
+      var value = parseInt(substr, 16);
       if (value !== resBytes[checkStart + i]) {
           return false;
       }
@@ -2457,7 +2534,7 @@ module.exports = {
     padLeft: padLeft,
     padRight: padRight,
     toHex: toHex,
-    toEvrAddr:toEvrAddr,
+    toEvrAddr: toEvrAddr,
     toDecimal: toDecimal,
     fromDecimal: fromDecimal,
     toUtf8: toUtf8,
