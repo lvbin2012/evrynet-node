@@ -1,18 +1,18 @@
-// Copyright 2018 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2018 The evrynet-node Authors
+// This file is part of evrynet-node.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// evrynet-node is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// evrynet-node is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with evrynet-node. If not, see <http://www.gnu.org/licenses/>.
 
 package core
 
@@ -264,7 +264,7 @@ func (api *SignerAPI) determineSignatureFormat(ctx context.Context, contentType 
 		req = &SignDataRequest{ContentType: mediaType, Rawdata: cliqueRlp, Message: message, Hash: sighash}
 	default: // also case TextPlain.Mime:
 		// Calculates an Evrynet ECDSA signature for:
-		// hash = keccak256("\x19${byteVersion}Ethereum Signed Message:\n${message length}${message}")
+		// hash = keccak256("\x19${byteVersion}EvrynetNode Signed Message:\n${message length}${message}")
 		// We expect it to be a string
 		if stringData, ok := data.(string); !ok {
 			return nil, useEvrynetV, fmt.Errorf("input for text/plain must be an hex-encoded string")
@@ -614,7 +614,7 @@ func (api *SignerAPI) EcRecover(ctx context.Context, data hexutil.Bytes, sig hex
 	//
 	// Note, this function is compatible with eth_sign and personal_sign. As such it recovers
 	// the address of:
-	// hash = keccak256("\x19${byteVersion}Ethereum Signed Message:\n${message length}${message}")
+	// hash = keccak256("\x19${byteVersion}EvrynetNode Signed Message:\n${message length}${message}")
 	// addr = ecrecover(hash, signature)
 	//
 	// Note, the signature must conform to the secp256k1 curve R, S and V values, where

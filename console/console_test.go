@@ -1,18 +1,18 @@
-// Copyright 2015 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2015 The evrynet-node Authors
+// This file is part of the evrynet-node library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The evrynet-node library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The evrynet-node library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the evrynet-node library. If not, see <http://www.gnu.org/licenses/>.
 
 package console
 
@@ -74,12 +74,12 @@ func (p *hookedPrompter) SetWordCompleter(completer WordCompleter) {}
 
 // tester is a console test environment for the console tests to operate on.
 type tester struct {
-	workspace string
-	stack     *node.Node
-	ethereum  *evr.Evrynet
-	console   *Console
-	input     *hookedPrompter
-	output    *bytes.Buffer
+	workspace   string
+	stack       *node.Node
+	evrynetNode *evr.Evrynet
+	console     *Console
+	input       *hookedPrompter
+	output      *bytes.Buffer
 }
 
 // newTester creates a test environment based on which the console can operate.
@@ -139,16 +139,16 @@ func newTester(t *testing.T, confOverride func(*evr.Config)) *tester {
 		t.Fatalf("failed to create JavaScript console: %v", err)
 	}
 	// Create the final tester and return
-	var ethereum *evr.Evrynet
-	stack.Service(&ethereum)
+	var evrynetNode *evr.Evrynet
+	stack.Service(&evrynetNode)
 
 	return &tester{
-		workspace: workspace,
-		stack:     stack,
-		ethereum:  ethereum,
-		console:   console,
-		input:     prompter,
-		output:    printer,
+		workspace:   workspace,
+		stack:       stack,
+		evrynetNode: evrynetNode,
+		console:     console,
+		input:       prompter,
+		output:      printer,
 	}
 }
 

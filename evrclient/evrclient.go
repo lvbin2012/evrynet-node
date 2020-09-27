@@ -1,18 +1,18 @@
-// Copyright 2016 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2016 The evrynet-node Authors
+// This file is part of the evrynet-node library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The evrynet-node library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The evrynet-node library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the evrynet-node library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package evrclient provides a client for the Evrynet RPC API.
 package evrclient
@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"math/big"
 
-	ethereum "github.com/Evrynetlabs/evrynet-node"
+	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -94,7 +94,7 @@ func (ec *Client) GetBlockSignerByNumber(ctx context.Context, number *big.Int) (
 	var json *ExtraDataDetails
 	err := ec.c.CallContext(ctx, &json, "eth_getBlockSignerByNumber", toBlockNumArg(number))
 	if err == nil && json == nil {
-		err = ethereum.NotFound
+		err = evrynetNode.NotFound
 	}
 	return json, err
 }
@@ -105,7 +105,7 @@ func (ec *Client) GetBlockSignerByHash(ctx context.Context, hash common.Hash) (*
 	var json *ExtraDataDetails
 	err := ec.c.CallContext(ctx, &json, "eth_getBlockSignerByHash", hash)
 	if err == nil && json == nil {
-		err = ethereum.NotFound
+		err = evrynetNode.NotFound
 	}
 	return json, err
 }
@@ -122,7 +122,7 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 	if err != nil {
 		return nil, err
 	} else if len(raw) == 0 {
-		return nil, ethereum.NotFound
+		return nil, evrynetNode.NotFound
 	}
 	// Decode header and transactions.
 	var head *types.Header
@@ -186,7 +186,7 @@ func (ec *Client) HeaderByHash(ctx context.Context, hash common.Hash) (*types.He
 	var head *types.Header
 	err := ec.c.CallContext(ctx, &head, "eth_getBlockByHash", hash, false)
 	if err == nil && head == nil {
-		err = ethereum.NotFound
+		err = evrynetNode.NotFound
 	}
 	return head, err
 }
@@ -197,7 +197,7 @@ func (ec *Client) HeaderByNumber(ctx context.Context, number *big.Int) (*types.H
 	var head *types.Header
 	err := ec.c.CallContext(ctx, &head, "eth_getBlockByNumber", toBlockNumArg(number), false)
 	if err == nil && head == nil {
-		err = ethereum.NotFound
+		err = evrynetNode.NotFound
 	}
 	return head, err
 }
@@ -247,7 +247,7 @@ func (ec *Client) TransactionByHash(ctx context.Context, hash common.Hash) (tx *
 	if err != nil {
 		return nil, false, err
 	} else if json == nil {
-		return nil, false, ethereum.NotFound
+		return nil, false, evrynetNode.NotFound
 	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
 		return nil, false, fmt.Errorf("server returned transaction without signature")
 	}
@@ -297,7 +297,7 @@ func (ec *Client) TransactionInBlock(ctx context.Context, blockHash common.Hash,
 		return nil, err
 	}
 	if json == nil {
-		return nil, ethereum.NotFound
+		return nil, evrynetNode.NotFound
 	} else if _, r, _ := json.tx.RawSignatureValues(); r == nil {
 		return nil, fmt.Errorf("server returned transaction without signature")
 	}
@@ -314,7 +314,7 @@ func (ec *Client) TransactionReceipt(ctx context.Context, txHash common.Hash) (*
 	err := ec.c.CallContext(ctx, &r, "eth_getTransactionReceipt", txHash)
 	if err == nil {
 		if r == nil {
-			return nil, ethereum.NotFound
+			return nil, evrynetNode.NotFound
 		}
 	}
 	return r, err
@@ -337,7 +337,7 @@ type rpcProgress struct {
 
 // SyncProgress retrieves the current progress of the sync algorithm. If there's
 // no sync currently running, it returns nil.
-func (ec *Client) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, error) {
+func (ec *Client) SyncProgress(ctx context.Context) (*evrynetNode.SyncProgress, error) {
 	var raw json.RawMessage
 	if err := ec.c.CallContext(ctx, &raw, "eth_syncing"); err != nil {
 		return nil, err
@@ -351,7 +351,7 @@ func (ec *Client) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, err
 	if err := json.Unmarshal(raw, &progress); err != nil {
 		return nil, err
 	}
-	return &ethereum.SyncProgress{
+	return &evrynetNode.SyncProgress{
 		StartingBlock: uint64(progress.StartingBlock),
 		CurrentBlock:  uint64(progress.CurrentBlock),
 		HighestBlock:  uint64(progress.HighestBlock),
@@ -362,7 +362,7 @@ func (ec *Client) SyncProgress(ctx context.Context) (*ethereum.SyncProgress, err
 
 // SubscribeNewHead subscribes to notifications about the current blockchain head
 // on the given channel.
-func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (ethereum.Subscription, error) {
+func (ec *Client) SubscribeNewHead(ctx context.Context, ch chan<- *types.Header) (evrynetNode.Subscription, error) {
 	return ec.c.EthSubscribe(ctx, ch, "newHeads")
 }
 
@@ -418,7 +418,7 @@ func (ec *Client) NonceAt(ctx context.Context, account common.Address, blockNumb
 // Filters
 
 // FilterLogs executes a filter query.
-func (ec *Client) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]types.Log, error) {
+func (ec *Client) FilterLogs(ctx context.Context, q evrynetNode.FilterQuery) ([]types.Log, error) {
 	var result []types.Log
 	arg, err := toFilterArg(q)
 	if err != nil {
@@ -429,7 +429,7 @@ func (ec *Client) FilterLogs(ctx context.Context, q ethereum.FilterQuery) ([]typ
 }
 
 // SubscribeFilterLogs subscribes to the results of a streaming filter query.
-func (ec *Client) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuery, ch chan<- types.Log) (ethereum.Subscription, error) {
+func (ec *Client) SubscribeFilterLogs(ctx context.Context, q evrynetNode.FilterQuery, ch chan<- types.Log) (evrynetNode.Subscription, error) {
 	arg, err := toFilterArg(q)
 	if err != nil {
 		return nil, err
@@ -437,7 +437,7 @@ func (ec *Client) SubscribeFilterLogs(ctx context.Context, q ethereum.FilterQuer
 	return ec.c.EthSubscribe(ctx, ch, "logs", arg)
 }
 
-func toFilterArg(q ethereum.FilterQuery) (interface{}, error) {
+func toFilterArg(q evrynetNode.FilterQuery) (interface{}, error) {
 	arg := map[string]interface{}{
 		"address": q.Addresses,
 		"topics":  q.Topics,
@@ -506,7 +506,7 @@ func (ec *Client) PendingTransactionCount(ctx context.Context) (uint, error) {
 // blockNumber selects the block height at which the call runs. It can be nil, in which
 // case the code is taken from the latest known block. Note that state from very old
 // blocks might not be available.
-func (ec *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockNumber *big.Int) ([]byte, error) {
+func (ec *Client) CallContract(ctx context.Context, msg evrynetNode.CallMsg, blockNumber *big.Int) ([]byte, error) {
 	var hex hexutil.Bytes
 	err := ec.c.CallContext(ctx, &hex, "eth_call", toCallArg(msg), toBlockNumArg(blockNumber))
 	if err != nil {
@@ -517,7 +517,7 @@ func (ec *Client) CallContract(ctx context.Context, msg ethereum.CallMsg, blockN
 
 // PendingCallContract executes a message call transaction using the EVM.
 // The state seen by the contract call is the pending state.
-func (ec *Client) PendingCallContract(ctx context.Context, msg ethereum.CallMsg) ([]byte, error) {
+func (ec *Client) PendingCallContract(ctx context.Context, msg evrynetNode.CallMsg) ([]byte, error) {
 	var hex hexutil.Bytes
 	err := ec.c.CallContext(ctx, &hex, "eth_call", toCallArg(msg), "pending")
 	if err != nil {
@@ -540,7 +540,7 @@ func (ec *Client) SuggestGasPrice(ctx context.Context) (*big.Int, error) {
 // the current pending state of the backend blockchain. There is no guarantee that this is
 // the true gas limit requirement as other transactions may be added or removed by miners,
 // but it should provide a basis for setting a reasonable default.
-func (ec *Client) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64, error) {
+func (ec *Client) EstimateGas(ctx context.Context, msg evrynetNode.CallMsg) (uint64, error) {
 	var hex hexutil.Uint64
 	err := ec.c.CallContext(ctx, &hex, "eth_estimateGas", toCallArg(msg))
 	if err != nil {
@@ -553,7 +553,7 @@ func (ec *Client) EstimateGas(ctx context.Context, msg ethereum.CallMsg) (uint64
 //
 // If the transaction was a contract creation use the TransactionReceipt method to get the
 // contract address after the transaction has been mined.
-func (ec *Client) SendTx(ctx context.Context, args ethereum.SendTxArgs) (common.Hash, error) {
+func (ec *Client) SendTx(ctx context.Context, args evrynetNode.SendTxArgs) (common.Hash, error) {
 	var hash common.Hash
 	err := ec.c.CallContext(ctx, &hash, "eth_sendTransaction", toSendTxArgs(args))
 	return hash, err
@@ -587,12 +587,12 @@ func (ec *Client) ProviderSignTx(ctx context.Context, tx *types.Transaction, pro
 		return nil, err
 	}
 	if json == nil {
-		return nil, ethereum.NotFound
+		return nil, evrynetNode.NotFound
 	}
 	return json.tx, nil
 }
 
-func toCallArg(msg ethereum.CallMsg) interface{} {
+func toCallArg(msg evrynetNode.CallMsg) interface{} {
 	arg := map[string]interface{}{
 		"from": msg.From,
 		"to":   msg.To,
@@ -612,7 +612,7 @@ func toCallArg(msg ethereum.CallMsg) interface{} {
 	return arg
 }
 
-func toSendTxArgs(args ethereum.SendTxArgs) interface{} {
+func toSendTxArgs(args evrynetNode.SendTxArgs) interface{} {
 	arg := map[string]interface{}{
 		"from": args.From,
 	}

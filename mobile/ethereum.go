@@ -1,34 +1,34 @@
-// Copyright 2016 The go-ethereum Authors
-// This file is part of the go-ethereum library.
+// Copyright 2016 The evrynet-node Authors
+// This file is part of the evrynet-node library.
 //
-// The go-ethereum library is free software: you can redistribute it and/or modify
+// The evrynet-node library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Lesser General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// The go-ethereum library is distributed in the hope that it will be useful,
+// The evrynet-node library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU Lesser General Public License for more details.
 //
 // You should have received a copy of the GNU Lesser General Public License
-// along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
+// along with the evrynet-node library. If not, see <http://www.gnu.org/licenses/>.
 
-// Contains all the wrappers from the go-ethereum root package.
+// Contains all the wrappers from the evrynet-node root package.
 
 package geth
 
 import (
 	"errors"
 
-	ethereum "github.com/Evrynetlabs/evrynet-node"
+	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/common"
 )
 
 // Subscription represents an event subscription where events are
 // delivered on a data channel.
 type Subscription struct {
-	sub ethereum.Subscription
+	sub evrynetNode.Subscription
 }
 
 // Unsubscribe cancels the sending of events to the data channel
@@ -39,7 +39,7 @@ func (s *Subscription) Unsubscribe() {
 
 // CallMsg contains parameters for contract calls.
 type CallMsg struct {
-	msg ethereum.CallMsg
+	msg evrynetNode.CallMsg
 }
 
 // NewCallMsg creates an empty contract call parameter list.
@@ -75,7 +75,7 @@ func (msg *CallMsg) SetTo(address *Address) {
 // SyncProgress gives progress indications when the node is synchronising with
 // the Evrynet network.
 type SyncProgress struct {
-	progress ethereum.SyncProgress
+	progress evrynetNode.SyncProgress
 }
 
 func (p *SyncProgress) GetStartingBlock() int64 { return int64(p.progress.StartingBlock) }
@@ -128,7 +128,7 @@ func (t *Topics) Append(topics *Hashes) {
 
 // FilterQuery contains options for contract log filtering.
 type FilterQuery struct {
-	query ethereum.FilterQuery
+	query evrynetNode.FilterQuery
 }
 
 // NewFilterQuery creates an empty filter query for contract log filtering.

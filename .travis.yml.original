@@ -1,5 +1,5 @@
 language: go
-go_import_path: github.com/ethereum/go-ethereum
+go_import_path: github.com/Evrynetlabs/evrynet-node
 sudo: false
 jobs:
   include:
@@ -11,7 +11,7 @@ jobs:
       env:
         - lint
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       script:
         - go run build/ci.go lint
 
@@ -65,7 +65,7 @@ jobs:
       env:
         - ubuntu-ppa
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       addons:
         apt:
           packages:
@@ -80,7 +80,7 @@ jobs:
           - $HOME/.gobundle
       script:
         - echo '|1|7SiYPr9xl3uctzovOTj4gMwAC1M=|t6ReES75Bo/PxlOPJ6/GsGbTrM0= ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEA0aKz5UTUndYgIGG7dQBV+HaeuEZJ2xPHo2DS2iSKvUL4xNMSAY4UguNW+pX56nAQmZKIZZ8MaEvSj6zMEDiq6HFfn5JcTlM80UwlnyKe8B8p7Nk06PPQLrnmQt5fh0HmEcZx+JU9TZsfCHPnX7MNz4ELfZE6cFsclClrKim3BHUIGq//t93DllB+h4O9LHjEUsQ1Sr63irDLSutkLJD6RXchjROXkNirlcNVHH/jwLWR5RcYilNX7S5bIkK8NlWPjsn/8Ua5O7I9/YoE97PpO6i73DTGLh5H9JN/SITwCKBkgSDWUt61uPK3Y11Gty7o2lWsBjhBUm2Y38CBsoGmBw==' >> ~/.ssh/known_hosts
-        - go run build/ci.go debsrc -upload ethereum/ethereum -sftp-user geth-ci -signer "Go Evrynet Linux Builder <geth-ci@ethereum.org>" -goversion 1.13.4 -gohash 95dbeab442ee2746b9acf0934c8e2fc26414a0565c008631b04addb8c02e7624 -gobundle $HOME/.gobundle/go.tar.gz
+        - go run build/ci.go debsrc -upload Evrynetlabs/evrynet-node -sftp-user geth-ci -signer "Go Evrynet Linux Builder <geth-ci@evrynet-node.org>" -goversion 1.13.4 -gohash 95dbeab442ee2746b9acf0934c8e2fc26414a0565c008631b04addb8c02e7624 -gobundle $HOME/.gobundle/go.tar.gz
 
     # This builder does the Linux Azure uploads
     - stage: build
@@ -92,7 +92,7 @@ jobs:
       env:
         - azure-linux
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       addons:
         apt:
           packages:
@@ -128,7 +128,7 @@ jobs:
       env:
         - azure-linux-mips
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       script:
         - go run build/ci.go xgo --alltools -- --targets=linux/mips --ldflags '-extldflags "-static"' -v
         - for bin in build/bin/*-linux-mips; do mv -f "${bin}" "${bin/-linux-mips/}"; done
@@ -168,7 +168,7 @@ jobs:
         - azure-android
         - maven-android
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       before_install:
         - curl https://dl.google.com/go/go1.13.linux-amd64.tar.gz | tar -xz
         - export PATH=`pwd`/go/bin:$PATH
@@ -180,8 +180,8 @@ jobs:
         - unzip -q android-ndk-r19b.zip && rm android-ndk-r19b.zip
         - mv android-ndk-r19b $ANDROID_HOME/ndk-bundle
 
-        - mkdir -p $GOPATH/src/github.com/ethereum
-        - ln -s `pwd` $GOPATH/src/github.com/ethereum/go-ethereum
+        - mkdir -p $GOPATH/src/github.com/Evrynetlabs
+        - ln -s `pwd` $GOPATH/src/github.com/Evrynetlabs/evrynet-node
         - go run build/ci.go aar -signer ANDROID_SIGNING_KEY -deploy https://oss.sonatype.org -upload gethstore/builds
 
     # This builder does the OSX Azure, iOS CocoaPods and iOS Azure uploads
@@ -194,7 +194,7 @@ jobs:
         - azure-ios
         - cocoapods-ios
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       script:
         - go run build/ci.go install
         - go run build/ci.go archive -type tar -signer OSX_SIGNING_KEY -upload gethstore/builds
@@ -223,6 +223,6 @@ jobs:
       env:
         - azure-purge
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       script:
         - go run build/ci.go purge -store gethstore/builds -days 14

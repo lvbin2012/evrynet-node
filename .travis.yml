@@ -16,7 +16,7 @@ jobs:
       env:
         - GOLANGCI_LINT_VERSION=1.15.0
       git:
-        submodules: false # avoid cloning ethereum/tests
+        submodules: false # avoid cloning Evrynetlabs/tests
       script:
         - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b ${TRAVIS_HOME}/bin v${GOLANGCI_LINT_VERSION}
         - ./vendor.sh

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	ethereum "github.com/Evrynetlabs/evrynet-node"
+	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/evrclient"
@@ -31,7 +31,7 @@ func TestSendTxCreateContractWithProviderAndOwner(t *testing.T) {
 	gPrice := hexutil.Big(*big.NewInt(gasPrice.Int64()))
 	value := hexutil.Big(*big.NewInt(0))
 	gas := hexutil.Uint64(testGasLimit)
-	args := ethereum.SendTxArgs{
+	args := evrynetNode.SendTxArgs{
 		From:     sender,
 		To:       nil,
 		GasPrice: &gPrice,
@@ -71,7 +71,7 @@ func TestSendTxCreateContractNormal(t *testing.T) {
 	gPrice := hexutil.Big(*big.NewInt(testGasPrice))
 	gas := hexutil.Uint64(testGasLimit)
 	value := hexutil.Big(*big.NewInt(0))
-	args := ethereum.SendTxArgs{
+	args := evrynetNode.SendTxArgs{
 		From: sender,
 		//To:       &sender,
 		GasPrice: &gPrice,
@@ -103,7 +103,7 @@ func TestSendTxNormal(t *testing.T) {
 	gPrice := hexutil.Big(*big.NewInt(gasPrice.Int64()))
 	gas := hexutil.Uint64(1000000)
 	value := hexutil.Big(*big.NewInt(0))
-	args := ethereum.SendTxArgs{
+	args := evrynetNode.SendTxArgs{
 		From:     sender,
 		To:       &sender,
 		GasPrice: &gPrice,

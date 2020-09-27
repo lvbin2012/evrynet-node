@@ -1,18 +1,18 @@
-// Copyright 2014 The go-ethereum Authors
-// This file is part of go-ethereum.
+// Copyright 2014 The evrynet-node Authors
+// This file is part of evrynet-node.
 //
-// go-ethereum is free software: you can redistribute it and/or modify
+// evrynet-node is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 //
-// go-ethereum is distributed in the hope that it will be useful,
+// evrynet-node is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
+// along with evrynet-node. If not, see <http://www.gnu.org/licenses/>.
 
 // geth is the official command-line client for Evrynet.
 package main
@@ -207,7 +207,7 @@ func init() {
 	// Initialize the CLI app and start Geth
 	app.Action = geth
 	app.HideVersion = true // we have a command to print the version
-	app.Copyright = "Copyright 2013-2019 The go-ethereum Authors"
+	app.Copyright = "Copyright 2013-2019 The evrynet-node Authors"
 	app.Commands = []cli.Command{
 		// See chaincmd.go:
 		initCommand,

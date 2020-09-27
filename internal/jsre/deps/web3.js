@@ -2621,7 +2621,7 @@ var properties = function () {
             inputFormatter: utils.toDecimal
         }),
         new Property({
-            name: 'version.ethereum',
+            name: 'version.evrynetNode',
             getter: 'eth_protocolVersion',
             inputFormatter: utils.toDecimal
         }),
@@ -4509,7 +4509,7 @@ var Iban = function (iban) {
 };
 
 /**
- * This method should be used to create iban object from ethereum address
+ * This method should be used to create iban object from EvrynetNode address
  *
  * @method fromAddress
  * @param {String} address
@@ -5875,7 +5875,7 @@ module.exports = Shh;
  * @author Alex Beregszaszi <alex@rtfs.hu>
  * @date 2016
  *
- * Reference: https://github.com/ethereum/go-ethereum/blob/swarm/internal/web3ext/web3ext.go#L33
+ * Reference: https://github.com/ethereum/evrynet-node/blob/swarm/internal/web3ext/web3ext.go#L33
  */
 
 "use strict";
