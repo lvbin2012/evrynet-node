@@ -46,14 +46,14 @@ func TestSetupGenesis(t *testing.T) {
 	var (
 		customghash = common.HexToHash("0x9079ce192cd7b41d97af1b246eb371ef45f1d934cc43504f5a0787f6b3cdc0ba")
 		customg     = Genesis{
-			Config: &params.ChainConfig{},
+			Config: &params.ChainConfig{ViervilleBlock: big.NewInt(3)},
 			Alloc: GenesisAlloc{
 				{1}: {Balance: big.NewInt(1), Storage: map[common.Hash]common.Hash{{1}: {1}}},
 			},
 		}
 		oldcustomg = customg
 	)
-	oldcustomg.Config = &params.ChainConfig{}
+	oldcustomg.Config = &params.ChainConfig{ViervilleBlock: big.NewInt(2)}
 	tests := []struct {
 		name       string
 		fn         func(evrdb.Database) (*params.ChainConfig, common.Hash, error)

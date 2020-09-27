@@ -1,7 +1,7 @@
 {
   "config": {
     "ethash":{},
-    "chainId": 314158,
+    "chainId": 314158
   },
   "nonce": "0x0",
   "timestamp": "0x59a4e76d",

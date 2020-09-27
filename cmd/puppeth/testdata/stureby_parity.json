@@ -8,15 +8,12 @@
         "difficultyBoundDivisor":"0x800",
         "durationLimit":"0xd",
         "blockReward":{
-          "0x0":"0x4563918244f40000",
-          "0x7530":"0x29a2241af62c0000",
-          "0x9c40":"0x1bc16d674ec80000"
+          "0x0":"0x1bc16d674ec80000"
         },
         "homesteadTransition":"0x2710",
         "eip100bTransition":"0x7530",
         "difficultyBombDelays":{
-          "0x7530":"0x2dc6c0",
-          "0x9c40":"0x1e8480"
+          "0x0":"0x1e8480"
         }
       }
     }
@@ -30,7 +27,7 @@
     "chainID":"0x4cb2e",
     "maxCodeSize":"0x6000",
     "maxCodeSizeTransition":"0x0",
-    "eip98Transition": "0x7fffffffffffffff",
+    "eip98Transition": "0x7fffffffffffffff"
   },
   "genesis":{
     "seal":{
@@ -114,7 +111,7 @@
       "nonce":"0",
       "builtin":{
         "name":"modexp",
-        "activate_at":"0x7530",
+        "activate_at":"0x0",
         "pricing":{
           "modexp":{
             "divisor":20
@@ -127,7 +124,7 @@
       "nonce":"0",
       "builtin":{
         "name":"alt_bn128_add",
-        "activate_at":"0x7530",
+        "activate_at":"0x0",
         "pricing":{
           "linear":{
             "base":500,
@@ -141,7 +138,7 @@
       "nonce":"0",
       "builtin":{
         "name":"alt_bn128_mul",
-        "activate_at":"0x7530",
+        "activate_at":"0x0",
         "pricing":{
           "linear":{
             "base":40000,
@@ -155,7 +152,7 @@
       "nonce":"0",
       "builtin":{
         "name":"alt_bn128_pairing",
-        "activate_at":"0x7530",
+        "activate_at":"0x0",
         "pricing":{
           "alt_bn128_pairing":{
             "base":100000,
