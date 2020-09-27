@@ -42,7 +42,7 @@ func TestCheckCompatible(t *testing.T) {
 			new:    &ChainConfig{ViervilleBlock: big.NewInt(20)},
 			head:   25,
 			wantErr: &ConfigCompatError{
-				What:         "ViervilleBlock fork block",
+				What:         "Vierville fork block",
 				StoredConfig: big.NewInt(10),
 				NewConfig:    big.NewInt(20),
 				RewindTo:     9,
