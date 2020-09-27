@@ -2103,24 +2103,9 @@ var toEvrAddr = function (val) {
       byteArray.unshift(0);
       index++;
     }
-    byteArray.unshift(33);
-    var hexString = "";
-    for (var i = 0; i < byteArray.length; i++){
-        var tmp =byteArray[i].toString(16);
-        if (tmp.length === 1){
-            tmp = "0" + tmp;
-        }
-        hexString = hexString + tmp;
-    }
-    var input = CryptoJS.enc.Hex.parse(hexString);
-    var hash1 = sha256(input, {outputLength: 256});
-    var hash2 = sha256(hash1, {outputLength: 256}).toString();
-    for (var i = 0; i < 4; i++) {
-        var substr = hash2.substring(i * 2, i * 2 + 2);
-        var value = parseInt(substr, 16);
-        byteArray.push(value);
-    }
-    return encodeBase58(byteArray);
+    byteArray = byteArray.slice(byteArray.length -20, byteArray.length);
+
+    return checkEncodeBase58(byteArray, 33);
 };
 
 /**
@@ -2268,8 +2253,8 @@ var toTwosComplement = function (number) {
  * convert bigNumber to byte array
  *
  * @method bigNumberToArray
- * @param {bigNumber} bigNumber
- * @return {Array{}}
+ * @param {bigNumber} var
+ * @return {Array}
  */
 var bigNumberToArray = function (val) {
     if (!isBigNumber(val)){
@@ -2292,7 +2277,7 @@ var bigNumberToArray = function (val) {
  * convert byte array to BigNumber
  *
  * @method arrayToBigNumber
- * @param {Array} byte Array
+ * @param {Array} val
  * @return {BigNumber}
  */
 var arrayToBigNumber = function (val) {
@@ -2314,8 +2299,8 @@ var arrayToBigNumber = function (val) {
  * encode byte array in base58
  *
  * @method encodeBase58
- * @param {Array} byte Array
- * @return {Base58 encode string}
+ * @param {Array} plain
+ * @return {string}
  */
 var encodeBase58 = function (plain) {
     if (!isArray(plain)){
@@ -2346,7 +2331,7 @@ var encodeBase58 = function (plain) {
  *
  * @method decodeBase58
  * @param {String} base58 encode string
- * @return {Array{}}
+ * @return {Arrary}
  */
 var  decodeBase58 = function (encoded) {
     var alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -2379,6 +2364,69 @@ var  decodeBase58 = function (encoded) {
 };
 
 /**
+ * CheckEncode prepends a version byte and appends a four byte checksum
+ *
+ * @method checkEncodeBase58
+ * @param {Array} byteArray
+ * @param {byte} version
+ * @return {string}
+ */
+var checkEncodeBase58 = function (byteArray, version) {
+    byteArray.unshift(version);
+    var hexString = "";
+    for (var i = 0; i < byteArray.length; i++){
+        var tmp =byteArray[i].toString(16);
+        if (tmp.length === 1){
+              tmp = "0" + tmp;
+        }
+        hexString = hexString + tmp;
+    }
+    var input = CryptoJS.enc.Hex.parse(hexString);
+    var hash1 = sha256(input, {outputLength: 256});
+    var hash2 = sha256(hash1, {outputLength: 256}).toString();
+    for (var i = 0; i < 4; i++) {
+        var substr = hash2.substring(i * 2, i * 2 + 2);
+        var value = parseInt(substr, 16);
+        byteArray.push(value);
+   }
+  return encodeBase58(byteArray);
+};
+
+/**
+ * CheckDecode decodes a string that was encoded with CheckEncode and verifies the checksum
+ *
+ * @method checkDecodeBase58
+ * @param {string} val
+ * @return {Array}
+ */
+var checkDecodeBase58 = function (val) {
+    var resBytes = decodeBase58(val);
+    if (resBytes.length < 5){
+        return new Array();
+    }
+    var hexString = "";
+    for (var i = 0; i < resBytes.length - 4; i++){
+        var tmp =resBytes[i].toString(16);
+        if (tmp.length === 1){
+            tmp = "0" + tmp;
+        }
+        hexString = hexString + tmp;
+    }
+    var input = CryptoJS.enc.Hex.parse(hexString);
+    var hash1 = sha256(input, {outputLength: 256});
+    var hash2 = sha256(hash1, {outputLength: 256}).toString();
+    var checkStart = 21;
+    for (var i = 0; i < 4; i++) {
+        var substr = hash2.substring(i * 2, i * 2 + 2);
+        var value = parseInt(substr, 16);
+        if (value !== resBytes[checkStart + i]) {
+            return new Array();
+        }
+      }
+    return resBytes;
+};
+
+/**
  * Checks if the given string is an address
  *
  * @method isAddress
@@ -2389,28 +2437,9 @@ var isAddress = function (address) {
     if (address.length !== 34){
         return false;
     }
-    var resBytes = decodeBase58(address);
-    if (resBytes.length < 5 || resBytes[0] !== 33){
+    var resBytes = checkDecodeBase58(address);
+    if (resBytes.length === 0 || resBytes[0] !== 33){
         return false;
-    }
-    var hexString = "";
-    for (var i = 0; i < resBytes.length - 4; i++){
-        var tmp =resBytes[i].toString(16);
-        if (tmp.length === 1){
-            tmp = "0" + tmp;
-        }
-        hexString = hexString + tmp;
-     }
-    var input = CryptoJS.enc.Hex.parse(hexString);
-    var hash1 = sha256(input, {outputLength: 256});
-    var hash2 = sha256(hash1, {outputLength: 256}).toString();
-    var checkStart = 21;
-    for (var i = 0; i < 4; i++) {
-      var substr = hash2.substring(i * 2, i * 2 + 2);
-      var value = parseInt(substr, 16);
-      if (value !== resBytes[checkStart + i]) {
-          return false;
-      }
     }
     return true;
 };
