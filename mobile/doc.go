@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the evrynet-node library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package geth contains the simplified mobile APIs to evrynet-node.
+// Package gev contains the simplified mobile APIs to evrynet-node.
 //
 // The scope of this package is *not* to allow writing a custom Evrynet client
 // with pieces plucked from evrynet-node, rather to allow writing native dapps on

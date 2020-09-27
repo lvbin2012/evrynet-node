@@ -15,13 +15,13 @@
 
 3. In working directory create a folder containing nodekey
     ```shell    
-    $ mkdir -p validator-node/geth
+    $ mkdir -p validator-node/gev
     ```  
 
-4. Generate node key and copy it into folder `validator-node/geth`
+4. Generate node key and copy it into folder `validator-node/gev`
     ```shell
     $ bootnode --genkey=nodekey
-    $ cp nodekey validator-node/geth
+    $ cp nodekey validator-node/gev
     ```
 
 5. Generate tendermint genesis.json from pupeth

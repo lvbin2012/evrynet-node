@@ -7,11 +7,11 @@ sh ./stop_test_nodes.sh
 for i in 1 2 3 4
 do
   echo "--- Clear data for node $i ..."
-  rm -rf ./tests/test_nodes/node"$i"/data/geth/chaindata
-  rm -rf ./tests/test_nodes/node"$i"/data/geth/lightchaindata
-  rm -rf ./tests/test_nodes/node"$i"/data/geth/nodes
-  rm -r ./tests/test_nodes/node"$i"/data/geth/LOCK
-  rm -r ./tests/test_nodes/node"$i"/data/geth/transactions.rlp
-  rm -r ./tests/test_nodes/node"$i"/data/geth.ipc
+  rm -rf ./tests/test_nodes/node"$i"/data/gev/chaindata
+  rm -rf ./tests/test_nodes/node"$i"/data/gev/lightchaindata
+  rm -rf ./tests/test_nodes/node"$i"/data/gev/nodes
+  rm -r ./tests/test_nodes/node"$i"/data/gev/LOCK
+  rm -r ./tests/test_nodes/node"$i"/data/gev/transactions.rlp
+  rm -r ./tests/test_nodes/node"$i"/data/gev.ipc
   rm -r ./node"$i".log
 done 

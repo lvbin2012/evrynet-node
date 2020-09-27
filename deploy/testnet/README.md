@@ -107,14 +107,14 @@ The bellow example explains how to deploy 3 nodes manually.
     $ mkdir -p nodes/node_1 nodes/node_2 nodes/node_3
     ```  
 
-3. In each node's working directory, create a log & data directory called `data`, and inside `data` create the `geth` directory   
+3. In each node's working directory, create a log & data directory called `data`, and inside `data` create the `gev` directory 
     ```shell script
     $ mkdir -p nodes/node_1/log
     $ mkdir -p nodes/node_2/log
     $ mkdir -p nodes/node_3/log
-    $ mkdir -p nodes/node_1/data/geth
-    $ mkdir -p nodes/node_2/data/geth
-    $ mkdir -p nodes/node_3/data/geth
+    $ mkdir -p nodes/node_1/data/gev
+    $ mkdir -p nodes/node_2/data/gev
+    $ mkdir -p nodes/node_3/data/gev
     ```
 
 4. Generate node key and copy it into folder `node_1`, `node_2` `node_3`
@@ -122,12 +122,12 @@ The bellow example explains how to deploy 3 nodes manually.
     $ bootnode --genkey=nodekey1
     $ bootnode --genkey=nodekey2
     $ bootnode --genkey=nodekey3
-    $ cp nodekey1 nodes/node_1/data/geth/nodekey
-    $ cp nodekey2 nodes/node_2/data/geth/nodekey
-    $ cp nodekey3 nodes/node_3/data/geth/nodekey
+    $ cp nodekey1 nodes/node_1/data/gev/nodekey
+    $ cp nodekey2 nodes/node_2/data/gev/nodekey
+    $ cp nodekey3 nodes/node_3/data/gev/nodekey
     ```
   
- 5. Now we will get the address for 3 nodes. Using the content of nodekey1,2,3 files (Ex: `node_1/data/geth/nodekey`) as Private Key to get Address of each nodes at [myetherwallet](myetherwallet.com) 
+ 5. Now we will get the address for 3 nodes. Using the content of nodekey1,2,3 files (Ex: `node_1/data/gev/nodekey`) as Private Key to get Address of each nodes at [myetherwallet](myetherwallet.com)
  6. The last step, we need to create new `genesis.json` using the new address of validators.  
  Run `puppeth` and full fill data of your chain. Using 3 Addresses we just get from 3 Private Keys above.   
  More information on Genesis file can be viewed at [genesis file wiki](https://github.com/Evrynetlabs/evrynet-node/wiki/Genesis-file).  

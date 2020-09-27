@@ -247,7 +247,7 @@ func (w *wizard) makeGenesis() {
 	w.conf.flush()
 }
 
-// importGenesis imports a Geth genesis spec into puppeth.
+// importGenesis imports a Gev genesis spec into puppeth.
 func (w *wizard) importGenesis() {
 	// Request the genesis JSON spec URL from the user
 	fmt.Println()
@@ -355,7 +355,7 @@ func (w *wizard) manageGenesis() {
 		}
 		out, _ := json.MarshalIndent(w.conf.Genesis, "", "  ")
 
-		// Export the native genesis spec used by puppeth and Geth
+		// Export the native genesis spec used by puppeth and Gev
 		gethJson := filepath.Join(folder, fmt.Sprintf("%s.json", w.network))
 		if err := ioutil.WriteFile((gethJson), out, 0644); err != nil {
 			log.Error("Failed to save genesis file", "err", err)

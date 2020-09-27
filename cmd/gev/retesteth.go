@@ -59,11 +59,11 @@ var (
 	retestethCommand = cli.Command{
 		Action:      utils.MigrateFlags(retesteth),
 		Name:        "retesteth",
-		Usage:       "Launches geth in retesteth mode",
+		Usage:       "Launches gev in retesteth mode",
 		ArgsUsage:   "",
 		Flags:       []cli.Flag{rpcPortFlag},
 		Category:    "MISCELLANEOUS COMMANDS",
-		Description: `Launches geth in retesteth mode (no database, no network, only retesteth RPC interface)`,
+		Description: `Launches gev in retesteth mode (no database, no network, only retesteth RPC interface)`,
 	}
 )
 
@@ -813,7 +813,7 @@ func (api *RetestethAPI) StorageRangeAt(ctx context.Context,
 }
 
 func (api *RetestethAPI) ClientVersion(ctx context.Context) (string, error) {
-	return "Geth-" + params.VersionWithCommit(gitCommit, gitDate), nil
+	return "Gev-" + params.VersionWithCommit(gitCommit, gitDate), nil
 }
 
 // splitAndTrim splits input separated by a comma
