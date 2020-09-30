@@ -338,7 +338,7 @@ var bn256PairingTests = []precompiledTest{
 
 func testPrecompiled(addrStr string, test precompiledTest, t *testing.T) {
 	addr, _ := common.EvryAddressStringToAddressCheck(addrStr)
-	p := PrecompiledContractsConstantinople[addr]
+	p := PrecompiledContractsOmaha[addr]
 	in := common.Hex2Bytes(test.input)
 	contractAddr, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmefphuFF6s")
 	contract := NewContract(AccountRef(contractAddr),
@@ -357,7 +357,7 @@ func benchmarkPrecompiled(addrStr string, test precompiledTest, bench *testing.B
 		return
 	}
 	addr, _ := common.EvryAddressStringToAddressCheck(addrStr)
-	p := PrecompiledContractsConstantinople[addr]
+	p := PrecompiledContractsOmaha[addr]
 	in := common.Hex2Bytes(test.input)
 	reqGas := p.RequiredGas(in)
 	contractAddr, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmefphuFF6s")

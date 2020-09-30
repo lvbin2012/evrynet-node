@@ -123,8 +123,6 @@ type ChainParams struct {
 
 type CParamsParams struct {
 	AccountStartNonce          math.HexOrDecimal64   `json:"accountStartNonce"`
-	ConstantinopleForkBlock    *math.HexOrDecimal64  `json:"constantinopleForkBlock"`
-	ConstantinopleFixForkBlock *math.HexOrDecimal64  `json:"constantinopleFixForkBlock"`
 	ChainID                    *math.HexOrDecimal256 `json:"chainID"`
 	MaximumExtraDataSize       math.HexOrDecimal64   `json:"maximumExtraDataSize"`
 	TieBreakingGas             bool                  `json:"tieBreakingGas"`
@@ -304,24 +302,9 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	if chainParams.Params.ChainID != nil {
 		chainId.Set((*big.Int)(chainParams.Params.ChainID))
 	}
-	var (
-		constantinopleBlock *big.Int
-		petersburgBlock     *big.Int
-	)
-	if chainParams.Params.ConstantinopleForkBlock != nil {
-		constantinopleBlock = big.NewInt(int64(*chainParams.Params.ConstantinopleForkBlock))
-	}
-	if chainParams.Params.ConstantinopleFixForkBlock != nil {
-		petersburgBlock = big.NewInt(int64(*chainParams.Params.ConstantinopleFixForkBlock))
-	}
-	if constantinopleBlock != nil && petersburgBlock == nil {
-		petersburgBlock = big.NewInt(100000000000)
-	}
 	genesis := &core.Genesis{
 		Config: &params.ChainConfig{
-			ChainID:             chainId,
-			ConstantinopleBlock: constantinopleBlock,
-			PetersburgBlock:     petersburgBlock,
+			ChainID: chainId,
 		},
 		Nonce:      uint64(chainParams.Genesis.Nonce),
 		Timestamp:  uint64(chainParams.Genesis.Timestamp),

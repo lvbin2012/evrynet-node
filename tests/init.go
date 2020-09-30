@@ -26,15 +26,9 @@ import (
 // Forks table defines supported forks and their chain config.
 // TODO change version name in future
 var Forks = map[string]*params.ChainConfig{
-	"Constantinople": {
+	"ViervilleBlock": {
 		ChainID:             big.NewInt(1),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(10000000),
-	},
-	"ConstantinopleFix": {
-		ChainID:             big.NewInt(1),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
+		ViervilleBlock: big.NewInt(0),
 	},
 }
 

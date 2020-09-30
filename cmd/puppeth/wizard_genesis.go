@@ -52,9 +52,7 @@ func (w *wizard) makeGenesis() {
 		GasLimit:   4700000,
 		Difficulty: big.NewInt(524288),
 		Alloc:      make(core.GenesisAlloc),
-		Config: &params.ChainConfig{
-			ConstantinopleBlock: big.NewInt(0),
-		},
+		Config:     &params.ChainConfig{},
 	}
 	// Figure out which consensus engine to choose
 	fmt.Println()
@@ -303,14 +301,8 @@ func (w *wizard) manageGenesis() {
 	case "1":
 		// Fork rule updating requested, iterate over each fork
 		fmt.Println()
-		fmt.Printf("Which block should Constantinople come into effect? (default = %v)\n", w.conf.Genesis.Config.ConstantinopleBlock)
-		w.conf.Genesis.Config.ConstantinopleBlock = w.readDefaultBigInt(w.conf.Genesis.Config.ConstantinopleBlock)
-		if w.conf.Genesis.Config.PetersburgBlock == nil {
-			w.conf.Genesis.Config.PetersburgBlock = w.conf.Genesis.Config.ConstantinopleBlock
-		}
-		fmt.Println()
-		fmt.Printf("Which block should Constantinople-Fix (remove EIP-1283) come into effect? (default = %v)\n", w.conf.Genesis.Config.PetersburgBlock)
-		w.conf.Genesis.Config.PetersburgBlock = w.readDefaultBigInt(w.conf.Genesis.Config.PetersburgBlock)
+		fmt.Printf("Which block should ViervilleBlock come into effect? (default = %v)\n", w.conf.Genesis.Config.ViervilleBlock)
+		w.conf.Genesis.Config.ViervilleBlock = w.readDefaultBigInt(w.conf.Genesis.Config.ViervilleBlock)
 
 		out, _ := json.MarshalIndent(w.conf.Genesis.Config, "", "  ")
 		fmt.Printf("Chain configuration updated:\n\n%s\n", out)
