@@ -38,7 +38,6 @@ type alethGenesisSpec struct {
 	Params     struct {
 		AccountStartNonce       math2.HexOrDecimal64   `json:"accountStartNonce"`
 		MaximumExtraDataSize    hexutil.Uint64         `json:"maximumExtraDataSize"`
-		DaoHardforkBlock        math2.HexOrDecimal64   `json:"daoHardforkBlock"`
 		EIP150ForkBlock         hexutil.Uint64         `json:"EIP150ForkBlock"`
 		EIP158ForkBlock         hexutil.Uint64         `json:"EIP158ForkBlock"`
 		ByzantiumForkBlock      hexutil.Uint64         `json:"byzantiumForkBlock"`
@@ -105,7 +104,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.AccountStartNonce = 0
 	spec.Params.TieBreakingGas = false
 	spec.Params.AllowFutureBlocks = false
-	spec.Params.DaoHardforkBlock = 0
 
 	spec.Params.EIP150ForkBlock = (hexutil.Uint64)(genesis.Config.EIP150Block.Uint64())
 	spec.Params.EIP158ForkBlock = (hexutil.Uint64)(genesis.Config.EIP158Block.Uint64())
