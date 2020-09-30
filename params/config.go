@@ -47,7 +47,6 @@ var (
 	MainnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(1),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		ByzantiumBlock:      big.NewInt(4370000),
 		ConstantinopleBlock: big.NewInt(7280000),
 		PetersburgBlock:     big.NewInt(7280000),
 		Ethash:              new(EthashConfig),
@@ -66,7 +65,6 @@ var (
 	TestnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(3),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		ByzantiumBlock:      big.NewInt(1700000),
 		ConstantinopleBlock: big.NewInt(4230000),
 		PetersburgBlock:     big.NewInt(4939394),
 		Ethash:              new(EthashConfig),
@@ -85,7 +83,6 @@ var (
 	RinkebyChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(4),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		ByzantiumBlock:      big.NewInt(1035301),
 		ConstantinopleBlock: big.NewInt(3660663),
 		PetersburgBlock:     big.NewInt(4321234),
 		Clique: &CliqueConfig{
@@ -107,7 +104,6 @@ var (
 	GoerliChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(5),
 		GasPrice:            big.NewInt(GasPriceConfig),
-		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 		Clique: &CliqueConfig{
@@ -130,17 +126,17 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig),  big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Evrynet core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig),  big.NewInt(0), big.NewInt(0), nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil}
 
-	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
-	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, nil, new(TendermintConfig)}
+	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig),  big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil, nil}
+	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig),  big.NewInt(0), big.NewInt(0), nil, nil, nil, new(TendermintConfig)}
 	TestRules                 = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -166,7 +162,6 @@ type ChainConfig struct {
 
 	GasPrice *big.Int `json:"gasPrice"` // gasPrice identified the gasPrice for each transaction
 
-	ByzantiumBlock      *big.Int `json:"byzantiumBlock,omitempty"`      // Byzantium switch block (nil = no fork, 0 = already on byzantium)
 	ConstantinopleBlock *big.Int `json:"constantinopleBlock,omitempty"` // Constantinople switch block (nil = no fork, 0 = already activated)
 	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	EWASMBlock          *big.Int `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
@@ -223,20 +218,15 @@ func (c *ChainConfig) String() string {
 	default:
 		engine = "unknown"
 	}
-	return fmt.Sprintf("{ChainID: %v GasPrice: %v Byzantium: %v Constantinople: %v  PetersburgBlock: %v Engine: %v}",
+	return fmt.Sprintf("{ChainID: %v GasPrice: %v Constantinople: %v  PetersburgBlock: %v Engine: %v}",
 		c.ChainID,
 		c.GasPrice,
-		c.ByzantiumBlock,
 		c.ConstantinopleBlock,
 		c.PetersburgBlock,
 		engine,
 	)
 }
 
-// IsByzantium returns whether num is either equal to the Byzantium fork block or greater.
-func (c *ChainConfig) IsByzantium(num *big.Int) bool {
-	return isForked(c.ByzantiumBlock, num)
-}
 
 // IsConstantinople returns whether num is either equal to the Constantinople fork block or greater.
 func (c *ChainConfig) IsConstantinople(num *big.Int) bool {
@@ -289,9 +279,6 @@ func (c *ChainConfig) CheckCompatible(newcfg *ChainConfig, height uint64) *Confi
 }
 
 func (c *ChainConfig) checkCompatible(newcfg *ChainConfig, head *big.Int) *ConfigCompatError {
-	if isForkIncompatible(c.ByzantiumBlock, newcfg.ByzantiumBlock, head) {
-		return newCompatError("Byzantium fork block", c.ByzantiumBlock, newcfg.ByzantiumBlock)
-	}
 	if isForkIncompatible(c.ConstantinopleBlock, newcfg.ConstantinopleBlock, head) {
 		return newCompatError("Constantinople fork block", c.ConstantinopleBlock, newcfg.ConstantinopleBlock)
 	}
@@ -365,8 +352,8 @@ func (err *ConfigCompatError) Error() string {
 // Rules is a one time interface meaning that it shouldn't be used in between transition
 // phases.
 type Rules struct {
-	ChainID                                     *big.Int
-	IsByzantium, IsConstantinople, IsPetersburg bool
+	ChainID                        *big.Int
+	IsConstantinople, IsPetersburg bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -377,7 +364,6 @@ func (c *ChainConfig) Rules(num *big.Int) Rules {
 	}
 	return Rules{
 		ChainID:          new(big.Int).Set(chainID),
-		IsByzantium:      c.IsByzantium(num),
 		IsConstantinople: c.IsConstantinople(num),
 		IsPetersburg:     c.IsPetersburg(num),
 	}

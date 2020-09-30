@@ -38,7 +38,6 @@ type alethGenesisSpec struct {
 	Params     struct {
 		AccountStartNonce       math2.HexOrDecimal64   `json:"accountStartNonce"`
 		MaximumExtraDataSize    hexutil.Uint64         `json:"maximumExtraDataSize"`
-		ByzantiumForkBlock      hexutil.Uint64         `json:"byzantiumForkBlock"`
 		ConstantinopleForkBlock hexutil.Uint64         `json:"constantinopleForkBlock"`
 		MinGasLimit             hexutil.Uint64         `json:"minGasLimit"`
 		MaxGasLimit             hexutil.Uint64         `json:"maxGasLimit"`
@@ -103,10 +102,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.TieBreakingGas = false
 	spec.Params.AllowFutureBlocks = false
 
-	// Byzantium
-	if num := genesis.Config.ByzantiumBlock; num != nil {
-		spec.setByzantium(num)
-	}
 	// Constantinople
 	if num := genesis.Config.ConstantinopleBlock; num != nil {
 		spec.setConstantinople(num)
@@ -146,18 +141,16 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 		Linear: &alethGenesisSpecLinearPricing{Base: 600, Word: 120}})
 	spec.setPrecompile(4, &alethGenesisSpecBuiltin{Name: "identity",
 		Linear: &alethGenesisSpecLinearPricing{Base: 15, Word: 3}})
-	if genesis.Config.ByzantiumBlock != nil {
-		spec.setPrecompile(5, &alethGenesisSpecBuiltin{Name: "modexp",
-			StartingBlock: (hexutil.Uint64)(genesis.Config.ByzantiumBlock.Uint64())})
-		spec.setPrecompile(6, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_add",
-			StartingBlock: (hexutil.Uint64)(genesis.Config.ByzantiumBlock.Uint64()),
-			Linear:        &alethGenesisSpecLinearPricing{Base: 500}})
-		spec.setPrecompile(7, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_mul",
-			StartingBlock: (hexutil.Uint64)(genesis.Config.ByzantiumBlock.Uint64()),
-			Linear:        &alethGenesisSpecLinearPricing{Base: 40000}})
-		spec.setPrecompile(8, &alethGenesisSpecBuiltin{Name: "alt_bn128_pairing_product",
-			StartingBlock: (hexutil.Uint64)(genesis.Config.ByzantiumBlock.Uint64())})
-	}
+	spec.setPrecompile(5, &alethGenesisSpecBuiltin{Name: "modexp",
+		StartingBlock: (hexutil.Uint64)(0)})
+	spec.setPrecompile(6, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_add",
+		StartingBlock: (hexutil.Uint64)(0),
+		Linear:        &alethGenesisSpecLinearPricing{Base: 500}})
+	spec.setPrecompile(7, &alethGenesisSpecBuiltin{Name: "alt_bn128_G1_mul",
+		StartingBlock: (hexutil.Uint64)(0),
+		Linear:        &alethGenesisSpecLinearPricing{Base: 40000}})
+	spec.setPrecompile(8, &alethGenesisSpecBuiltin{Name: "alt_bn128_pairing_product",
+		StartingBlock: (hexutil.Uint64)(0)})
 	return spec, nil
 }
 
@@ -187,10 +180,6 @@ func (spec *alethGenesisSpec) setAccount(address common.Address, account core.Ge
 
 }
 
-func (spec *alethGenesisSpec) setByzantium(num *big.Int) {
-	spec.Params.ByzantiumForkBlock = hexutil.Uint64(num.Uint64())
-}
-
 func (spec *alethGenesisSpec) setConstantinople(num *big.Int) {
 	spec.Params.ConstantinopleForkBlock = hexutil.Uint64(num.Uint64())
 }
@@ -207,7 +196,6 @@ type parityChainSpec struct {
 				DurationLimit          *hexutil.Big      `json:"durationLimit"`
 				BlockReward            map[string]string `json:"blockReward"`
 				DifficultyBombDelays   map[string]string `json:"difficultyBombDelays"`
-				EIP100bTransition      hexutil.Uint64    `json:"eip100bTransition"`
 			} `json:"params"`
 		} `json:"Ethash"`
 	} `json:"engine"`
@@ -222,10 +210,6 @@ type parityChainSpec struct {
 		MaxCodeSize              hexutil.Uint64       `json:"maxCodeSize"`
 		MaxCodeSizeTransition    hexutil.Uint64       `json:"maxCodeSizeTransition"`
 		EIP98Transition          hexutil.Uint64       `json:"eip98Transition"`
-		EIP140Transition         hexutil.Uint64       `json:"eip140Transition"`
-		EIP211Transition         hexutil.Uint64       `json:"eip211Transition"`
-		EIP214Transition         hexutil.Uint64       `json:"eip214Transition"`
-		EIP658Transition         hexutil.Uint64       `json:"eip658Transition"`
 		EIP145Transition         hexutil.Uint64       `json:"eip145Transition"`
 		EIP1014Transition        hexutil.Uint64       `json:"eip1014Transition"`
 		EIP1052Transition        hexutil.Uint64       `json:"eip1052Transition"`
@@ -311,10 +295,6 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
 	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.FrontierBlockReward)
 
-	// Byzantium
-	if num := genesis.Config.ByzantiumBlock; num != nil {
-		spec.setByzantium(num)
-	}
 	// Constantinople
 	if num := genesis.Config.ConstantinopleBlock; num != nil {
 		spec.setConstantinople(num)
@@ -368,21 +348,19 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.setPrecompile(4, &parityChainSpecBuiltin{
 		Name: "identity", Pricing: &parityChainSpecPricing{Linear: &parityChainSpecLinearPricing{Base: 15, Word: 3}},
 	})
-	if genesis.Config.ByzantiumBlock != nil {
-		blnum := math2.HexOrDecimal64(genesis.Config.ByzantiumBlock.Uint64())
-		spec.setPrecompile(5, &parityChainSpecBuiltin{
-			Name: "modexp", ActivateAt: blnum, Pricing: &parityChainSpecPricing{ModExp: &parityChainSpecModExpPricing{Divisor: 20}},
-		})
-		spec.setPrecompile(6, &parityChainSpecBuiltin{
-			Name: "alt_bn128_add", ActivateAt: blnum, Pricing: &parityChainSpecPricing{Linear: &parityChainSpecLinearPricing{Base: 500}},
-		})
-		spec.setPrecompile(7, &parityChainSpecBuiltin{
-			Name: "alt_bn128_mul", ActivateAt: blnum, Pricing: &parityChainSpecPricing{Linear: &parityChainSpecLinearPricing{Base: 40000}},
-		})
-		spec.setPrecompile(8, &parityChainSpecBuiltin{
-			Name: "alt_bn128_pairing", ActivateAt: blnum, Pricing: &parityChainSpecPricing{AltBnPairing: &parityChainSpecAltBnPairingPricing{Base: 100000, Pair: 80000}},
-		})
-	}
+	blnum := math2.HexOrDecimal64(0)
+	spec.setPrecompile(5, &parityChainSpecBuiltin{
+		Name: "modexp", ActivateAt: blnum, Pricing: &parityChainSpecPricing{ModExp: &parityChainSpecModExpPricing{Divisor: 20}},
+	})
+	spec.setPrecompile(6, &parityChainSpecBuiltin{
+		Name: "alt_bn128_add", ActivateAt: blnum, Pricing: &parityChainSpecPricing{Linear: &parityChainSpecLinearPricing{Base: 500}},
+	})
+	spec.setPrecompile(7, &parityChainSpecBuiltin{
+		Name: "alt_bn128_mul", ActivateAt: blnum, Pricing: &parityChainSpecPricing{Linear: &parityChainSpecLinearPricing{Base: 40000}},
+	})
+	spec.setPrecompile(8, &parityChainSpecBuiltin{
+		Name: "alt_bn128_pairing", ActivateAt: blnum, Pricing: &parityChainSpecPricing{AltBnPairing: &parityChainSpecAltBnPairingPricing{Base: 100000, Pair: 80000}},
+	})
 	return spec, nil
 }
 
@@ -395,17 +373,6 @@ func (spec *parityChainSpec) setPrecompile(address byte, data *parityChainSpecBu
 		spec.Accounts[a] = &parityChainSpecAccount{}
 	}
 	spec.Accounts[a].Builtin = data
-}
-
-func (spec *parityChainSpec) setByzantium(num *big.Int) {
-	spec.Engine.Ethash.Params.BlockReward[hexutil.EncodeBig(num)] = hexutil.EncodeBig(ethash.ByzantiumBlockReward)
-	spec.Engine.Ethash.Params.DifficultyBombDelays[hexutil.EncodeBig(num)] = hexutil.EncodeUint64(3000000)
-	n := hexutil.Uint64(num.Uint64())
-	spec.Engine.Ethash.Params.EIP100bTransition = n
-	spec.Params.EIP140Transition = n
-	spec.Params.EIP211Transition = n
-	spec.Params.EIP214Transition = n
-	spec.Params.EIP658Transition = n
 }
 
 func (spec *parityChainSpec) setConstantinople(num *big.Int) {

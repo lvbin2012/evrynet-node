@@ -89,7 +89,7 @@ func (w *wizard) configStakingSC(genesis *core.Genesis, validators []common.Addr
 	fmt.Println("What is the address of staking smart contract? (avoid special address from 0x0000000000000000000000000000000000000001 to 0x0000000000000000000000000000000000000008)")
 	for {
 		if expectedSCAddress = w.readAddress(); expectedSCAddress != nil {
-			if _, ok := vm.PrecompiledContractsByzantium[*expectedSCAddress]; !ok {
+			if _, ok := vm.PrecompiledContractsConstantinople[*expectedSCAddress]; !ok {
 				break
 			}
 		}

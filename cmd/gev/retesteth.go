@@ -123,7 +123,6 @@ type ChainParams struct {
 
 type CParamsParams struct {
 	AccountStartNonce          math.HexOrDecimal64   `json:"accountStartNonce"`
-	ByzantiumForkBlock         *math.HexOrDecimal64  `json:"byzantiumForkBlock"`
 	ConstantinopleForkBlock    *math.HexOrDecimal64  `json:"constantinopleForkBlock"`
 	ConstantinopleFixForkBlock *math.HexOrDecimal64  `json:"constantinopleFixForkBlock"`
 	ChainID                    *math.HexOrDecimal256 `json:"chainID"`
@@ -306,13 +305,9 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		chainId.Set((*big.Int)(chainParams.Params.ChainID))
 	}
 	var (
-		byzantiumBlock      *big.Int
 		constantinopleBlock *big.Int
 		petersburgBlock     *big.Int
 	)
-	if chainParams.Params.ByzantiumForkBlock != nil {
-		byzantiumBlock = big.NewInt(int64(*chainParams.Params.ByzantiumForkBlock))
-	}
 	if chainParams.Params.ConstantinopleForkBlock != nil {
 		constantinopleBlock = big.NewInt(int64(*chainParams.Params.ConstantinopleForkBlock))
 	}
@@ -325,7 +320,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	genesis := &core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID:             chainId,
-			ByzantiumBlock:      byzantiumBlock,
 			ConstantinopleBlock: constantinopleBlock,
 			PetersburgBlock:     petersburgBlock,
 		},

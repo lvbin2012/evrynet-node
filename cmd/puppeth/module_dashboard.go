@@ -626,7 +626,6 @@ func deployDashboard(client *sshClient, network string, conf *config, config *da
 		"ParityGenesis":     network + "-parity.json",
 		"PythonGenesis":     network + "-python.json",
 		"PythonBootnodes":   strings.Join(bootPython, ","),
-		"Byzantium":         conf.Genesis.Config.ByzantiumBlock,
 		"Constantinople":    conf.Genesis.Config.ConstantinopleBlock,
 		"ConstantinopleFix": conf.Genesis.Config.PetersburgBlock,
 	})

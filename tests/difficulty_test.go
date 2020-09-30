@@ -26,7 +26,6 @@ import (
 var (
 	mainnetChainConfig = params.ChainConfig{
 		ChainID:        big.NewInt(1),
-		ByzantiumBlock: big.NewInt(4370000),
 	}
 )
 
@@ -49,10 +48,6 @@ func TestDifficulty(t *testing.T) {
 
 	dt.config("Ropsten", *params.TestnetChainConfig)
 	dt.config("Morden", *params.TestnetChainConfig)
-
-	dt.config("Byzantium", params.ChainConfig{
-		ByzantiumBlock: big.NewInt(0),
-	})
 
 	dt.config("MainNetwork", mainnetChainConfig)
 	dt.config("CustomMainNetwork", mainnetChainConfig)

@@ -30,7 +30,6 @@ import (
 // TransactionTest checks RLP decoding and sender derivation of transactions.
 type TransactionTest struct {
 	RLP            hexutil.Bytes `json:"rlp"`
-	Byzantium      ttFork
 	Constantinople ttFork
 }
 
@@ -68,7 +67,6 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 		fork        ttFork
 		isHomestead bool
 	}{
-		{"Byzantium", types.NewEIP155Signer(config.ChainID), tt.Byzantium, true},
 		{"Constantinople", types.NewEIP155Signer(config.ChainID), tt.Constantinople, true},
 	} {
 		sender, txhash, err := validateTx(tt.RLP, testcase.signer)
