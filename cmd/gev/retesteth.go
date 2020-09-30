@@ -307,7 +307,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		chainId.Set((*big.Int)(chainParams.Params.ChainID))
 	}
 	var (
-		eip155Block         *big.Int
 		eip158Block         *big.Int
 		byzantiumBlock      *big.Int
 		constantinopleBlock *big.Int
@@ -315,7 +314,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	)
 	if chainParams.Params.EIP158ForkBlock != nil {
 		eip158Block = big.NewInt(int64(*chainParams.Params.EIP158ForkBlock))
-		eip155Block = eip158Block
 	}
 	if chainParams.Params.ByzantiumForkBlock != nil {
 		byzantiumBlock = big.NewInt(int64(*chainParams.Params.ByzantiumForkBlock))
@@ -332,7 +330,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	genesis := &core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID:             chainId,
-			EIP155Block:         eip155Block,
 			EIP158Block:         eip158Block,
 			ByzantiumBlock:      byzantiumBlock,
 			ConstantinopleBlock: constantinopleBlock,

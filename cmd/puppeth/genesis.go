@@ -225,10 +225,8 @@ type parityChainSpec struct {
 		MaxCodeSize              hexutil.Uint64       `json:"maxCodeSize"`
 		MaxCodeSizeTransition    hexutil.Uint64       `json:"maxCodeSizeTransition"`
 		EIP98Transition          hexutil.Uint64       `json:"eip98Transition"`
-		EIP160Transition         hexutil.Uint64       `json:"eip160Transition"`
 		EIP161abcTransition      hexutil.Uint64       `json:"eip161abcTransition"`
 		EIP161dTransition        hexutil.Uint64       `json:"eip161dTransition"`
-		EIP155Transition         hexutil.Uint64       `json:"eip155Transition"`
 		EIP140Transition         hexutil.Uint64       `json:"eip140Transition"`
 		EIP211Transition         hexutil.Uint64       `json:"eip211Transition"`
 		EIP214Transition         hexutil.Uint64       `json:"eip214Transition"`
@@ -317,10 +315,6 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.DifficultyBoundDivisor = (*hexutil.Big)(params.DifficultyBoundDivisor)
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
 	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.FrontierBlockReward)
-	// Spurious Dragon: 155, 160, 161, 170
-	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-607.md
-	spec.Params.EIP155Transition = hexutil.Uint64(genesis.Config.EIP155Block.Uint64())
-	spec.Params.EIP160Transition = hexutil.Uint64(genesis.Config.EIP155Block.Uint64())
 	spec.Params.EIP161abcTransition = hexutil.Uint64(genesis.Config.EIP158Block.Uint64())
 	spec.Params.EIP161dTransition = hexutil.Uint64(genesis.Config.EIP158Block.Uint64())
 

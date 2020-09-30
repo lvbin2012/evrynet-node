@@ -53,7 +53,6 @@ func (w *wizard) makeGenesis() {
 		Difficulty: big.NewInt(524288),
 		Alloc:      make(core.GenesisAlloc),
 		Config: &params.ChainConfig{
-			EIP155Block:         big.NewInt(0),
 			EIP158Block:         big.NewInt(0),
 			ByzantiumBlock:      big.NewInt(0),
 			ConstantinopleBlock: big.NewInt(0),
@@ -305,10 +304,6 @@ func (w *wizard) manageGenesis() {
 	switch choice {
 	case "1":
 		// Fork rule updating requested, iterate over each fork
-		fmt.Println()
-		fmt.Printf("Which block should EIP155 (Spurious Dragon) come into effect? (default = %v)\n", w.conf.Genesis.Config.EIP155Block)
-		w.conf.Genesis.Config.EIP155Block = w.readDefaultBigInt(w.conf.Genesis.Config.EIP155Block)
-
 		fmt.Println()
 		fmt.Printf("Which block should EIP158/161 (also Spurious Dragon) come into effect? (default = %v)\n", w.conf.Genesis.Config.EIP158Block)
 		w.conf.Genesis.Config.EIP158Block = w.readDefaultBigInt(w.conf.Genesis.Config.EIP158Block)

@@ -68,11 +68,8 @@ func (api *PublicEvrynetAPI) Hashrate() hexutil.Uint64 {
 
 // ChainId is the EIP-155 replay-protection chain id for the current evrynetNode chain config.
 func (api *PublicEvrynetAPI) ChainId() hexutil.Uint64 {
-	chainID := new(big.Int)
-	if config := api.e.blockchain.Config(); config.IsEIP155(api.e.blockchain.CurrentBlock().Number()) {
-		chainID = config.ChainID
-	}
-	return (hexutil.Uint64)(chainID.Uint64())
+	config := api.e.blockchain.Config()
+	return (hexutil.Uint64)(config.ChainID.Uint64())
 }
 
 // PublicMinerAPI provides an API to control the miner.
