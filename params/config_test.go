@@ -22,6 +22,7 @@ import (
 	"testing"
 )
 
+// TODO change ConstantinopleBlock  to future version
 func TestCheckCompatible(t *testing.T) {
 	type test struct {
 		stored, new *ChainConfig
@@ -32,17 +33,17 @@ func TestCheckCompatible(t *testing.T) {
 		{stored: AllEthashProtocolChanges, new: AllEthashProtocolChanges, head: 0, wantErr: nil},
 		{stored: AllEthashProtocolChanges, new: AllEthashProtocolChanges, head: 100, wantErr: nil},
 		{
-			stored:  &ChainConfig{EIP150Block: big.NewInt(10)},
-			new:     &ChainConfig{EIP150Block: big.NewInt(20)},
+			stored:  &ChainConfig{ConstantinopleBlock: big.NewInt(10)},
+			new:     &ChainConfig{ConstantinopleBlock: big.NewInt(20)},
 			head:    9,
 			wantErr: nil,
 		},
 		{
-			stored: &ChainConfig{EIP150Block: big.NewInt(10)},
-			new:    &ChainConfig{EIP150Block: big.NewInt(20)},
+			stored: &ChainConfig{ConstantinopleBlock: big.NewInt(10)},
+			new:    &ChainConfig{ConstantinopleBlock: big.NewInt(20)},
 			head:   25,
 			wantErr: &ConfigCompatError{
-				What:         "EIP150 fork block",
+				What:         "ConstantinopleBlock fork block",
 				StoredConfig: big.NewInt(10),
 				NewConfig:    big.NewInt(20),
 				RewindTo:     9,

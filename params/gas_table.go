@@ -50,19 +50,6 @@ var (
 		ExpByte:     10,
 	}
 
-	// GasTableEIP150 contain the gas re-prices for
-	// the EIP150 phase.
-	GasTableEIP150 = GasTable{
-		ExtcodeSize: 700,
-		ExtcodeCopy: 700,
-		Balance:     400,
-		SLoad:       200,
-		Calls:       700,
-		Suicide:     5000,
-		ExpByte:     10,
-
-		CreateBySuicide: 25000,
-	}
 	// GasTableEIP158 contain the gas re-prices for
 	// the EIP155/EIP158 phase.
 	GasTableEIP158 = GasTable{

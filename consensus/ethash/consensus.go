@@ -29,7 +29,6 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/math"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
-	"github.com/Evrynetlabs/evrynet-node/consensus/misc"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/params"
@@ -288,10 +287,6 @@ func (ethash *Ethash) verifyHeader(chain consensus.ChainReader, header, parent *
 		if err := ethash.VerifySeal(chain, header); err != nil {
 			return err
 		}
-	}
-	// If all checks passed, validate any special fields for hard forks
-	if err := misc.VerifyForkHashes(chain.Config(), header, uncle); err != nil {
-		return err
 	}
 	return nil
 }

@@ -38,7 +38,6 @@ type alethGenesisSpec struct {
 	Params     struct {
 		AccountStartNonce       math2.HexOrDecimal64   `json:"accountStartNonce"`
 		MaximumExtraDataSize    hexutil.Uint64         `json:"maximumExtraDataSize"`
-		EIP150ForkBlock         hexutil.Uint64         `json:"EIP150ForkBlock"`
 		EIP158ForkBlock         hexutil.Uint64         `json:"EIP158ForkBlock"`
 		ByzantiumForkBlock      hexutil.Uint64         `json:"byzantiumForkBlock"`
 		ConstantinopleForkBlock hexutil.Uint64         `json:"constantinopleForkBlock"`
@@ -105,7 +104,6 @@ func newAlethGenesisSpec(network string, genesis *core.Genesis) (*alethGenesisSp
 	spec.Params.TieBreakingGas = false
 	spec.Params.AllowFutureBlocks = false
 
-	spec.Params.EIP150ForkBlock = (hexutil.Uint64)(genesis.Config.EIP150Block.Uint64())
 	spec.Params.EIP158ForkBlock = (hexutil.Uint64)(genesis.Config.EIP158Block.Uint64())
 
 	// Byzantium
@@ -227,7 +225,6 @@ type parityChainSpec struct {
 		MaxCodeSize              hexutil.Uint64       `json:"maxCodeSize"`
 		MaxCodeSizeTransition    hexutil.Uint64       `json:"maxCodeSizeTransition"`
 		EIP98Transition          hexutil.Uint64       `json:"eip98Transition"`
-		EIP150Transition         hexutil.Uint64       `json:"eip150Transition"`
 		EIP160Transition         hexutil.Uint64       `json:"eip160Transition"`
 		EIP161abcTransition      hexutil.Uint64       `json:"eip161abcTransition"`
 		EIP161dTransition        hexutil.Uint64       `json:"eip161dTransition"`
@@ -320,10 +317,6 @@ func newParityChainSpec(network string, genesis *core.Genesis, bootnodes []strin
 	spec.Engine.Ethash.Params.DifficultyBoundDivisor = (*hexutil.Big)(params.DifficultyBoundDivisor)
 	spec.Engine.Ethash.Params.DurationLimit = (*hexutil.Big)(params.DurationLimit)
 	spec.Engine.Ethash.Params.BlockReward["0x0"] = hexutil.EncodeBig(ethash.FrontierBlockReward)
-	// Tangerine Whistle : 150
-	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-608.md
-	spec.Params.EIP150Transition = hexutil.Uint64(genesis.Config.EIP150Block.Uint64())
-
 	// Spurious Dragon: 155, 160, 161, 170
 	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-607.md
 	spec.Params.EIP155Transition = hexutil.Uint64(genesis.Config.EIP155Block.Uint64())
