@@ -121,7 +121,6 @@ var dashboardContent = `
 										</p>
 										<br/>
 										<p>You can download Gev from <a href="https://gev.Evrynetlabs.org/downloads/" target="about:blank">https://gev.Evrynetlabs.org/downloads/</a>.</p>
-									</div>
 								</div>
 							</div>
 							<div class="col-md-6">

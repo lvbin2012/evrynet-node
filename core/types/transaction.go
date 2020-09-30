@@ -701,7 +701,7 @@ type Message struct {
 	extraData interface{}
 }
 
-//TODO: add new message with gas payer so user can use eth_call with enterprise contract
+//TODO: add new message with gas payer so user can use evr_call with enterprise contract
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, checkNonce bool) Message {
 	return Message{
 		from:                 from,
