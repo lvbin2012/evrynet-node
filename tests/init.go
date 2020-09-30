@@ -25,28 +25,18 @@ import (
 
 // Forks table defines supported forks and their chain config.
 var Forks = map[string]*params.ChainConfig{
-	"Frontier": {
-		ChainID: big.NewInt(1),
-	},
-	"Homestead": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-	},
 	"EIP150": {
 		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
 	},
 	"EIP158": {
 		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
 		EIP155Block:    big.NewInt(0),
 		EIP158Block:    big.NewInt(0),
 	},
 	"Byzantium": {
 		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
 		EIP155Block:    big.NewInt(0),
 		EIP158Block:    big.NewInt(0),
@@ -55,7 +45,6 @@ var Forks = map[string]*params.ChainConfig{
 	},
 	"Constantinople": {
 		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
@@ -66,7 +55,6 @@ var Forks = map[string]*params.ChainConfig{
 	},
 	"ConstantinopleFix": {
 		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),
@@ -75,24 +63,16 @@ var Forks = map[string]*params.ChainConfig{
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
 	},
-	"FrontierToHomesteadAt5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(5),
-	},
 	"HomesteadToEIP150At5": {
 		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(5),
 	},
 	"HomesteadToDaoAt5": {
 		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		DAOForkBlock:   big.NewInt(5),
 		DAOForkSupport: true,
 	},
 	"EIP158ToByzantiumAt5": {
 		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
 		EIP150Block:    big.NewInt(0),
 		EIP155Block:    big.NewInt(0),
 		EIP158Block:    big.NewInt(0),
@@ -100,7 +80,6 @@ var Forks = map[string]*params.ChainConfig{
 	},
 	"ByzantiumToConstantinopleAt5": {
 		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
 		EIP150Block:         big.NewInt(0),
 		EIP155Block:         big.NewInt(0),
 		EIP158Block:         big.NewInt(0),

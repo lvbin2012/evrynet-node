@@ -34,8 +34,6 @@ type TransactionTest struct {
 	Constantinople ttFork
 	EIP150         ttFork
 	EIP158         ttFork
-	Frontier       ttFork
-	Homestead      ttFork
 }
 
 type ttFork struct {
@@ -45,7 +43,7 @@ type ttFork struct {
 
 func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 
-	validateTx := func(rlpData hexutil.Bytes, signer types.Signer, isHomestead bool) (*common.Address, *common.Hash, error) {
+	validateTx := func(rlpData hexutil.Bytes, signer types.Signer) (*common.Address, *common.Hash, error) {
 		tx := new(types.Transaction)
 		if err := rlp.DecodeBytes(rlpData, tx); err != nil {
 			return nil, nil, err
@@ -55,7 +53,7 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 			return nil, nil, err
 		}
 		// Intrinsic gas
-		requiredGas, err := core.IntrinsicGas(tx.Data(), tx.To() == nil, isHomestead)
+		requiredGas, err := core.IntrinsicGas(tx.Data(), tx.To() == nil)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -72,14 +70,12 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 		fork        ttFork
 		isHomestead bool
 	}{
-		{"Frontier", types.FrontierSigner{}, tt.Frontier, false},
-		{"Homestead", types.HomesteadSigner{}, tt.Homestead, true},
 		{"EIP150", types.HomesteadSigner{}, tt.EIP150, true},
 		{"EIP158", types.NewEIP155Signer(config.ChainID), tt.EIP158, true},
 		{"Byzantium", types.NewEIP155Signer(config.ChainID), tt.Byzantium, true},
 		{"Constantinople", types.NewEIP155Signer(config.ChainID), tt.Constantinople, true},
 	} {
-		sender, txhash, err := validateTx(tt.RLP, testcase.signer, testcase.isHomestead)
+		sender, txhash, err := validateTx(tt.RLP, testcase.signer)
 
 		if testcase.fork.Sender == (common.UnprefixedAddress{}) {
 			if err == nil {

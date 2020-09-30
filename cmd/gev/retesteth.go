@@ -125,7 +125,6 @@ type ChainParams struct {
 
 type CParamsParams struct {
 	AccountStartNonce          math.HexOrDecimal64   `json:"accountStartNonce"`
-	HomesteadForkBlock         *math.HexOrDecimal64  `json:"homesteadForkBlock"`
 	EIP150ForkBlock            *math.HexOrDecimal64  `json:"EIP150ForkBlock"`
 	EIP158ForkBlock            *math.HexOrDecimal64  `json:"EIP158ForkBlock"`
 	DaoHardforkBlock           *math.HexOrDecimal64  `json:"daoHardforkBlock"`
@@ -312,7 +311,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		chainId.Set((*big.Int)(chainParams.Params.ChainID))
 	}
 	var (
-		homesteadBlock      *big.Int
 		daoForkBlock        *big.Int
 		eip150Block         *big.Int
 		eip155Block         *big.Int
@@ -321,9 +319,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		constantinopleBlock *big.Int
 		petersburgBlock     *big.Int
 	)
-	if chainParams.Params.HomesteadForkBlock != nil {
-		homesteadBlock = big.NewInt(int64(*chainParams.Params.HomesteadForkBlock))
-	}
 	if chainParams.Params.DaoHardforkBlock != nil {
 		daoForkBlock = big.NewInt(int64(*chainParams.Params.DaoHardforkBlock))
 	}
@@ -349,7 +344,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	genesis := &core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID:             chainId,
-			HomesteadBlock:      homesteadBlock,
 			DAOForkBlock:        daoForkBlock,
 			DAOForkSupport:      false,
 			EIP150Block:         eip150Block,

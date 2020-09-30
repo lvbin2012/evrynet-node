@@ -316,8 +316,6 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 		return calcDifficultyConstantinople(time, parent)
 	case config.IsByzantium(next):
 		return calcDifficultyByzantium(time, parent)
-	case config.IsHomestead(next):
-		return calcDifficultyHomestead(time, parent)
 	default:
 		return calcDifficultyFrontier(time, parent)
 	}
