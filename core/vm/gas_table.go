@@ -383,15 +383,12 @@ func gasCall(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, mem
 		gas            = gt.Calls
 		transfersValue = stack.Back(2).Sign() != 0
 		address        = common.BigToAddress(stack.Back(1))
-		eip158         = evm.ChainConfig().IsEIP158(evm.BlockNumber)
 	)
-	if eip158 {
-		if transfersValue && evm.StateDB.Empty(address) {
-			gas += params.CallNewAccountGas
-		}
-	} else if !evm.StateDB.Exist(address) {
+
+	if transfersValue && evm.StateDB.Empty(address) {
 		gas += params.CallNewAccountGas
 	}
+
 	if transfersValue {
 		gas += params.CallValueTransferGas
 	}
@@ -450,15 +447,9 @@ func gasSuicide(gt params.GasTable, evm *EVM, contract *Contract, stack *Stack, 
 	var (
 		gas     = gt.Suicide
 		address = common.BigToAddress(stack.Back(0))
-		eip158  = evm.ChainConfig().IsEIP158(evm.BlockNumber)
 	)
 
-	if eip158 {
-		// if empty and transfers value
-		if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {
-			gas += gt.CreateBySuicide
-		}
-	} else if !evm.StateDB.Exist(address) {
+	if evm.StateDB.Empty(address) && evm.StateDB.GetBalance(contract.Address()).Sign() != 0 {
 		gas += gt.CreateBySuicide
 	}
 

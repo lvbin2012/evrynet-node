@@ -123,7 +123,6 @@ type ChainParams struct {
 
 type CParamsParams struct {
 	AccountStartNonce          math.HexOrDecimal64   `json:"accountStartNonce"`
-	EIP158ForkBlock            *math.HexOrDecimal64  `json:"EIP158ForkBlock"`
 	ByzantiumForkBlock         *math.HexOrDecimal64  `json:"byzantiumForkBlock"`
 	ConstantinopleForkBlock    *math.HexOrDecimal64  `json:"constantinopleForkBlock"`
 	ConstantinopleFixForkBlock *math.HexOrDecimal64  `json:"constantinopleFixForkBlock"`
@@ -229,7 +228,7 @@ func (e *NoRewardEngine) Finalize(chain consensus.FullChainReader, header *types
 		return e.inner.Finalize(chain, header, statedb, txs, uncles)
 	} else {
 		e.accumulateRewards(chain.Config(), statedb, header, uncles)
-		header.Root = statedb.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+		header.Root = statedb.IntermediateRoot(true)
 		return nil
 	}
 }
@@ -240,7 +239,7 @@ func (e *NoRewardEngine) FinalizeAndAssemble(chain consensus.FullChainReader, he
 		return e.inner.FinalizeAndAssemble(chain, header, statedb, txs, uncles, receipts)
 	} else {
 		e.accumulateRewards(chain.Config(), statedb, header, uncles)
-		header.Root = statedb.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+		header.Root = statedb.IntermediateRoot(true)
 
 		// Header seems complete, assemble into a block and return
 		return types.NewBlock(header, txs, uncles, receipts), nil
@@ -307,14 +306,10 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		chainId.Set((*big.Int)(chainParams.Params.ChainID))
 	}
 	var (
-		eip158Block         *big.Int
 		byzantiumBlock      *big.Int
 		constantinopleBlock *big.Int
 		petersburgBlock     *big.Int
 	)
-	if chainParams.Params.EIP158ForkBlock != nil {
-		eip158Block = big.NewInt(int64(*chainParams.Params.EIP158ForkBlock))
-	}
 	if chainParams.Params.ByzantiumForkBlock != nil {
 		byzantiumBlock = big.NewInt(int64(*chainParams.Params.ByzantiumForkBlock))
 	}
@@ -330,7 +325,6 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 	genesis := &core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID:             chainId,
-			EIP158Block:         eip158Block,
 			ByzantiumBlock:      byzantiumBlock,
 			ConstantinopleBlock: constantinopleBlock,
 			PetersburgBlock:     petersburgBlock,
@@ -613,11 +607,10 @@ func (api *RetestethAPI) AccountRangeAt(ctx context.Context,
 				return AccountRangeResult{}, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 			}
 			// Ensure any modifications are committed to the state
-			// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-			root = statedb.IntermediateRoot(vmenv.ChainConfig().IsEIP158(block.Number()))
+			root = statedb.IntermediateRoot(true)
 			if idx == int(txIndex) {
 				// This is to make sure root can be opened by OpenTrie
-				root, err = statedb.Commit(api.chainConfig.IsEIP158(block.Number()))
+				root, err = statedb.Commit(true)
 				if err != nil {
 					return AccountRangeResult{}, err
 				}
@@ -726,11 +719,10 @@ func (api *RetestethAPI) StorageRangeAt(ctx context.Context,
 				return StorageRangeResult{}, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)
 			}
 			// Ensure any modifications are committed to the state
-			// Only delete empty objects if EIP158/161 (a.k.a Spurious Dragon) is in effect
-			root = statedb.IntermediateRoot(vmenv.ChainConfig().IsEIP158(block.Number()))
+			root = statedb.IntermediateRoot(true)
 			if idx == int(txIndex) {
 				// This is to make sure root can be opened by OpenTrie
-				root, err = statedb.Commit(vmenv.ChainConfig().IsEIP158(block.Number()))
+				root, err = statedb.Commit(true)
 				if err != nil {
 					return StorageRangeResult{}, err
 				}

@@ -32,7 +32,6 @@ type TransactionTest struct {
 	RLP            hexutil.Bytes `json:"rlp"`
 	Byzantium      ttFork
 	Constantinople ttFork
-	EIP158         ttFork
 }
 
 type ttFork struct {
@@ -69,7 +68,6 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 		fork        ttFork
 		isHomestead bool
 	}{
-		{"EIP158", types.NewEIP155Signer(config.ChainID), tt.EIP158, true},
 		{"Byzantium", types.NewEIP155Signer(config.ChainID), tt.Byzantium, true},
 		{"Constantinople", types.NewEIP155Signer(config.ChainID), tt.Constantinople, true},
 	} {

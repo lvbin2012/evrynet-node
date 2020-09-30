@@ -467,8 +467,7 @@ func (sb *Backend) Finalize(chain consensus.FullChainReader, header *types.Heade
 	}
 
 	// Since there is a change in stateDB, its trie must be update
-	// In case block reached EIP158 hash, the state will attempt to delete empty object as EIP158 sepcification
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(true)
 	return nil
 }
 
@@ -486,7 +485,7 @@ func (sb *Backend) FinalizeAndAssemble(chain consensus.FullChainReader, header *
 	}
 
 	// No block rewards, so the state remains as is and uncles are dropped
-	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
+	header.Root = state.IntermediateRoot(true)
 	header.UncleHash = types.CalcUncleHash(nil)
 
 	// Assemble and return the final block for sealing
