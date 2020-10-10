@@ -38,7 +38,7 @@ func TestSendNormalTxWithFixedFee(t *testing.T) {
 
 	spk, err := crypto.HexToECDSA(senderPK)
 	assert.NoError(t, err)
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial("http://localhost:22001")
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)

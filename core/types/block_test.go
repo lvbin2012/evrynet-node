@@ -33,7 +33,7 @@ func signTx(t *testing.T, tx *Transaction) *Transaction {
 	keyString := "09C73E3F79CFAA928089CD69AFCD5E1623B1D32415166A6A0436BF0FECAC9B7C"
 	key, err := crypto.HexToECDSA(keyString)
 	assert.NoError(t, err)
-	signer := NewEIP155Signer(common.Big1)
+	signer := NewOmahaSigner(common.Big1)
 	signTx, err := SignTx(tx, signer, key)
 	assert.NoError(t, err)
 	return signTx

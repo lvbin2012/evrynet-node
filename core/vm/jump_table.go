@@ -57,8 +57,8 @@ var (
 	omahaInstructionSet = newOmahaInstructionSet()
 )
 
-// NewFrontierInstructionSet returns the frontier instructions
-// that can be executed during the frontier phase.
+// newOmahaInstructionSet returns the omaha instructions
+// that can be executed during the omaha phase.
 func newOmahaInstructionSet() [256]operation {
 	return [256]operation{
 		STOP: {

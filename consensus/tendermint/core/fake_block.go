@@ -50,7 +50,7 @@ func fakeTxsForProposalBlock(header *types.Header, proposal *Proposal) error {
 		nodeAddr          = crypto.PubkeyToAddress(fakePrivateKey.PublicKey)
 	)
 	fakeTx, err := types.SignTx(types.NewTransaction(0, nodeAddr, big.NewInt(10), 800000, big.NewInt(params.GasPriceConfig), nil),
-		types.HomesteadSigner{}, fakePrivateKey)
+		types.BaseSigner{}, fakePrivateKey)
 	if err != nil {
 		return err
 	}

@@ -29,7 +29,7 @@ func TestSendToNormalAddress(t *testing.T) {
 	spk, err := crypto.HexToECDSA(senderPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -55,7 +55,7 @@ func TestSendToNormalAddressWithProviderSignature(t *testing.T) {
 
 	ppk, err := crypto.HexToECDSA(providerPK)
 	assert.NoError(t, err)
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -81,7 +81,7 @@ func TestSendToNonEnterpriseSmartContractWithoutProviderSignature(t *testing.T) 
 	spk, err := crypto.HexToECDSA(senderPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -108,7 +108,7 @@ func TestSendToNonEnterpriseSmartContractWithProviderSignature(t *testing.T) {
 	ppk, err := crypto.HexToECDSA(providerPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -136,7 +136,7 @@ func TestInteractWithNonEnterpriseSmartContractWithoutProviderSignature(t *testi
 	spk, err := crypto.HexToECDSA(senderPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -164,7 +164,7 @@ func TestSendToEnterPriseSmartContractWithInvalidProviderSignature(t *testing.T)
 	ppk, err := crypto.HexToECDSA(invadlidProviderPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -193,7 +193,7 @@ func TestSendToEnterPriseSmartContractWithValidProviderSignature(t *testing.T) {
 	ppk, err := crypto.HexToECDSA(providerPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -226,7 +226,7 @@ func TestInteractToEnterpriseSmartContractWithInvalidProviderSignature(t *testin
 	ppk, err := crypto.HexToECDSA(invadlidProviderPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -256,7 +256,7 @@ func TestInteractToEnterpriseSmartContractWithoutProviderSignature(t *testing.T)
 	spk, err := crypto.HexToECDSA(senderPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
@@ -287,7 +287,7 @@ func TestInteractToEnterpriseSmartContractWithValidProviderSignature(t *testing.
 	ppk, err := crypto.HexToECDSA(providerPK)
 	assert.NoError(t, err)
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)

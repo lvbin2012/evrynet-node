@@ -158,7 +158,7 @@ func TestCoreFutureMessage(t *testing.T) {
 	// create fake block
 	to, _ := common.EvryAddressStringToAddressCheck("EPXt4N4aPgV4BEKLtYJgz2NdiAHfa7c2ao")
 	tx := types.NewTransaction(0, to, big.NewInt(10), 800000, big.NewInt(params.GasPriceConfig), nil)
-	tx, err = types.SignTx(tx, types.HomesteadSigner{}, nodePrivateKey)
+	tx, err = types.SignTx(tx, types.BaseSigner{}, nodePrivateKey)
 	assert.NoError(t, err)
 
 	header := types.CopyHeader(genesisHeader)

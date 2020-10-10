@@ -30,7 +30,7 @@ func TestProviderSignTransaction(t *testing.T) {
 	ethClient, err := evrclient.Dial(ethRPCEndpoint)
 	assert.NoError(t, err)
 	id, err := ethClient.ChainID(context.Background())
-	signer := types.NewEIP155Signer(id)
+	signer := types.NewOmahaSigner(id)
 	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
 	assert.NoError(t, err)
 	gasPrice, err := ethClient.SuggestGasPrice(context.Background())
@@ -85,7 +85,7 @@ func prepareNewContract(hasProvider bool) *common.Address {
 		tx = types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes)
 	}
 
-	tx, err = types.SignTx(tx, types.HomesteadSigner{}, spk)
+	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
 	if err != nil {
 		return nil
 	}

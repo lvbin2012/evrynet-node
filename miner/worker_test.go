@@ -76,10 +76,10 @@ func init() {
 		ProposerPolicy: common.Big0.Uint64(),
 	}
 	tx1, _ := types.SignTx(types.NewTransaction(0, testUserAddress, big.NewInt(1000), params.TxGas,
-		big.NewInt(params.GasPriceConfig), nil), types.HomesteadSigner{}, testBankKey)
+		big.NewInt(params.GasPriceConfig), nil), types.BaseSigner{}, testBankKey)
 	pendingTxs = append(pendingTxs, tx1)
 	tx2, _ := types.SignTx(types.NewTransaction(1, testUserAddress, big.NewInt(1000), params.TxGas,
-		big.NewInt(params.GasPriceConfig), nil), types.HomesteadSigner{}, testBankKey)
+		big.NewInt(params.GasPriceConfig), nil), types.BaseSigner{}, testBankKey)
 	newTxs = append(newTxs, tx2)
 }
 

@@ -66,7 +66,7 @@ func TestBackend_RewardNoTx_WithVoter(t *testing.T) {
 			require.NoError(t, err)
 			tx, err := types.SignTx(
 				types.NewTransaction(nonce, stakingScAddress, big.NewInt(1), 1000000, big.NewInt(params.GasPriceConfig), input),
-				types.NewEIP155Signer(big.NewInt(15)),
+				types.NewOmahaSigner(big.NewInt(15)),
 				faucetKeys[1],
 			)
 			require.NoError(t, err)
@@ -111,7 +111,7 @@ func TestBackend_RewardWithTx(t *testing.T) {
 	testFinalize(t, func(i int, gen *core.BlockGen) {
 		gen.SetCoinbase(addr[0])
 		if i == 0 {
-			sign := types.NewEIP155Signer(big.NewInt(15))
+			sign := types.NewOmahaSigner(big.NewInt(15))
 			for i := 0; i < numberTransaction; i++ {
 				tx, _ := types.SignTx(
 					types.NewTransaction(nonce, common.Address{0}, big.NewInt(1000), params.TxGas, big.NewInt(params.GasPriceConfig), nil),
