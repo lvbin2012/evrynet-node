@@ -54,119 +54,12 @@ type operation struct {
 }
 
 var (
-	frontierInstructionSet       = newFrontierInstructionSet()
-	homesteadInstructionSet      = newHomesteadInstructionSet()
-	byzantiumInstructionSet      = newByzantiumInstructionSet()
-	constantinopleInstructionSet = newConstantinopleInstructionSet()
+	omahaInstructionSet = newOmahaInstructionSet()
 )
 
-// NewConstantinopleInstructionSet returns the frontier, homestead
-// byzantium and contantinople instructions.
-func newConstantinopleInstructionSet() [256]operation {
-	// instructions that can be executed during the byzantium phase.
-	instructionSet := newByzantiumInstructionSet()
-	instructionSet[SHL] = operation{
-		execute:     opSHL,
-		constantGas: GasFastestStep,
-		minStack:    minStack(2, 1),
-		maxStack:    maxStack(2, 1),
-		valid:       true,
-	}
-	instructionSet[SHR] = operation{
-		execute:     opSHR,
-		constantGas: GasFastestStep,
-		minStack:    minStack(2, 1),
-		maxStack:    maxStack(2, 1),
-		valid:       true,
-	}
-	instructionSet[SAR] = operation{
-		execute:     opSAR,
-		constantGas: GasFastestStep,
-		minStack:    minStack(2, 1),
-		maxStack:    maxStack(2, 1),
-		valid:       true,
-	}
-	instructionSet[EXTCODEHASH] = operation{
-		execute:    opExtCodeHash,
-		dynamicGas: gasExtCodeHash,
-		minStack:   minStack(1, 1),
-		maxStack:   maxStack(1, 1),
-		valid:      true,
-	}
-	instructionSet[CREATE2] = operation{
-		execute:    opCreate2,
-		dynamicGas: gasCreate2,
-		minStack:   minStack(4, 1),
-		maxStack:   maxStack(4, 1),
-		memorySize: memoryCreate2,
-		valid:      true,
-		writes:     true,
-		returns:    true,
-	}
-	return instructionSet
-}
-
-// NewByzantiumInstructionSet returns the frontier, homestead and
-// byzantium instructions.
-func newByzantiumInstructionSet() [256]operation {
-	// instructions that can be executed during the homestead phase.
-	instructionSet := newHomesteadInstructionSet()
-	instructionSet[STATICCALL] = operation{
-		execute:    opStaticCall,
-		dynamicGas: gasStaticCall,
-		minStack:   minStack(6, 1),
-		maxStack:   maxStack(6, 1),
-		memorySize: memoryStaticCall,
-		valid:      true,
-		returns:    true,
-	}
-	instructionSet[RETURNDATASIZE] = operation{
-		execute:     opReturnDataSize,
-		constantGas: GasQuickStep,
-		minStack:    minStack(0, 1),
-		maxStack:    maxStack(0, 1),
-		valid:       true,
-	}
-	instructionSet[RETURNDATACOPY] = operation{
-		execute:    opReturnDataCopy,
-		dynamicGas: gasReturnDataCopy,
-		minStack:   minStack(3, 0),
-		maxStack:   maxStack(3, 0),
-		memorySize: memoryReturnDataCopy,
-		valid:      true,
-	}
-	instructionSet[REVERT] = operation{
-		execute:    opRevert,
-		dynamicGas: gasRevert,
-		minStack:   minStack(2, 0),
-		maxStack:   maxStack(2, 0),
-		memorySize: memoryRevert,
-		valid:      true,
-		reverts:    true,
-		returns:    true,
-	}
-	return instructionSet
-}
-
-// NewHomesteadInstructionSet returns the frontier and homestead
-// instructions that can be executed during the homestead phase.
-func newHomesteadInstructionSet() [256]operation {
-	instructionSet := newFrontierInstructionSet()
-	instructionSet[DELEGATECALL] = operation{
-		execute:    opDelegateCall,
-		dynamicGas: gasDelegateCall,
-		minStack:   minStack(6, 1),
-		maxStack:   maxStack(6, 1),
-		memorySize: memoryDelegateCall,
-		valid:      true,
-		returns:    true,
-	}
-	return instructionSet
-}
-
-// NewFrontierInstructionSet returns the frontier instructions
-// that can be executed during the frontier phase.
-func newFrontierInstructionSet() [256]operation {
+// newOmahaInstructionSet returns the omaha instructions
+// that can be executed during the omaha phase.
+func newOmahaInstructionSet() [256]operation {
 	return [256]operation{
 		STOP: {
 			execute:     opStop,
@@ -1103,6 +996,87 @@ func newFrontierInstructionSet() [256]operation {
 			halts:      true,
 			valid:      true,
 			writes:     true,
+		},
+		DELEGATECALL: {
+			execute:    opDelegateCall,
+			dynamicGas: gasDelegateCall,
+			minStack:   minStack(6, 1),
+			maxStack:   maxStack(6, 1),
+			memorySize: memoryDelegateCall,
+			valid:      true,
+			returns:    true,
+		},
+		STATICCALL: {
+			execute:    opStaticCall,
+			dynamicGas: gasStaticCall,
+			minStack:   minStack(6, 1),
+			maxStack:   maxStack(6, 1),
+			memorySize: memoryStaticCall,
+			valid:      true,
+			returns:    true,
+		},
+		RETURNDATASIZE: {
+			execute:     opReturnDataSize,
+			constantGas: GasQuickStep,
+			minStack:    minStack(0, 1),
+			maxStack:    maxStack(0, 1),
+			valid:       true,
+		},
+		RETURNDATACOPY: {
+			execute:    opReturnDataCopy,
+			dynamicGas: gasReturnDataCopy,
+			minStack:   minStack(3, 0),
+			maxStack:   maxStack(3, 0),
+			memorySize: memoryReturnDataCopy,
+			valid:      true,
+		},
+		REVERT: {
+			execute:    opRevert,
+			dynamicGas: gasRevert,
+			minStack:   minStack(2, 0),
+			maxStack:   maxStack(2, 0),
+			memorySize: memoryRevert,
+			valid:      true,
+			reverts:    true,
+			returns:    true,
+		},
+		SHL: {
+			execute:     opSHL,
+			constantGas: GasFastestStep,
+			minStack:    minStack(2, 1),
+			maxStack:    maxStack(2, 1),
+			valid:       true,
+		},
+		SHR: {
+			execute:     opSHR,
+			constantGas: GasFastestStep,
+			minStack:    minStack(2, 1),
+			maxStack:    maxStack(2, 1),
+			valid:       true,
+		},
+		SAR: {
+			execute:     opSAR,
+			constantGas: GasFastestStep,
+			minStack:    minStack(2, 1),
+			maxStack:    maxStack(2, 1),
+			valid:       true,
+		},
+		EXTCODEHASH: {
+			execute:    opExtCodeHash,
+			dynamicGas: gasExtCodeHash,
+			minStack:   minStack(1, 1),
+			maxStack:   maxStack(1, 1),
+			valid:      true,
+		},
+		CREATE2: {
+			execute:    opCreate2,
+			dynamicGas: gasCreate2,
+			minStack:   minStack(4, 1),
+			maxStack:   maxStack(4, 1),
+			memorySize: memoryCreate2,
+			valid:      true,
+			writes:     true,
+			returns:    true,
 		},
 	}
 }

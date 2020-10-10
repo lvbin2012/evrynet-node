@@ -23,7 +23,7 @@ func TestModifyProviders(t *testing.T) {
 		senderKey, _    = crypto.HexToECDSA(senderPK)
 		providerKey, _  = crypto.HexToECDSA(providerPK)
 		gasPrice        = big.NewInt(params.GasPriceConfig)
-		signer          = types.NewEIP155Signer(big.NewInt(chainId))
+		signer          = types.NewOmahaSigner(big.NewInt(chainId))
 	)
 	contractAddr := prepareNewContract(true)
 	require.NotNil(t, contractAddr)
@@ -55,7 +55,7 @@ func TestModifyProviders(t *testing.T) {
 
 	addProviderTx, err := types.NewModifyProvidersTransaction(nonce, *contractAddr, 21000, big.NewInt(params.GasPriceConfig), providerAddr, true)
 	require.NoError(t, err)
-	addProviderTx, err = types.SignTx(addProviderTx, types.NewEIP155Signer(big.NewInt(chainId)), ownerKey)
+	addProviderTx, err = types.SignTx(addProviderTx, types.NewOmahaSigner(big.NewInt(chainId)), ownerKey)
 	require.NoError(t, err)
 	require.NoError(t, ethClient.SendTransaction(context.Background(), addProviderTx))
 	assertTransactionSuccess(t, ethClient, addProviderTx.Hash(), false, ownerAddr)

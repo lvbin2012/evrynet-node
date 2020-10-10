@@ -360,18 +360,18 @@ func TestGetTransactionByHash(t *testing.T) {
 	to1, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdYvGRyE")
 	to2, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdfucv31")
 	tx := types.NewTransaction(uint64(0), to1, big.NewInt(100), 21000, big.NewInt(params.GasPriceConfig), nil)
-	tx, err = types.SignTx(tx, types.NewEIP155Signer(chainID), testKey)
+	tx, err = types.SignTx(tx, types.NewOmahaSigner(chainID), testKey)
 	require.NoError(t, err)
 
 	txWithProvider := types.NewTransaction(uint64(0), to2, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
-	txWithProvider, err = types.SignTx(txWithProvider, types.NewEIP155Signer(chainID), testKey2)
+	txWithProvider, err = types.SignTx(txWithProvider, types.NewOmahaSigner(chainID), testKey2)
 	require.NoError(t, err)
-	txWithProvider, err = types.ProviderSignTx(txWithProvider, types.NewEIP155Signer(chainID), testKey)
+	txWithProvider, err = types.ProviderSignTx(txWithProvider, types.NewOmahaSigner(chainID), testKey)
 	require.NoError(t, err)
 
 	data := hexutil.MustDecode(payload)
 	creationContractTx := types.NewContractCreation(uint64(1), big.NewInt(0), 1000000, big.NewInt(params.GasPriceConfig), data)
-	creationContractTx, err = types.SignTx(creationContractTx, types.NewEIP155Signer(chainID), testKey)
+	creationContractTx, err = types.SignTx(creationContractTx, types.NewOmahaSigner(chainID), testKey)
 	require.NoError(t, err)
 
 	owner, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeW8fmHkiJ")
@@ -382,7 +382,7 @@ func TestGetTransactionByHash(t *testing.T) {
 		ProviderAddress: &provider,
 	}
 	creationEnterpriseContractTx := types.NewContractCreation(uint64(1), big.NewInt(0), 1000000, big.NewInt(params.GasPriceConfig), data, opts)
-	creationEnterpriseContractTx, err = types.SignTx(creationEnterpriseContractTx, types.NewEIP155Signer(chainID), testKey2)
+	creationEnterpriseContractTx, err = types.SignTx(creationEnterpriseContractTx, types.NewOmahaSigner(chainID), testKey2)
 	require.NoError(t, err)
 
 	backend, _ := newTestBackend(t, types.Transactions{tx, txWithProvider, creationContractTx, creationEnterpriseContractTx})
@@ -393,14 +393,14 @@ func TestGetTransactionByHash(t *testing.T) {
 	tx0, _, err := ec.TransactionByHash(context.Background(), tx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, tx0.Hash(), tx.Hash())
-	msg, err := tx0.AsMessage(types.NewEIP155Signer(chainID))
+	msg, err := tx0.AsMessage(types.NewOmahaSigner(chainID))
 	require.NoError(t, err)
 	require.Equal(t, msg.From(), testAddr)
 
 	tx1, _, err := ec.TransactionByHash(context.Background(), txWithProvider.Hash())
 	require.NoError(t, err)
 	require.Equal(t, tx1.Hash(), txWithProvider.Hash())
-	msg, err = tx1.AsMessage(types.NewEIP155Signer(chainID))
+	msg, err = tx1.AsMessage(types.NewOmahaSigner(chainID))
 	require.NoError(t, err)
 	require.Equal(t, msg.From().Hex(), testAddr2.Hex())
 	require.Equal(t, msg.GasPayer().Hex(), testAddr.Hex())
@@ -408,14 +408,14 @@ func TestGetTransactionByHash(t *testing.T) {
 	tx2, _, err := ec.TransactionByHash(context.Background(), creationContractTx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, tx2.Hash(), creationContractTx.Hash())
-	msg, err = tx2.AsMessage(types.NewEIP155Signer(chainID))
+	msg, err = tx2.AsMessage(types.NewOmahaSigner(chainID))
 	require.NoError(t, err)
 	require.Equal(t, msg.From().Hex(), testAddr.Hex())
 
 	tx3, _, err := ec.TransactionByHash(context.Background(), creationEnterpriseContractTx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, tx3.Hash(), creationEnterpriseContractTx.Hash())
-	msg, err = tx3.AsMessage(types.NewEIP155Signer(chainID))
+	msg, err = tx3.AsMessage(types.NewOmahaSigner(chainID))
 	require.NoError(t, err)
 	require.Equal(t, msg.From().Hex(), testAddr2.Hex())
 	require.Equal(t, msg.GasPayer().Hex(), testAddr2.Hex())
@@ -432,22 +432,22 @@ func TestReplayAttackWithProviderAddress(t *testing.T) {
 	//Create atx and sign it with senderKey
 	to, _ := common.EvryAddressStringToAddressCheck("EH9uVaqWRxHuzJbroqzX18yxmeWdfucv31")
 	txWithProvider := types.NewTransaction(uint64(0), to, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
-	txWithProvider, err = types.SignTx(txWithProvider, types.NewEIP155Signer(chainID), senderKey)
+	txWithProvider, err = types.SignTx(txWithProvider, types.NewOmahaSigner(chainID), senderKey)
 	require.NoError(t, err)
-	txWithProvider, err = types.ProviderSignTx(txWithProvider, types.NewEIP155Signer(chainID), providerKey)
+	txWithProvider, err = types.ProviderSignTx(txWithProvider, types.NewOmahaSigner(chainID), providerKey)
 	require.NoError(t, err)
 
 	//copy the Provider Signature from it
 	pv, pr, ps := txWithProvider.RawProviderSignatureValues()
 
-	var fSigner = &fakeSigner{pv: pv, pr: pr, ps: ps, base: types.NewEIP155Signer(chainID)}
+	var fSigner = &fakeSigner{pv: pv, pr: pr, ps: ps, base: types.NewOmahaSigner(chainID)}
 
 	replayTx := types.NewTransaction(uint64(0), to, big.NewInt(1), 21000, big.NewInt(params.GasPriceConfig), nil)
 	//sign the message with the copied signature from the sender
 	replayTx, err = types.SignTx(replayTx, fSigner, senderKey)
 	require.NoError(t, err)
 
-	msg, err := replayTx.AsMessage(types.NewEIP155Signer(chainID))
+	msg, err := replayTx.AsMessage(types.NewOmahaSigner(chainID))
 	require.NoError(t, err)
 	require.NotEqual(t, msg.From().Hex(), providerAddr.Hex(), "The address from this relay attack will not success")
 }

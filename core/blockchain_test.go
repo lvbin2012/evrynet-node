@@ -598,7 +598,7 @@ func TestFastVsFullChains(t *testing.T) {
 			Alloc:  GenesisAlloc{address: {Balance: funds}},
 		}
 		genesis = gspec.MustCommit(gendb)
-		signer  = types.NewEIP155Signer(gspec.Config.ChainID)
+		signer  = types.NewOmahaSigner(gspec.Config.ChainID)
 	)
 	blocks, receipts := GenerateChain(gspec.Config, genesis, ethash.NewFaker(), gendb, 1024, func(i int, block *BlockGen) {
 		block.SetCoinbase(common.Address{0x00})
@@ -838,7 +838,7 @@ func TestChainTxReorgs(t *testing.T) {
 			},
 		}
 		genesis = gspec.MustCommit(db)
-		signer  = types.NewEIP155Signer(gspec.Config.ChainID)
+		signer  = types.NewOmahaSigner(gspec.Config.ChainID)
 	)
 
 	// Create two transactions shared between the chains:
@@ -944,7 +944,7 @@ func TestLogReorgs(t *testing.T) {
 		balance = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
 		gspec   = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: balance}}}
 		genesis = gspec.MustCommit(db)
-		signer  = types.NewEIP155Signer(gspec.Config.ChainID)
+		signer  = types.NewOmahaSigner(gspec.Config.ChainID)
 	)
 
 	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{}, nil)
@@ -992,7 +992,7 @@ func TestLogRebirth(t *testing.T) {
 		balance  = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
 		gspec    = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: balance}}}
 		genesis  = gspec.MustCommit(db)
-		signer   = types.NewEIP155Signer(gspec.Config.ChainID)
+		signer   = types.NewOmahaSigner(gspec.Config.ChainID)
 		newLogCh = make(chan bool)
 	)
 
@@ -1115,7 +1115,7 @@ func TestSideLogRebirth(t *testing.T) {
 		balance  = new(big.Int).Mul(big.NewInt(10000000000000), big.NewInt(params.GasPriceConfig))
 		gspec    = &Genesis{Config: params.TestChainConfig, Alloc: GenesisAlloc{addr1: {Balance: balance}}}
 		genesis  = gspec.MustCommit(db)
-		signer   = types.NewEIP155Signer(gspec.Config.ChainID)
+		signer   = types.NewOmahaSigner(gspec.Config.ChainID)
 		newLogCh = make(chan bool)
 	)
 
@@ -1201,7 +1201,7 @@ func TestReorgSideEvent(t *testing.T) {
 			Alloc:  GenesisAlloc{addr1: {Balance: balance}},
 		}
 		genesis = gspec.MustCommit(db)
-		signer  = types.NewEIP155Signer(gspec.Config.ChainID)
+		signer  = types.NewOmahaSigner(gspec.Config.ChainID)
 	)
 
 	blockchain, _ := NewBlockChain(db, nil, gspec.Config, ethash.NewFaker(), vm.Config{}, nil)
@@ -1976,7 +1976,7 @@ func TestReorgToShorterRemovesCanonMappingHeaderChain(t *testing.T) {
 // Benchmarks large blocks with value transfers to non-existing accounts
 func benchmarkLargeNumberOfValueToNonexisting(b *testing.B, numTxs, numBlocks int, recipientFn func(uint64) common.Address, dataFn func(uint64) []byte) {
 	var (
-		signer          = types.HomesteadSigner{}
+		signer          = types.BaseSigner{}
 		testBankKey, _  = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		testBankAddress = crypto.PubkeyToAddress(testBankKey.PublicKey)
 		bankFunds       = big.NewInt(100000000000000000)

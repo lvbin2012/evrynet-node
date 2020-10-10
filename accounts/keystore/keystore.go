@@ -279,11 +279,11 @@ func (ks *KeyStore) SignTx(a accounts.Account, tx *types.Transaction, chainID *b
 	if !found {
 		return nil, ErrLocked
 	}
-	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	// Depending on the presence of the chain ID, sign with Omaha or base
 	if chainID != nil {
-		return types.SignTx(tx, types.NewEIP155Signer(chainID), unlockedKey.PrivateKey)
+		return types.SignTx(tx, types.NewOmahaSigner(chainID), unlockedKey.PrivateKey)
 	}
-	return types.SignTx(tx, types.HomesteadSigner{}, unlockedKey.PrivateKey)
+	return types.SignTx(tx, types.BaseSigner{}, unlockedKey.PrivateKey)
 }
 
 // ProviderSignTx signs the given transaction with the requested account.
@@ -297,11 +297,11 @@ func (ks *KeyStore) ProviderSignTx(a accounts.Account, tx *types.Transaction, ch
 		return nil, ErrLocked
 	}
 
-	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	// Depending on the presence of the chain ID, sign with Omaha or Base
 	if chainID != nil {
-		return types.ProviderSignTx(tx, types.NewEIP155Signer(chainID), unlockedKey.PrivateKey)
+		return types.ProviderSignTx(tx, types.NewOmahaSigner(chainID), unlockedKey.PrivateKey)
 	}
-	return types.ProviderSignTx(tx, types.HomesteadSigner{}, unlockedKey.PrivateKey)
+	return types.ProviderSignTx(tx, types.BaseSigner{}, unlockedKey.PrivateKey)
 }
 
 // SignHashWithPassphrase signs hash if the private key matching the given address
@@ -325,11 +325,11 @@ func (ks *KeyStore) SignTxWithPassphrase(a accounts.Account, passphrase string, 
 	}
 	defer zeroKey(key.PrivateKey)
 
-	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	// Depending on the presence of the chain ID, sign with Omaha or Base
 	if chainID != nil {
-		return types.SignTx(tx, types.NewEIP155Signer(chainID), key.PrivateKey)
+		return types.SignTx(tx, types.NewOmahaSigner(chainID), key.PrivateKey)
 	}
-	return types.SignTx(tx, types.HomesteadSigner{}, key.PrivateKey)
+	return types.SignTx(tx, types.BaseSigner{}, key.PrivateKey)
 }
 
 // ProviderSignTxWithPassphrase signs the transaction if the private key matching the
@@ -341,11 +341,11 @@ func (ks *KeyStore) ProviderSignTxWithPassphrase(a accounts.Account, passphrase 
 	}
 	defer zeroKey(key.PrivateKey)
 
-	// Depending on the presence of the chain ID, sign with EIP155 or homestead
+	// Depending on the presence of the chain ID, sign with Omaha or Base
 	if chainID != nil {
-		return types.ProviderSignTx(tx, types.NewEIP155Signer(chainID), key.PrivateKey)
+		return types.ProviderSignTx(tx, types.NewOmahaSigner(chainID), key.PrivateKey)
 	}
-	return types.ProviderSignTx(tx, types.HomesteadSigner{}, key.PrivateKey)
+	return types.ProviderSignTx(tx, types.BaseSigner{}, key.PrivateKey)
 }
 
 // Unlock unlocks the given account indefinitely.

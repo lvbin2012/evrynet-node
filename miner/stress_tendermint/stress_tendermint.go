@@ -371,7 +371,7 @@ func prepareNewContract(rpcEndpoint string, acc *ecdsa.PrivateKey, nonce uint64,
 	}
 
 	tx := types.NewContractCreation(nonce, big.NewInt(0), estGas, gasPrice, payLoadBytes)
-	tx, err = types.SignTx(tx, types.HomesteadSigner{}, acc)
+	tx, err = types.SignTx(tx, types.BaseSigner{}, acc)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to sign Tx")
 	}
@@ -399,14 +399,14 @@ func createTx(txMode TxMode, gasPrice *big.Int, faucet *ecdsa.PrivateKey, nonces
 		return types.SignTx(
 			types.NewTransaction(nonces, crypto.PubkeyToAddress(faucet.PublicKey), new(big.Int),
 				21000, gasPrice, nil),
-			types.HomesteadSigner{},
+			types.BaseSigner{},
 			faucet)
 	case SmartContractMode:
 		return types.SignTx(
 			types.NewTransaction(nonces, *contractAddr, new(big.Int),
 				40000, gasPrice,
 				[]byte("0x3fb5c1cb0000000000000000000000000000000000000000000000000000000000000002")),
-			types.HomesteadSigner{},
+			types.BaseSigner{},
 			faucet)
 	default:
 		return nil, errors.Errorf("unexpected tx mode: %d", txMode)

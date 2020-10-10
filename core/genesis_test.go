@@ -117,8 +117,7 @@ func TestSetupGenesis(t *testing.T) {
 		{
 			name: "incompatible config in DB",
 			fn: func(db evrdb.Database) (*params.ChainConfig, common.Hash, error) {
-				// Commit the 'old' genesis block with Homestead transition at #2.
-				// Advance to block #4, past the homestead transition block of customg.
+				// Commit the 'old' genesis block with Base transition at #2.
 				genesis := oldcustomg.MustCommit(db)
 
 				bc, _ := NewBlockChain(db, nil, oldcustomg.Config, ethash.NewFullFaker(), vm.Config{}, nil)
@@ -133,7 +132,7 @@ func TestSetupGenesis(t *testing.T) {
 			wantHash:   customghash,
 			wantConfig: customg.Config,
 			wantErr: &params.ConfigCompatError{
-				What:         "Homestead fork block",
+				What:         "Vierville fork block",
 				StoredConfig: big.NewInt(2),
 				NewConfig:    big.NewInt(3),
 				RewindTo:     1,
