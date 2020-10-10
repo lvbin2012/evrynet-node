@@ -46,7 +46,7 @@ func TestReimportMirroredState(t *testing.T) {
 		key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 		addr   = crypto.PubkeyToAddress(key.PublicKey)
 		engine = New(params.AllCliqueProtocolChanges.Clique, db)
-		signer = new(types.HomesteadSigner)
+		signer = new(types.BaseSigner)
 	)
 	genspec := &core.Genesis{
 		ExtraData: make([]byte, extraVanity+common.AddressLength+extraSeal),

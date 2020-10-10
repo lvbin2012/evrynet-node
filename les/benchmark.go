@@ -173,7 +173,7 @@ type benchmarkTxSend struct {
 func (b *benchmarkTxSend) init(pm *ProtocolManager, count int) error {
 	key, _ := crypto.GenerateKey()
 	addr := crypto.PubkeyToAddress(key.PublicKey)
-	signer := types.NewEIP155Signer(big.NewInt(18))
+	signer := types.NewOmahaSigner(big.NewInt(18))
 	b.txs = make(types.Transactions, count)
 
 	for i := range b.txs {

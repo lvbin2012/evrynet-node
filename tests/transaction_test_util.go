@@ -62,12 +62,12 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 	}
 
 	for _, testcase := range []struct {
-		name        string
-		signer      types.Signer
-		fork        ttFork
-		isHomestead bool
+		name   string
+		signer types.Signer
+		fork   ttFork
+		isBase bool
 	}{
-		{"Vierville", types.NewEIP155Signer(config.ChainID), tt.Vierville, true},
+		{"Vierville", types.NewOmahaSigner(config.ChainID), tt.Vierville, true},
 	} {
 		sender, txhash, err := validateTx(tt.RLP, testcase.signer)
 

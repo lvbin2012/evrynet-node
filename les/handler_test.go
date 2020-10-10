@@ -520,7 +520,7 @@ func TestTransactionStatusLes2(t *testing.T) {
 		require.NoError(t, expectResponse(peer.app, TxStatusMsg, reqID, testBufLimit, []light.TxStatus{expStatus}), "transaction status mismatch")
 	}
 
-	signer := types.HomesteadSigner{}
+	signer := types.BaseSigner{}
 
 	// test error status by sending an underpriced transaction
 	tx0, _ := types.SignTx(types.NewTransaction(0, acc1Addr, big.NewInt(10000), params.TxGas, nil, nil), signer, testBankKey)

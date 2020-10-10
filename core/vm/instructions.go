@@ -699,9 +699,6 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memor
 	//TODO: this might related to contract creating contract case. Which we should consider adding owner/provider logic
 	res, addr, returnGas, suberr := interpreter.evm.Create(contract, input, gas, value)
 	// Push item on the stack based on the returned error. If the ruleset is
-	// homestead we must check for CodeStoreOutOfGasError (homestead only
-	// rule) and treat as an error, if the ruleset is frontier we must
-	// ignore this error and pretend the operation was successful.
 	if suberr == ErrCodeStoreOutOfGas {
 		stack.push(interpreter.intPool.getZero())
 	} else if suberr != nil && suberr != ErrCodeStoreOutOfGas {

@@ -699,7 +699,7 @@ func (w *Wallet) signHash(account accounts.Account, hash []byte) ([]byte, error)
 // the needed details via SignTxWithPassphrase, or by other means (e.g. unlock
 // the account in a keystore).
 func (w *Wallet) SignTx(account accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	signer := types.NewEIP155Signer(chainID)
+	signer := types.NewOmahaSigner(chainID)
 	hash := signer.Hash(tx)
 	sig, err := w.signHash(account, hash[:])
 	if err != nil {
@@ -720,7 +720,7 @@ func (w *Wallet) SignTx(account accounts.Account, tx *types.Transaction, chainID
 // the needed details via ProviderSignTxWithPassphrase, or by other means (e.g. unlock
 // the account in a keystore).
 func (w *Wallet) ProviderSignTx(account accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
-	signer := types.NewEIP155Signer(chainID)
+	signer := types.NewOmahaSigner(chainID)
 	hash := signer.Hash(tx)
 	sig, err := w.signHash(account, hash[:])
 	if err != nil {

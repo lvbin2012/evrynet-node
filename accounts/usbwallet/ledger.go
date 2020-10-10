@@ -152,9 +152,6 @@ func (w *ledgerDriver) Derive(path accounts.DerivationPath) (common.Address, err
 // SignTx implements usbwallet.driver, sending the transaction to the Ledger and
 // waiting for the user to confirm or deny the transaction.
 //
-// Note, if the version of the Evrynet application running on the Ledger wallet is
-// too old to sign EIP-155 transactions, but such is requested nonetheless, an error
-// will be returned opposed to silently signing in Homestead mode.
 func (w *ledgerDriver) SignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
 	// If the Evrynet app doesn't run, abort
 	if w.offline() {
@@ -171,9 +168,6 @@ func (w *ledgerDriver) SignTx(path accounts.DerivationPath, tx *types.Transactio
 // SignTx implements usbwallet.driver, sending the transaction to the Ledger and
 // waiting for the user to confirm or deny the transaction.
 //
-// Note, if the version of the Evrynet application running on the Ledger wallet is
-// too old to sign EIP-155 transactions, but such is requested nonetheless, an error
-// will be returned opposed to silently signing in Homestead mode.
 func (w *ledgerDriver) ProviderSignTx(path accounts.DerivationPath, tx *types.Transaction, chainID *big.Int) (common.Address, *types.Transaction, error) {
 	// If the Evrynet app doesn't run, abort
 	if w.offline() {
@@ -324,7 +318,7 @@ func (w *ledgerDriver) ledgerSign(derivationPath []uint32, tx *types.Transaction
 	for i, component := range derivationPath {
 		binary.BigEndian.PutUint32(path[1+4*i:], component)
 	}
-	// Create the transaction RLP based on whether legacy or EIP155 signing was requested
+	// Create the transaction RLP based on whether legacy or Omaha signing was requested
 	var (
 		txrlp []byte
 		err   error
@@ -369,9 +363,9 @@ func (w *ledgerDriver) ledgerSign(derivationPath []uint32, tx *types.Transaction
 	// Create the correct signer and signature transform based on the chain ID
 	var signer types.Signer
 	if chainID == nil {
-		signer = new(types.HomesteadSigner)
+		signer = new(types.BaseSigner)
 	} else {
-		signer = types.NewEIP155Signer(chainID)
+		signer = types.NewOmahaSigner(chainID)
 		signature[64] -= byte(chainID.Uint64()*2 + 35)
 	}
 	signed, err := tx.WithSignature(signer, signature)
