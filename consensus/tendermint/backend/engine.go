@@ -349,6 +349,13 @@ func (sb *Backend) getValSetFromChain(chain consensus.ChainReader, header *types
 			if currentHeader == nil {
 				return nil, consensus.ErrUnknownAncestor
 			}
+			if number%sb.config.Epoch != 0 {
+				currentHeaderOnChain := chain.GetHeaderByNumber(number)
+				if currentHeaderOnChain.Hash() == hash {
+					number = (number / sb.config.Epoch) * sb.config.Epoch
+					currentHeader = chain.GetHeaderByNumber(number)
+				}
+			}
 		}
 		if number%sb.config.Epoch == 0 {
 			validators, err := utils.GetValSetAddresses(currentHeader)
