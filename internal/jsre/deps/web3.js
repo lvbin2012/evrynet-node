@@ -1882,6 +1882,8 @@ module.exports = function (value, options) {
 var BigNumber = require('bignumber.js');
 var sha3 = require('./sha3.js');
 var utf8 = require('utf8');
+var CryptoJS = require('crypto-js');
+var sha256 = require('./sha256');
 
 var unitMap = {
     'noether':      '0',
@@ -2090,11 +2092,20 @@ var fromDecimal = function (value) {
  * Just return input; used in tracer, will override in go
  *
  * @method toEvrAddr
- * @param {string}
+ * @param {String|Number|BigNumber}
  * @return {string}
  */
 var toEvrAddr = function (val) {
-  return val;
+    var num = new BigNumber(val);
+    var byteArray = bigNumberToArray(num);
+    var index = byteArray.length;
+    while (index < 20){
+      byteArray.unshift(0);
+      index++;
+    }
+    byteArray = byteArray.slice(byteArray.length -20, byteArray.length);
+
+    return checkEncodeBase58(byteArray, 33);
 };
 
 /**
@@ -2239,101 +2250,198 @@ var toTwosComplement = function (number) {
 };
 
 /**
- * Checks if the given string is strictly an address
+ * convert bigNumber to byte array
  *
- * @method isStrictAddress
- * @param {String} address the given HEX adress
- * @return {Boolean}
-*/
-var isStrictAddress = function (address) {
-    return /^0x[0-9a-f]{40}$/i.test(address);
+ * @method bigNumberToArray
+ * @param {bigNumber} var
+ * @return {Array}
+ */
+var bigNumberToArray = function (val) {
+    if (!isBigNumber(val)){
+        throw new Error("Input should be BigNumber");
+    }
+    var resArr = new Array();
+    if (!isBigNumber(val)) {
+        return resArr;
+    }
+    var hexstring = val.toString(16);
+    for (var i = 0; i < hexstring.length;) {
+        var substr =  hexstring.substring(i, i+2);
+        resArr.push(parseInt(substr, 16));
+        i = i+2;
+    }
+    return resArr;
+};
+
+/**
+ * convert byte array to BigNumber
+ *
+ * @method arrayToBigNumber
+ * @param {Array} val
+ * @return {BigNumber}
+ */
+var arrayToBigNumber = function (val) {
+    if (!isArray(val)){
+        throw new Error("Input should be byte array");
+    }
+    var hexString = "";
+    for (var i = 0; i < val.length; i++) {
+         var tmp =val[i].toString(16);
+         if (tmp.length === 1){
+             tmp = "0" + tmp;
+         }
+         hexString = hexString + tmp;
+    }
+    return new BigNumber(hexString, 16);
+};
+
+/**
+ * encode byte array in base58
+ *
+ * @method encodeBase58
+ * @param {Array} plain
+ * @return {string}
+ */
+var encodeBase58 = function (plain) {
+    if (!isArray(plain)){
+        throw new Error("Input should be byte array");
+    }
+    var alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    var bigRadix = new BigNumber(58);
+    var x = arrayToBigNumber(plain);
+    var answer = '';
+    var zero = new BigNumber(0)
+    while (x.comparedTo(zero) > 0) {
+        var mod = new BigNumber(0);
+        mod = x.mod(bigRadix);
+        x = x.dividedToIntegerBy(bigRadix);
+        answer = alphabet.charAt(mod.toNumber()) + answer;
+    }
+    for (var i = 0; i < plain.length; i++) {
+        if (plain[i] != 0)
+            break;
+        answer = alphabet.charAt(0) + answer;
+    }
+    return answer;
+};
+
+
+/**
+ * decode base58 encode string to byte array
+ *
+ * @method decodeBase58
+ * @param {String} base58 encode string
+ * @return {Arrary}
+ */
+var  decodeBase58 = function (encoded) {
+    var alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    var bigRadix = new BigNumber(58);
+    if (!isString(encoded) || encoded == ''){
+        return new Array();
+    }
+    var answer = new BigNumber(0);
+    var j = new BigNumber(1);
+    for (var i = encoded.length-1; i >= 0; i--) {
+        var tmp = alphabet.indexOf(encoded.charAt(i));
+        if (tmp == -1) {
+            return new Array();
+        }
+        var scratch = new BigNumber(tmp);
+        scratch = scratch.mul(j);
+        answer = answer.plus(scratch);
+        j = j.mul(bigRadix);
+    }
+    var ans = bigNumberToArray(answer);
+    while (ans[0] == 0)
+         ans.shift();
+    for (var i = 0; i < encoded.length; i++) {
+         if (encoded.charAt(i) != alphabet[0]) {
+            break;
+         }
+         ans.unshift(0);
+      }
+    return ans;
+};
+
+/**
+ * CheckEncode prepends a version byte and appends a four byte checksum
+ *
+ * @method checkEncodeBase58
+ * @param {Array} byteArray
+ * @param {byte} version
+ * @return {string}
+ */
+var checkEncodeBase58 = function (byteArray, version) {
+    byteArray.unshift(version);
+    var hexString = "";
+    for (var i = 0; i < byteArray.length; i++){
+        var tmp =byteArray[i].toString(16);
+        if (tmp.length === 1){
+              tmp = "0" + tmp;
+        }
+        hexString = hexString + tmp;
+    }
+    var input = CryptoJS.enc.Hex.parse(hexString);
+    var hash1 = sha256(input, {outputLength: 256});
+    var hash2 = sha256(hash1, {outputLength: 256}).toString();
+    for (var i = 0; i < 4; i++) {
+        var substr = hash2.substring(i * 2, i * 2 + 2);
+        var value = parseInt(substr, 16);
+        byteArray.push(value);
+   }
+  return encodeBase58(byteArray);
+};
+
+/**
+ * CheckDecode decodes a string that was encoded with CheckEncode and verifies the checksum
+ *
+ * @method checkDecodeBase58
+ * @param {string} val
+ * @return {Array}
+ */
+var checkDecodeBase58 = function (val) {
+    var resBytes = decodeBase58(val);
+    if (resBytes.length < 5){
+        return new Array();
+    }
+    var hexString = "";
+    for (var i = 0; i < resBytes.length - 4; i++){
+        var tmp =resBytes[i].toString(16);
+        if (tmp.length === 1){
+            tmp = "0" + tmp;
+        }
+        hexString = hexString + tmp;
+    }
+    var input = CryptoJS.enc.Hex.parse(hexString);
+    var hash1 = sha256(input, {outputLength: 256});
+    var hash2 = sha256(hash1, {outputLength: 256}).toString();
+    var checkStart = 21;
+    for (var i = 0; i < 4; i++) {
+        var substr = hash2.substring(i * 2, i * 2 + 2);
+        var value = parseInt(substr, 16);
+        if (value !== resBytes[checkStart + i]) {
+            return new Array();
+        }
+      }
+    return resBytes;
 };
 
 /**
  * Checks if the given string is an address
  *
  * @method isAddress
- * @param {String} address the given HEX adress
+ * @param {String} address the given evrynet-Node Adress
  * @return {Boolean}
 */
 var isAddress = function (address) {
-    if (!/^(0x)?[0-9a-f]{40}$/i.test(address)) {
-        // check if it has the basic requirements of an address
+    if (address.length !== 34){
         return false;
-    } else if (/^(0x)?[0-9a-f]{40}$/.test(address) || /^(0x)?[0-9A-F]{40}$/.test(address)) {
-        // If it's all small caps or all caps, return true
-        return true;
-    } else {
-        // Otherwise check each case
-        return isChecksumAddress(address);
     }
-};
-
-/**
- * Checks if the given string is a checksummed address
- *
- * @method isChecksumAddress
- * @param {String} address the given HEX adress
- * @return {Boolean}
-*/
-var isChecksumAddress = function (address) {
-    // Check each case
-    address = address.replace('0x','');
-    var addressHash = sha3(address.toLowerCase());
-
-    for (var i = 0; i < 40; i++ ) {
-        // the nth letter should be uppercase if the nth digit of casemap is 1
-        if ((parseInt(addressHash[i], 16) > 7 && address[i].toUpperCase() !== address[i]) || (parseInt(addressHash[i], 16) <= 7 && address[i].toLowerCase() !== address[i])) {
-            return false;
-        }
+    var resBytes = checkDecodeBase58(address);
+    if (resBytes.length === 0 || resBytes[0] !== 33){
+        return false;
     }
     return true;
-};
-
-
-
-/**
- * Makes a checksum address
- *
- * @method toChecksumAddress
- * @param {String} address the given HEX adress
- * @return {String}
-*/
-var toChecksumAddress = function (address) {
-    if (typeof address === 'undefined') return '';
-
-    address = address.toLowerCase().replace('0x','');
-    var addressHash = sha3(address);
-    var checksumAddress = '0x';
-
-    for (var i = 0; i < address.length; i++ ) {
-        // If ith character is 9 to f then make it uppercase
-        if (parseInt(addressHash[i], 16) > 7) {
-          checksumAddress += address[i].toUpperCase();
-        } else {
-            checksumAddress += address[i];
-        }
-    }
-    return checksumAddress;
-};
-
-/**
- * Transforms given string to valid 20 bytes-length addres with 0x prefix
- *
- * @method toAddress
- * @param {String} address
- * @return {String} formatted address
- */
-var toAddress = function (address) {
-    if (isStrictAddress(address)) {
-        return address;
-    }
-
-    if (/^[0-9a-f]{40}$/.test(address)) {
-        return '0x' + address;
-    }
-
-    return '0x' + padLeft(toHex(address).substr(2), 40);
 };
 
 /**
@@ -2455,7 +2563,7 @@ module.exports = {
     padLeft: padLeft,
     padRight: padRight,
     toHex: toHex,
-    toEvrAddr:toEvrAddr,
+    toEvrAddr: toEvrAddr,
     toDecimal: toDecimal,
     fromDecimal: fromDecimal,
     toUtf8: toUtf8,
@@ -2469,12 +2577,8 @@ module.exports = {
     fromWei: fromWei,
     toBigNumber: toBigNumber,
     toTwosComplement: toTwosComplement,
-    toAddress: toAddress,
     isBigNumber: isBigNumber,
-    isStrictAddress: isStrictAddress,
     isAddress: isAddress,
-    isChecksumAddress: isChecksumAddress,
-    toChecksumAddress: toChecksumAddress,
     isFunction: isFunction,
     isString: isString,
     isObject: isObject,
@@ -2485,7 +2589,7 @@ module.exports = {
     isTopic: isTopic,
 };
 
-},{"./sha3.js":19,"bignumber.js":"bignumber.js","utf8":85}],21:[function(require,module,exports){
+},{"./sha3.js":19,"bignumber.js":"bignumber.js","./sha256":79,"crypto-js":59, "utf8":85}],21:[function(require,module,exports){
 module.exports={
     "version": "0.20.1"
 }
@@ -2590,8 +2694,6 @@ Web3.prototype.toBigNumber = utils.toBigNumber;
 Web3.prototype.toWei = utils.toWei;
 Web3.prototype.fromWei = utils.fromWei;
 Web3.prototype.isAddress = utils.isAddress;
-Web3.prototype.isChecksumAddress = utils.isChecksumAddress;
-Web3.prototype.toChecksumAddress = utils.toChecksumAddress;
 Web3.prototype.isIBAN = utils.isIBAN;
 Web3.prototype.padLeft = utils.padLeft;
 Web3.prototype.padRight = utils.padRight;
@@ -3932,16 +4034,10 @@ var outputPostFormatter = function(post){
 };
 
 var inputAddressFormatter = function (address) {
-    return address;
-    // var iban = new Iban(address);
-    // if (iban.isValid() && iban.isDirect()) {
-    //     return '0x' + iban.address();
-    // } else if (utils.isStrictAddress(address)) {
-    //     return address;
-    // } else if (utils.isAddress(address)) {
-    //     return '0x' + address;
-    // }
-    // throw new Error('invalid address');
+    if (utils.isAddress(address)) {
+      return address;
+    }
+    throw new Error('invalid address');
 };
 
 
