@@ -66,7 +66,6 @@ type Message interface {
 	From() common.Address
 	GasPayer() common.Address
 	HasProviderSignature() bool
-	//FromFrontier() (common.Address, error)
 	To() *common.Address
 	Owner() *common.Address
 	Provider() *common.Address
