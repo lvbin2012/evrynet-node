@@ -272,13 +272,13 @@ func ImportPreimages(db evrdb.Database, fn string) error {
 		// Accumulate the preimages and flush when enough ws gathered
 		preimages[crypto.Keccak256Hash(blob)] = common.CopyBytes(blob)
 		if len(preimages) > 1024 {
-			rawdb.WritePreimages(db, preimages)
+			rawdb.WritePreimages(db, preimages, false)
 			preimages = make(map[common.Hash][]byte)
 		}
 	}
 	// Flush the last batch preimage data
 	if len(preimages) > 0 {
-		rawdb.WritePreimages(db, preimages)
+		rawdb.WritePreimages(db, preimages, false)
 	}
 	return nil
 }

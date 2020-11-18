@@ -700,7 +700,7 @@ func (api *PrivateDebugAPI) computeStateDB(block *types.Block, reexec uint64) (*
 // and returns them as a JSON object.
 func (api *PrivateDebugAPI) TraceTransaction(ctx context.Context, hash common.Hash, config *TraceConfig) (interface{}, error) {
 	// Retrieve the transaction and assemble its EVM context
-	tx, blockHash, _, index := rawdb.ReadTransaction(api.evr.ChainDb(), hash)
+	tx, blockHash, _, index := rawdb.ReadTransaction(api.evr.ChainDb(), hash, false)
 	if tx == nil {
 		return nil, fmt.Errorf("transaction %#x not found", hash)
 	}

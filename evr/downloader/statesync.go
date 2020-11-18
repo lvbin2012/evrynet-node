@@ -491,6 +491,6 @@ func (s *stateSync) updateStats(written, duplicate, unexpected int, duration tim
 		log.Info("Imported new state entries", "count", written, "elapsed", common.PrettyDuration(duration), "processed", s.d.syncStatsState.processed, "pending", s.d.syncStatsState.pending, "retry", len(s.tasks), "duplicate", s.d.syncStatsState.duplicate, "unexpected", s.d.syncStatsState.unexpected)
 	}
 	if written > 0 {
-		rawdb.WriteFastTrieProgress(s.d.stateDB, s.d.syncStatsState.processed)
+		rawdb.WriteFastTrieProgress(s.d.stateDB, s.d.syncStatsState.processed, s.d.blockchain.IsFinalChain())
 	}
 }

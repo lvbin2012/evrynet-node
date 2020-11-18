@@ -295,7 +295,7 @@ func NewPrivateDebugAPI(eth *Evrynet) *PrivateDebugAPI {
 
 // Preimage is a debug API function that returns the preimage for a sha3 hash, if known.
 func (api *PrivateDebugAPI) Preimage(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
-	if preimage := rawdb.ReadPreimage(api.evr.ChainDb(), hash); preimage != nil {
+	if preimage := rawdb.ReadPreimage(api.evr.ChainDb(), hash, false); preimage != nil {
 		return preimage, nil
 	}
 	return nil, errors.New("unknown preimage")

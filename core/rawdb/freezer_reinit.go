@@ -33,7 +33,7 @@ import (
 // of frozen ancient blocks. The method iterates over all the frozen blocks and
 // injects into the database the block hash->number mappings and the transaction
 // lookup entries.
-func InitDatabaseFromFreezer(db evrdb.Database) error {
+func InitDatabaseFromFreezer(db evrdb.Database, isFinalChain bool) error {
 	// If we can't access the freezer or it's empty, abort
 	frozen, err := db.Ancients()
 	if err != nil || frozen == 0 {
@@ -58,7 +58,7 @@ func InitDatabaseFromFreezer(db evrdb.Database) error {
 				// Retrieve the block from the freezer (no need for the hash, we pull by
 				// number from the freezer). If successful, pre-cache the block hash and
 				// the individual transaction hashes for storing into the database.
-				block := ReadBlock(db, common.Hash{}, n)
+				block := ReadBlock(db, common.Hash{}, n, isFinalChain)
 				if block != nil {
 					block.Hash()
 					for _, tx := range block.Transactions() {
@@ -101,8 +101,8 @@ func InitDatabaseFromFreezer(db evrdb.Database) error {
 			next++
 
 			// Inject hash<->number mapping and txlookup indexes
-			WriteHeaderNumber(batch, block.Hash(), block.NumberU64())
-			WriteTxLookupEntries(batch, block)
+			WriteHeaderNumber(batch, block.Hash(), block.NumberU64(), isFinalChain)
+			WriteTxLookupEntries(batch, block, isFinalChain)
 
 			// If enough data was accumulated in memory or we're at the last block, dump to disk
 			if batch.ValueSize() > evrdb.IdealBatchSize || uint64(next) == frozen {
@@ -118,9 +118,9 @@ func InitDatabaseFromFreezer(db evrdb.Database) error {
 			}
 		}
 	}
-	hash := ReadCanonicalHash(db, frozen-1)
-	WriteHeadHeaderHash(db, hash)
-	WriteHeadFastBlockHash(db, hash)
+	hash := ReadCanonicalHash(db, frozen-1,isFinalChain)
+	WriteHeadHeaderHash(db, hash, isFinalChain)
+	WriteHeadFastBlockHash(db, hash, isFinalChain)
 
 	log.Info("Initialized chain from ancient data", "number", frozen-1, "hash", hash, "elapsed", common.PrettyDuration(time.Since(start)))
 	return nil

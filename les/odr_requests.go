@@ -110,7 +110,7 @@ func (r *BlockRequest) Validate(db evrdb.Database, msg *Msg) error {
 	body := bodies[0]
 
 	// Retrieve our stored header and validate block content against it
-	header := rawdb.ReadHeader(db, r.Hash, r.Number)
+	header := rawdb.ReadHeader(db, r.Hash, r.Number, r.IsFinalChain)
 	if header == nil {
 		return errHeaderUnavailable
 	}
@@ -166,7 +166,7 @@ func (r *ReceiptsRequest) Validate(db evrdb.Database, msg *Msg) error {
 	receipt := receipts[0]
 
 	// Retrieve our stored header and validate receipt content against it
-	header := rawdb.ReadHeader(db, r.Hash, r.Number)
+	header := rawdb.ReadHeader(db, r.Hash, r.Number, r.IsFinalChain)
 	if header == nil {
 		return errHeaderUnavailable
 	}

@@ -45,9 +45,9 @@ var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
 var (
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(1),
-		GasPrice:            big.NewInt(GasPriceConfig),
-		Ethash:              new(EthashConfig),
+		ChainID:  big.NewInt(1),
+		GasPrice: big.NewInt(GasPriceConfig),
+		Ethash:   new(EthashConfig),
 	}
 
 	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
@@ -61,9 +61,9 @@ var (
 
 	// TestnetChainConfig contains the chain parameters to run a node on the Ropsten test network.
 	TestnetChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(3),
-		GasPrice:            big.NewInt(GasPriceConfig),
-		Ethash:              new(EthashConfig),
+		ChainID:  big.NewInt(3),
+		GasPrice: big.NewInt(GasPriceConfig),
+		Ethash:   new(EthashConfig),
 	}
 
 	// TestnetTrustedCheckpoint contains the light client trusted checkpoint for the Ropsten test network.
@@ -77,8 +77,8 @@ var (
 
 	// RinkebyChainConfig contains the chain parameters to run a node on the Rinkeby test network.
 	RinkebyChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(4),
-		GasPrice:            big.NewInt(GasPriceConfig),
+		ChainID:  big.NewInt(4),
+		GasPrice: big.NewInt(GasPriceConfig),
 		Clique: &CliqueConfig{
 			Period: 15,
 			Epoch:  30000,
@@ -96,8 +96,8 @@ var (
 
 	// GoerliChainConfig contains the chain parameters to run a node on the Görli test network.
 	GoerliChainConfig = &ChainConfig{
-		ChainID:             big.NewInt(5),
-		GasPrice:            big.NewInt(GasPriceConfig),
+		ChainID:  big.NewInt(5),
+		GasPrice: big.NewInt(GasPriceConfig),
 		Clique: &CliqueConfig{
 			Period: 15,
 			Epoch:  30000,
@@ -118,17 +118,17 @@ var (
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), nil, nil, new(EthashConfig), nil, nil}
+	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), nil, nil, new(EthashConfig), nil, nil, false}
 
 	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
 	// and accepted by the Evrynet core developers into the Clique consensus.
 	//
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil}
+	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil, false}
 
-	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), nil, nil, new(EthashConfig), nil, nil}
-	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), nil, nil, nil, nil, new(TendermintConfig)}
+	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), nil, nil, new(EthashConfig), nil, nil, false}
+	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), nil, nil, nil, nil, new(TendermintConfig), false}
 	TestRules                 = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -158,9 +158,10 @@ type ChainConfig struct {
 	EWASMBlock     *big.Int `json:"ewasmBlock,omitempty"`     // EWASM switch block (nil = no fork, 0 = already activated)
 
 	// Various consensus engines
-	Ethash     *EthashConfig     `json:"ethash,omitempty"`
-	Clique     *CliqueConfig     `json:"clique,omitempty"`
-	Tendermint *TendermintConfig `json:"tendermint,omitempty"`
+	Ethash       *EthashConfig     `json:"ethash,omitempty"`
+	Clique       *CliqueConfig     `json:"clique,omitempty"`
+	Tendermint   *TendermintConfig `json:"tendermint,omitempty"`
+	IsFinalChain bool              `json:"isFinalChain"`
 }
 
 // EthashConfig is the consensus engine configs for proof-of-work based sealing.

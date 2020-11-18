@@ -237,14 +237,14 @@ func makeChainForBench(db evrdb.Database, full bool, count uint64) {
 		}
 		hash = header.Hash()
 
-		rawdb.WriteHeader(db, header)
-		rawdb.WriteCanonicalHash(db, hash, n)
-		rawdb.WriteTd(db, hash, n, big.NewInt(int64(n+1)))
+		rawdb.WriteHeader(db, header, false)
+		rawdb.WriteCanonicalHash(db, hash, n, false)
+		rawdb.WriteTd(db, hash, n, big.NewInt(int64(n+1)), false)
 
 		if full || n == 0 {
 			block := types.NewBlockWithHeader(header)
-			rawdb.WriteBody(db, hash, n, block.Body())
-			rawdb.WriteReceipts(db, hash, n, nil)
+			rawdb.WriteBody(db, hash, n, block.Body(), false)
+			rawdb.WriteReceipts(db, hash, n, nil, false)
 		}
 	}
 }
@@ -296,8 +296,8 @@ func benchReadChain(b *testing.B, full bool, count uint64) {
 			header := chain.GetHeaderByNumber(n)
 			if full {
 				hash := header.Hash()
-				rawdb.ReadBody(db, hash, n)
-				rawdb.ReadReceipts(db, hash, n, chain.Config())
+				rawdb.ReadBody(db, hash, n, false)
+				rawdb.ReadReceipts(db, hash, n, chain.Config(), false)
 			}
 		}
 		chain.Stop()

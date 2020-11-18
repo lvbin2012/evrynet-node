@@ -65,7 +65,7 @@ func (b *benchmarkBlockHeaders) init(pm *ProtocolManager, count int) error {
 	if b.byHash {
 		b.hashes = make([]common.Hash, count)
 		for i := range b.hashes {
-			b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb, uint64(b.offset+rand.Int63n(b.randMax)))
+			b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb, uint64(b.offset+rand.Int63n(b.randMax)), false)
 		}
 	}
 	return nil
@@ -89,7 +89,7 @@ func (b *benchmarkBodiesOrReceipts) init(pm *ProtocolManager, count int) error {
 	randMax := pm.blockchain.CurrentHeader().Number.Int64() + 1
 	b.hashes = make([]common.Hash, count)
 	for i := range b.hashes {
-		b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb, uint64(rand.Int63n(randMax)))
+		b.hashes[i] = rawdb.ReadCanonicalHash(pm.chainDb, uint64(rand.Int63n(randMax)), false)
 	}
 	return nil
 }

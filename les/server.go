@@ -119,8 +119,8 @@ func NewLesServer(evr *evr.Evrynet, config *evr.Config) (*LesServer, error) {
 			config:           config,
 			chainDb:          evr.ChainDb(),
 			iConfig:          light.DefaultServerIndexerConfig,
-			chtIndexer:       light.NewChtIndexer(evr.ChainDb(), nil, params.CHTFrequency, params.HelperTrieProcessConfirmations),
-			bloomTrieIndexer: light.NewBloomTrieIndexer(evr.ChainDb(), nil, params.BloomBitsBlocks, params.BloomTrieFrequency),
+			chtIndexer:       light.NewChtIndexer(evr.ChainDb(), nil, params.CHTFrequency, params.HelperTrieProcessConfirmations, config.Genesis.Config.IsFinalChain),
+			bloomTrieIndexer: light.NewBloomTrieIndexer(evr.ChainDb(), nil, params.BloomBitsBlocks, params.BloomTrieFrequency, config.Genesis.Config.IsFinalChain),
 			protocolManager:  pm,
 		},
 		archiveMode:  evr.ArchiveMode(),
@@ -322,11 +322,11 @@ func (pm *ProtocolManager) blockLoop() {
 					header := ev.Block.Header()
 					hash := header.Hash()
 					number := header.Number.Uint64()
-					td := rawdb.ReadTd(pm.chainDb, hash, number)
+					td := rawdb.ReadTd(pm.chainDb, hash, number, pm.chainConfig.IsFinalChain)
 					if td != nil && td.Cmp(lastBroadcastTd) > 0 {
 						var reorg uint64
 						if lastHead != nil {
-							reorg = lastHead.Number.Uint64() - rawdb.FindCommonAncestor(pm.chainDb, header, lastHead).Number.Uint64()
+							reorg = lastHead.Number.Uint64() - rawdb.FindCommonAncestor(pm.chainDb, header, lastHead, pm.chainConfig.IsFinalChain).Number.Uint64()
 						}
 						lastHead = header
 						lastBroadcastTd = td

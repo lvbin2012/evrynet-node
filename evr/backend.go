@@ -139,7 +139,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 		gasPrice:       chainConfig.GasPrice,
 		etherbase:      config.Miner.Etherbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
+		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms, chainConfig.IsFinalChain),
 	}
 
 	bcVersion := rawdb.ReadDatabaseVersion(chainDb)

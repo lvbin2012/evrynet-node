@@ -290,6 +290,11 @@ func (dl *downloadTester) InsertChain(blocks types.Blocks) (i int, err error) {
 	return len(blocks), nil
 }
 
+
+func (dl*downloadTester) IsFinalChain() bool{
+	return false
+}
+
 // InsertReceiptChain injects a new batch of receipts into the simulated chain.
 func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (i int, err error) {
 	dl.lock.Lock()

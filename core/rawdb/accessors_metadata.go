@@ -53,8 +53,8 @@ func WriteDatabaseVersion(db evrdb.KeyValueWriter, version uint64) {
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
-func ReadChainConfig(db evrdb.KeyValueReader, hash common.Hash) *params.ChainConfig {
-	data, _ := db.Get(configKey(hash))
+func ReadChainConfig(db evrdb.KeyValueReader, hash common.Hash, isFinalChain bool) *params.ChainConfig {
+	data, _ := db.Get(getFinalKey(configKey(hash), isFinalChain))
 	if len(data) == 0 {
 		return nil
 	}
@@ -75,21 +75,21 @@ func WriteChainConfig(db evrdb.KeyValueWriter, hash common.Hash, cfg *params.Cha
 	if err != nil {
 		log.Crit("Failed to JSON encode chain config", "err", err)
 	}
-	if err := db.Put(configKey(hash), data); err != nil {
+	if err := db.Put(getFinalKey(configKey(hash), cfg.IsFinalChain), data); err != nil {
 		log.Crit("Failed to store chain config", "err", err)
 	}
 }
 
 // ReadPreimage retrieves a single preimage of the provided hash.
-func ReadPreimage(db evrdb.KeyValueReader, hash common.Hash) []byte {
-	data, _ := db.Get(preimageKey(hash))
+func ReadPreimage(db evrdb.KeyValueReader, hash common.Hash, isFinalChain bool) []byte {
+	data, _ := db.Get(getFinalKey(preimageKey(hash), isFinalChain))
 	return data
 }
 
 // WritePreimages writes the provided set of preimages to the database.
-func WritePreimages(db evrdb.KeyValueWriter, preimages map[common.Hash][]byte) {
+func WritePreimages(db evrdb.KeyValueWriter, preimages map[common.Hash][]byte, isFinalChain bool) {
 	for hash, preimage := range preimages {
-		if err := db.Put(preimageKey(hash), preimage); err != nil {
+		if err := db.Put(getFinalKey(preimageKey(hash), isFinalChain), preimage); err != nil {
 			log.Crit("Failed to store trie preimage", "err", err)
 		}
 	}

@@ -80,6 +80,22 @@ const (
 
 	// freezerDifficultyTable indicates the name of the freezer total difficulty table.
 	freezerDifficultyTable = "diffs"
+
+
+	// freezerFHeaderTable indicates the name of the freezer header table.
+	freezerFHeaderTable = "fheaders"
+
+	// freezerHashTable indicates the name of the freezer canonical hash table.
+	freezerFHashTable = "fhashes"
+
+	// freezerFBodiesTable indicates the name of the freezer block body table.
+	freezerFBodiesTable = "fbodies"
+
+	// freezerFReceiptTable indicates the name of the freezer receipts table.
+	freezerFReceiptTable = "freceipts"
+
+	// freezerFDifficultyTable indicates the name of the freezer total difficulty table.
+	freezerFDifficultyTable = "fdiffs"
 )
 
 // freezerNoSnappy configures whether compression is disabled for the ancient-tables.
@@ -90,6 +106,11 @@ var freezerNoSnappy = map[string]bool{
 	freezerBodiesTable:     false,
 	freezerReceiptTable:    false,
 	freezerDifficultyTable: true,
+	freezerFHeaderTable:     false,
+	freezerFHashTable:       true,
+	freezerFBodiesTable:     false,
+	freezerFReceiptTable:    false,
+	freezerFDifficultyTable: true,
 }
 
 // LegacyTxLookupEntry is the legacy TxLookupEntry definition with some unnecessary
@@ -166,3 +187,11 @@ func preimageKey(hash common.Hash) []byte {
 func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
+
+func getFinalKey(key []byte, isFinalChain bool) []byte{
+	if isFinalChain{
+		return append([]byte{'F'}, key...)
+	}
+	return key
+}
+

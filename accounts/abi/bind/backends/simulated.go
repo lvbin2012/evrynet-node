@@ -197,7 +197,7 @@ func (b *SimulatedBackend) TransactionByHash(ctx context.Context, txHash common.
 	if tx != nil {
 		return tx, true, nil
 	}
-	tx, _, _, _ = rawdb.ReadTransaction(b.database, txHash)
+	tx, _, _, _ = rawdb.ReadTransaction(b.database, txHash, false)
 	if tx != nil {
 		return tx, false, nil
 	}
@@ -507,7 +507,7 @@ func (fb *filterBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*t
 }
 
 func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	number := rawdb.ReadHeaderNumber(fb.db, hash)
+	number := rawdb.ReadHeaderNumber(fb.db, hash, fb.bc.Config().IsFinalChain)
 	if number == nil {
 		return nil, nil
 	}
@@ -515,7 +515,7 @@ func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (typ
 }
 
 func (fb *filterBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
-	number := rawdb.ReadHeaderNumber(fb.db, hash)
+	number := rawdb.ReadHeaderNumber(fb.db, hash, fb.bc.Config().IsFinalChain)
 	if number == nil {
 		return nil, nil
 	}

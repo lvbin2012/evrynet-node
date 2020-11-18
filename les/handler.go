@@ -636,12 +636,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 					if bytes >= softResponseLimit {
 						break
 					}
-					number := rawdb.ReadHeaderNumber(pm.chainDb, hash)
+					number := rawdb.ReadHeaderNumber(pm.chainDb, hash, pm.chainConfig.IsFinalChain)
 					if number == nil {
 						atomic.AddUint32(&p.invalidCount, 1)
 						continue
 					}
-					if data := rawdb.ReadBodyRLP(pm.chainDb, hash, *number); len(data) != 0 {
+					if data := rawdb.ReadBodyRLP(pm.chainDb, hash, *number, pm.chainConfig.IsFinalChain); len(data) != 0 {
 						bodies = append(bodies, data)
 						bytes += len(data)
 					}
@@ -695,13 +695,13 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 						return
 					}
 					// Look up the root hash belonging to the request
-					number := rawdb.ReadHeaderNumber(pm.chainDb, request.BHash)
+					number := rawdb.ReadHeaderNumber(pm.chainDb, request.BHash, pm.chainConfig.IsFinalChain)
 					if number == nil {
 						p.Log().Warn("Failed to retrieve block num for code", "hash", request.BHash)
 						atomic.AddUint32(&p.invalidCount, 1)
 						continue
 					}
-					header := rawdb.ReadHeader(pm.chainDb, request.BHash, *number)
+					header := rawdb.ReadHeader(pm.chainDb, request.BHash, *number, pm.chainConfig.IsFinalChain)
 					if header == nil {
 						p.Log().Warn("Failed to retrieve header for code", "block", *number, "hash", request.BHash)
 						continue
@@ -786,12 +786,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 					}
 					// Retrieve the requested block's receipts, skipping if unknown to us
 					var results types.Receipts
-					number := rawdb.ReadHeaderNumber(pm.chainDb, hash)
+					number := rawdb.ReadHeaderNumber(pm.chainDb, hash, pm.chainConfig.IsFinalChain)
 					if number == nil {
 						atomic.AddUint32(&p.invalidCount, 1)
 						continue
 					}
-					results = rawdb.ReadRawReceipts(pm.chainDb, hash, *number)
+					results = rawdb.ReadRawReceipts(pm.chainDb, hash, *number, pm.chainConfig.IsFinalChain)
 					if results == nil {
 						if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
 							continue
@@ -864,12 +864,12 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 					if request.BHash != lastBHash {
 						root, lastBHash = common.Hash{}, request.BHash
 
-						if number = rawdb.ReadHeaderNumber(pm.chainDb, request.BHash); number == nil {
+						if number = rawdb.ReadHeaderNumber(pm.chainDb, request.BHash, pm.chainConfig.IsFinalChain); number == nil {
 							p.Log().Warn("Failed to retrieve block num for proof", "hash", request.BHash)
 							atomic.AddUint32(&p.invalidCount, 1)
 							continue
 						}
-						if header = rawdb.ReadHeader(pm.chainDb, request.BHash, *number); header == nil {
+						if header = rawdb.ReadHeader(pm.chainDb, request.BHash, *number, pm.chainConfig.IsFinalChain); header == nil {
 							p.Log().Warn("Failed to retrieve header for proof", "block", *number, "hash", request.BHash)
 							continue
 						}
@@ -1180,10 +1180,10 @@ func (pm *ProtocolManager) getAccount(triedb *trie.Database, root, hash common.H
 func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, string) {
 	switch id {
 	case htCanonical:
-		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, (idx+1)*pm.iConfig.ChtSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, (idx+1)*pm.iConfig.ChtSize-1, pm.chainConfig.IsFinalChain)
 		return light.GetChtRoot(pm.chainDb, idx, sectionHead), light.ChtTablePrefix
 	case htBloomBits:
-		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, (idx+1)*pm.iConfig.BloomTrieSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(pm.chainDb, (idx+1)*pm.iConfig.BloomTrieSize-1, pm.chainConfig.IsFinalChain)
 		return light.GetBloomTrieRoot(pm.chainDb, idx, sectionHead), light.BloomTrieTablePrefix
 	}
 	return common.Hash{}, ""
@@ -1193,8 +1193,8 @@ func (pm *ProtocolManager) getHelperTrie(id uint, idx uint64) (common.Hash, stri
 func (pm *ProtocolManager) getHelperTrieAuxData(req HelperTrieReq) []byte {
 	if req.Type == htCanonical && req.AuxReq == auxHeader && len(req.Key) == 8 {
 		blockNum := binary.BigEndian.Uint64(req.Key)
-		hash := rawdb.ReadCanonicalHash(pm.chainDb, blockNum)
-		return rawdb.ReadHeaderRLP(pm.chainDb, hash, blockNum)
+		hash := rawdb.ReadCanonicalHash(pm.chainDb, blockNum, pm.chainConfig.IsFinalChain)
+		return rawdb.ReadHeaderRLP(pm.chainDb, hash, blockNum, pm.chainConfig.IsFinalChain)
 	}
 	return nil
 }
@@ -1204,7 +1204,7 @@ func (pm *ProtocolManager) txStatus(hash common.Hash) light.TxStatus {
 	stat.Status = pm.txpool.Status([]common.Hash{hash})[0]
 	// If the transaction is unknown to the pool, try looking it up locally
 	if stat.Status == core.TxStatusUnknown {
-		if tx, blockHash, blockNumber, txIndex := rawdb.ReadTransaction(pm.chainDb, hash); tx != nil {
+		if tx, blockHash, blockNumber, txIndex := rawdb.ReadTransaction(pm.chainDb, hash, pm.chainConfig.IsFinalChain); tx != nil {
 			stat.Status = core.TxStatusIncluded
 			stat.Lookup = &rawdb.LegacyTxLookupEntry{BlockHash: blockHash, BlockIndex: blockNumber, Index: txIndex}
 		}

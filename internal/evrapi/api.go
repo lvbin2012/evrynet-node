@@ -372,6 +372,7 @@ func (s *PrivateAccountAPI) signTransaction(ctx context.Context, args *SendTxArg
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 
+
 	return wallet.SignTxWithPassphrase(account, passwd, tx, s.b.ChainConfig().ChainID)
 }
 
@@ -1339,7 +1340,7 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByHash(ctx context.Context, 
 
 // GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
-	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash)
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash, false)
 	if tx == nil {
 		return nil, nil
 	}

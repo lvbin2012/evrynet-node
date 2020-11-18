@@ -109,27 +109,29 @@ func (req *CodeRequest) StoreResult(db evrdb.Database) {
 // BlockRequest is the ODR request type for retrieving block bodies
 type BlockRequest struct {
 	OdrRequest
-	Hash   common.Hash
-	Number uint64
-	Rlp    []byte
+	Hash         common.Hash
+	Number       uint64
+	Rlp          []byte
+	IsFinalChain bool
 }
 
 // StoreResult stores the retrieved data in local database
 func (req *BlockRequest) StoreResult(db evrdb.Database) {
-	rawdb.WriteBodyRLP(db, req.Hash, req.Number, req.Rlp)
+	rawdb.WriteBodyRLP(db, req.Hash, req.Number, req.Rlp, req.IsFinalChain)
 }
 
 // ReceiptsRequest is the ODR request type for retrieving block bodies
 type ReceiptsRequest struct {
 	OdrRequest
-	Hash     common.Hash
-	Number   uint64
-	Receipts types.Receipts
+	Hash         common.Hash
+	Number       uint64
+	Receipts     types.Receipts
+	IsFinalChain bool
 }
 
 // StoreResult stores the retrieved data in local database
 func (req *ReceiptsRequest) StoreResult(db evrdb.Database) {
-	rawdb.WriteReceipts(db, req.Hash, req.Number, req.Receipts)
+	rawdb.WriteReceipts(db, req.Hash, req.Number, req.Receipts, req.IsFinalChain)
 }
 
 // ChtRequest is the ODR request type for state/storage trie entries
@@ -147,9 +149,9 @@ type ChtRequest struct {
 func (req *ChtRequest) StoreResult(db evrdb.Database) {
 	hash, num := req.Header.Hash(), req.Header.Number.Uint64()
 
-	rawdb.WriteHeader(db, req.Header)
-	rawdb.WriteTd(db, hash, num, req.Td)
-	rawdb.WriteCanonicalHash(db, hash, num)
+	rawdb.WriteHeader(db, req.Header, req.Config.IsFinalChain)
+	rawdb.WriteTd(db, hash, num, req.Td, false)
+	rawdb.WriteCanonicalHash(db, hash, num, req.Config.IsFinalChain)
 }
 
 // BloomRequest is the ODR request type for retrieving bloom filters from a CHT structure
@@ -167,12 +169,12 @@ type BloomRequest struct {
 // StoreResult stores the retrieved data in local database
 func (req *BloomRequest) StoreResult(db evrdb.Database) {
 	for i, sectionIdx := range req.SectionIndexList {
-		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*req.Config.BloomTrieSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*req.Config.BloomTrieSize-1, req.Config.IsFinalChain)
 		// if we don't have the canonical hash stored for this section head number, we'll still store it under
 		// a key with a zero sectionHead. GetBloomBits will look there too if we still don't have the canonical
 		// hash. In the unlikely case we've retrieved the section head hash since then, we'll just retrieve the
 		// bit vector again from the network.
-		rawdb.WriteBloomBits(db, req.BitIdx, sectionIdx, sectionHead, req.BloomBits[i])
+		rawdb.WriteBloomBits(db, req.BitIdx, sectionIdx, sectionHead, req.BloomBits[i], req.Config.IsFinalChain)
 	}
 }
 

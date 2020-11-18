@@ -358,7 +358,7 @@ func (db *Database) AncientSize(kind string) (uint64, error) {
 	panic("implement me")
 }
 
-func (db *Database) AppendAncient(number uint64, hash, header, body, receipt, td []byte) error {
+func (db *Database) AppendAncient(number uint64, hash, header, body, receipt, td []byte, isFinalChain bool) error {
 	panic("implement me")
 }
 

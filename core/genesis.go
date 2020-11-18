@@ -57,9 +57,9 @@ type Genesis struct {
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
-	Number     uint64      `json:"number"`
-	GasUsed    uint64      `json:"gasUsed"`
-	ParentHash common.Hash `json:"parentHash"`
+	Number       uint64      `json:"number"`
+	GasUsed      uint64      `json:"gasUsed"`
+	ParentHash   common.Hash `json:"parentHash"`
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
@@ -158,7 +158,10 @@ func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis) (*params
 		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
 	// Just commit the new block if there is no stored genesis block.
-	stored := rawdb.ReadCanonicalHash(db, 0)
+	isFinalChain := false
+
+	//TODO isFinalChain give value
+	stored := rawdb.ReadCanonicalHash(db, 0, isFinalChain)
 	if (stored == common.Hash{}) {
 		if genesis == nil {
 			log.Info("Writing default main-net genesis block")
@@ -172,7 +175,7 @@ func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis) (*params
 
 	// We have the genesis block in database(perhaps in ancient database)
 	// but the corresponding state is missing.
-	header := rawdb.ReadHeader(db, stored, 0)
+	header := rawdb.ReadHeader(db, stored, 0, isFinalChain)
 	if _, err := state.New(header.Root, state.NewDatabaseWithCache(db, 0)); err != nil {
 		if genesis == nil {
 			genesis = DefaultGenesisBlock()
@@ -197,7 +200,7 @@ func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis) (*params
 	// Get the existing chain configuration.
 	newcfg := genesis.configOrDefault(stored)
 
-	storedcfg := rawdb.ReadChainConfig(db, stored)
+	storedcfg := rawdb.ReadChainConfig(db, stored, isFinalChain)
 	if storedcfg == nil {
 		log.Warn("Found genesis block without chain config")
 		rawdb.WriteChainConfig(db, stored, newcfg)
@@ -212,7 +215,7 @@ func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis) (*params
 
 	// Check config compatibility and write the config. Compatibility errors
 	// are returned to the caller unless we're already at block zero.
-	height := rawdb.ReadHeaderNumber(db, rawdb.ReadHeadHeaderHash(db))
+	height := rawdb.ReadHeaderNumber(db, rawdb.ReadHeadHeaderHash(db, genesis.Config.IsFinalChain), genesis.Config.IsFinalChain)
 	if height == nil {
 		return newcfg, stored, fmt.Errorf("missing block number for head header hash")
 	}
@@ -285,13 +288,13 @@ func (g *Genesis) Commit(db evrdb.Database) (*types.Block, error) {
 	if block.Number().Sign() != 0 {
 		return nil, fmt.Errorf("can't commit genesis block with number > 0")
 	}
-	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), g.Difficulty)
-	rawdb.WriteBlock(db, block)
-	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil)
-	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
-	rawdb.WriteHeadBlockHash(db, block.Hash())
-	rawdb.WriteHeadFastBlockHash(db, block.Hash())
-	rawdb.WriteHeadHeaderHash(db, block.Hash())
+	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), g.Difficulty, g.Config.IsFinalChain)
+	rawdb.WriteBlock(db, block,g.Config.IsFinalChain)
+	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil, g.Config.IsFinalChain)
+	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64(),g.Config.IsFinalChain)
+	rawdb.WriteHeadBlockHash(db, block.Hash(),g.Config.IsFinalChain)
+	rawdb.WriteHeadFastBlockHash(db, block.Hash(),g.Config.IsFinalChain)
+	rawdb.WriteHeadHeaderHash(db, block.Hash(),g.Config.IsFinalChain)
 
 	config := g.Config
 	if config == nil {

@@ -45,7 +45,7 @@ type ChainIndexerBackend interface {
 	Process(ctx context.Context, header *types.Header) error
 
 	// Commit finalizes the section metadata and stores it into the database.
-	Commit() error
+	Commit(isFinalChain bool) error
 }
 
 // ChainIndexerChain interface is used for connecting the indexer to a blockchain
@@ -90,14 +90,15 @@ type ChainIndexer struct {
 
 	throttling time.Duration // Disk throttling to prevent a heavy upgrade from hogging resources
 
-	log  log.Logger
-	lock sync.RWMutex
+	log          log.Logger
+	lock         sync.RWMutex
+	isFinalChain bool
 }
 
 // NewChainIndexer creates a new chain indexer to do background processing on
 // chain segments of a given size after certain number of confirmations passed.
 // The throttling parameter might be used to prevent database thrashing.
-func NewChainIndexer(chainDb evrdb.Database, indexDb evrdb.Database, backend ChainIndexerBackend, section, confirm uint64, throttling time.Duration, kind string) *ChainIndexer {
+func NewChainIndexer(chainDb evrdb.Database, indexDb evrdb.Database, backend ChainIndexerBackend, section, confirm uint64, throttling time.Duration, kind string, isFinalChain bool) *ChainIndexer {
 	c := &ChainIndexer{
 		chainDb:     chainDb,
 		indexDb:     indexDb,
@@ -108,6 +109,7 @@ func NewChainIndexer(chainDb evrdb.Database, indexDb evrdb.Database, backend Cha
 		confirmsReq: confirm,
 		throttling:  throttling,
 		log:         log.New("type", kind),
+		isFinalChain:  isFinalChain,
 	}
 	// Initialize database dependent fields and start the updater
 	c.loadValidSections()
@@ -222,8 +224,8 @@ func (c *ChainIndexer) eventLoop(currentHeader *types.Header, events chan ChainH
 				// Reorg to the common ancestor if needed (might not exist in light sync mode, skip reorg then)
 				// TODO(karalabe, zsfelfoldi): This seems a bit brittle, can we detect this case explicitly?
 
-				if rawdb.ReadCanonicalHash(c.chainDb, prevHeader.Number.Uint64()) != prevHash {
-					if h := rawdb.FindCommonAncestor(c.chainDb, prevHeader, header); h != nil {
+				if rawdb.ReadCanonicalHash(c.chainDb, prevHeader.Number.Uint64(), c.isFinalChain) != prevHash {
+					if h := rawdb.FindCommonAncestor(c.chainDb, prevHeader, header, c.isFinalChain); h != nil {
 						c.newHead(h.Number.Uint64(), true)
 					}
 				}
@@ -279,7 +281,7 @@ func (c *ChainIndexer) newHead(head uint64, reorg bool) {
 		if sections > c.knownSections {
 			if c.knownSections < c.checkpointSections {
 				// syncing reached the checkpoint, verify section head
-				syncedHead := rawdb.ReadCanonicalHash(c.chainDb, c.checkpointSections*c.sectionSize-1)
+				syncedHead := rawdb.ReadCanonicalHash(c.chainDb, c.checkpointSections*c.sectionSize-1, c.isFinalChain)
 				if syncedHead != c.checkpointHead {
 					c.log.Error("Synced chain does not match checkpoint", "number", c.checkpointSections*c.sectionSize-1, "expected", c.checkpointHead, "synced", syncedHead)
 					return
@@ -390,11 +392,11 @@ func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (com
 	}
 
 	for number := section * c.sectionSize; number < (section+1)*c.sectionSize; number++ {
-		hash := rawdb.ReadCanonicalHash(c.chainDb, number)
+		hash := rawdb.ReadCanonicalHash(c.chainDb, number, c.isFinalChain)
 		if hash == (common.Hash{}) {
 			return common.Hash{}, fmt.Errorf("canonical block #%d unknown", number)
 		}
-		header := rawdb.ReadHeader(c.chainDb, hash, number)
+		header := rawdb.ReadHeader(c.chainDb, hash, number, c.isFinalChain)
 		if header == nil {
 			return common.Hash{}, fmt.Errorf("block #%d [%x…] not found", number, hash[:4])
 		} else if header.ParentHash != lastHead {
@@ -405,7 +407,7 @@ func (c *ChainIndexer) processSection(section uint64, lastHead common.Hash) (com
 		}
 		lastHead = header.Hash()
 	}
-	if err := c.backend.Commit(); err != nil {
+	if err := c.backend.Commit(c.isFinalChain); err != nil {
 		return common.Hash{}, err
 	}
 	return lastHead, nil

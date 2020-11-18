@@ -207,6 +207,9 @@ type BlockChain interface {
 
 	// InsertReceiptChain inserts a batch of receipts into the local chain.
 	InsertReceiptChain(types.Blocks, []types.Receipts, uint64) (int, error)
+
+	// IsFinalChain return bool
+	IsFinalChain() bool
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
@@ -236,7 +239,7 @@ func New(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.SyncBloom, 
 		stateCh:        make(chan dataPack),
 		stateSyncStart: make(chan *stateSync),
 		syncStatsState: stateSyncStats{
-			processed: rawdb.ReadFastTrieProgress(stateDb),
+			processed: rawdb.ReadFastTrieProgress(stateDb, chain.IsFinalChain()),
 		},
 		trackStateReq: make(chan *stateReq),
 	}
@@ -500,7 +503,7 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 		if origin+1 < frozen {
 			var hashes []common.Hash
 			for i := origin + 1; i < d.lightchain.CurrentHeader().Number.Uint64(); i++ {
-				hashes = append(hashes, rawdb.ReadCanonicalHash(d.stateDB, i))
+				hashes = append(hashes, rawdb.ReadCanonicalHash(d.stateDB, i, d.blockchain.IsFinalChain()))
 			}
 			d.lightchain.Rollback(hashes)
 		}

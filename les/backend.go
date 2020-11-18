@@ -107,7 +107,7 @@ func New(ctx *node.ServiceContext, config *evr.Config) (*LightEvrynet, error) {
 		shutdownChan:   make(chan bool),
 		networkId:      config.NetworkId,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
-		bloomIndexer:   evr.NewBloomIndexer(chainDb, params.BloomBitsBlocksClient, params.HelperTrieConfirmations),
+		bloomIndexer:   evr.NewBloomIndexer(chainDb, params.BloomBitsBlocksClient, params.HelperTrieConfirmations, chainConfig.IsFinalChain),
 	}
 
 	var trustedNodes []string
@@ -119,8 +119,8 @@ func New(ctx *node.ServiceContext, config *evr.Config) (*LightEvrynet, error) {
 	leth.relay = NewLesTxRelay(peers, leth.retriever)
 
 	leth.odr = NewLesOdr(chainDb, light.DefaultClientIndexerConfig, leth.retriever)
-	leth.chtIndexer = light.NewChtIndexer(chainDb, leth.odr, params.CHTFrequency, params.HelperTrieConfirmations)
-	leth.bloomTrieIndexer = light.NewBloomTrieIndexer(chainDb, leth.odr, params.BloomBitsBlocksClient, params.BloomTrieFrequency)
+	leth.chtIndexer = light.NewChtIndexer(chainDb, leth.odr, params.CHTFrequency, params.HelperTrieConfirmations, chainConfig.IsFinalChain)
+	leth.bloomTrieIndexer = light.NewBloomTrieIndexer(chainDb, leth.odr, params.BloomBitsBlocksClient, params.BloomTrieFrequency, chainConfig.IsFinalChain)
 	leth.odr.SetIndexers(leth.chtIndexer, leth.bloomTrieIndexer, leth.bloomIndexer)
 
 	// Note: NewLightChain adds the trusted checkpoint so it needs an ODR with

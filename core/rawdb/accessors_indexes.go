@@ -29,8 +29,8 @@ import (
 
 // ReadTxLookupEntry retrieves the positional metadata associated with a transaction
 // hash to allow retrieving the transaction or receipt by hash.
-func ReadTxLookupEntry(db evrdb.Reader, hash common.Hash) *uint64 {
-	data, _ := db.Get(txLookupKey(hash))
+func ReadTxLookupEntry(db evrdb.Reader, hash common.Hash, isFinalChain bool) *uint64 {
+	data, _ := db.Get(getFinalKey(txLookupKey(hash), isFinalChain))
 	if len(data) == 0 {
 		return nil
 	}
@@ -41,7 +41,7 @@ func ReadTxLookupEntry(db evrdb.Reader, hash common.Hash) *uint64 {
 	}
 	// Database v4-v5 tx lookup format just stores the hash
 	if len(data) == common.HashLength {
-		return ReadHeaderNumber(db, common.BytesToHash(data))
+		return ReadHeaderNumber(db, common.BytesToHash(data), isFinalChain)
 	}
 	// Finally try database v3 tx lookup format
 	var entry LegacyTxLookupEntry
@@ -54,32 +54,32 @@ func ReadTxLookupEntry(db evrdb.Reader, hash common.Hash) *uint64 {
 
 // WriteTxLookupEntries stores a positional metadata for every transaction from
 // a block, enabling hash based transaction and receipt lookups.
-func WriteTxLookupEntries(db evrdb.KeyValueWriter, block *types.Block) {
+func WriteTxLookupEntries(db evrdb.KeyValueWriter, block *types.Block, isFinalChain bool) {
 	number := block.Number().Bytes()
 	for _, tx := range block.Transactions() {
-		if err := db.Put(txLookupKey(tx.Hash()), number); err != nil {
+		if err := db.Put(getFinalKey(txLookupKey(tx.Hash()), isFinalChain), number); err != nil {
 			log.Crit("Failed to store transaction lookup entry", "err", err)
 		}
 	}
 }
 
 // DeleteTxLookupEntry removes all transaction data associated with a hash.
-func DeleteTxLookupEntry(db evrdb.KeyValueWriter, hash common.Hash) {
-	db.Delete(txLookupKey(hash))
+func DeleteTxLookupEntry(db evrdb.KeyValueWriter, hash common.Hash, isFinalChain bool) {
+	db.Delete(getFinalKey(txLookupKey(hash), isFinalChain))
 }
 
 // ReadTransaction retrieves a specific transaction from the database, along with
 // its added positional metadata.
-func ReadTransaction(db evrdb.Reader, hash common.Hash) (*types.Transaction, common.Hash, uint64, uint64) {
-	blockNumber := ReadTxLookupEntry(db, hash)
+func ReadTransaction(db evrdb.Reader, hash common.Hash, isFinalChain bool) (*types.Transaction, common.Hash, uint64, uint64) {
+	blockNumber := ReadTxLookupEntry(db, hash, isFinalChain)
 	if blockNumber == nil {
 		return nil, common.Hash{}, 0, 0
 	}
-	blockHash := ReadCanonicalHash(db, *blockNumber)
+	blockHash := ReadCanonicalHash(db, *blockNumber, isFinalChain)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
-	body := ReadBody(db, blockHash, *blockNumber)
+	body := ReadBody(db, blockHash, *blockNumber, isFinalChain)
 	if body == nil {
 		log.Error("Transaction referenced missing", "number", blockNumber, "hash", blockHash)
 		return nil, common.Hash{}, 0, 0
@@ -97,11 +97,11 @@ func ReadTransaction(db evrdb.Reader, hash common.Hash) (*types.Transaction, com
 // its added positional metadata.
 func ReadReceipt(db evrdb.Reader, hash common.Hash, config *params.ChainConfig) (*types.Receipt, common.Hash, uint64, uint64) {
 	// Retrieve the context of the receipt based on the transaction hash
-	blockNumber := ReadTxLookupEntry(db, hash)
+	blockNumber := ReadTxLookupEntry(db, hash, config.IsFinalChain)
 	if blockNumber == nil {
 		return nil, common.Hash{}, 0, 0
 	}
-	blockHash := ReadCanonicalHash(db, *blockNumber)
+	blockHash := ReadCanonicalHash(db, *blockNumber, config.IsFinalChain)
 	if blockHash == (common.Hash{}) {
 		return nil, common.Hash{}, 0, 0
 	}
@@ -118,14 +118,14 @@ func ReadReceipt(db evrdb.Reader, hash common.Hash, config *params.ChainConfig) 
 
 // ReadBloomBits retrieves the compressed bloom bit vector belonging to the given
 // section and bit index from the.
-func ReadBloomBits(db evrdb.KeyValueReader, bit uint, section uint64, head common.Hash) ([]byte, error) {
-	return db.Get(bloomBitsKey(bit, section, head))
+func ReadBloomBits(db evrdb.KeyValueReader, bit uint, section uint64, head common.Hash, isFinalChain bool) ([]byte, error) {
+	return db.Get(getFinalKey(bloomBitsKey(bit, section, head), isFinalChain))
 }
 
 // WriteBloomBits stores the compressed bloom bits vector belonging to the given
 // section and bit index.
-func WriteBloomBits(db evrdb.KeyValueWriter, bit uint, section uint64, head common.Hash, bits []byte) {
-	if err := db.Put(bloomBitsKey(bit, section, head), bits); err != nil {
+func WriteBloomBits(db evrdb.KeyValueWriter, bit uint, section uint64, head common.Hash, bits []byte, isFinalChain bool) {
+	if err := db.Put(getFinalKey(bloomBitsKey(bit, section, head), isFinalChain), bits); err != nil {
 		log.Crit("Failed to store bloom bits", "err", err)
 	}
 }

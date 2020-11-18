@@ -98,7 +98,7 @@ func NewHeaderChain(chainDb evrdb.Database, config *params.ChainConfig, engine c
 	}
 
 	hc.currentHeader.Store(hc.genesisHeader)
-	if head := rawdb.ReadHeadBlockHash(chainDb); head != (common.Hash{}) {
+	if head := rawdb.ReadHeadBlockHash(chainDb, hc.config.IsFinalChain); head != (common.Hash{}) {
 		if chead := hc.GetHeaderByHash(head); chead != nil {
 			hc.currentHeader.Store(chead)
 		}
@@ -116,7 +116,7 @@ func (hc *HeaderChain) GetBlockNumber(hash common.Hash) *uint64 {
 		number := cached.(uint64)
 		return &number
 	}
-	number := rawdb.ReadHeaderNumber(hc.chainDb, hash)
+	number := rawdb.ReadHeaderNumber(hc.chainDb, hash, hc.config.IsFinalChain)
 	if number != nil {
 		hc.numberCache.Add(hash, *number)
 	}
@@ -150,7 +150,7 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 	if err := hc.WriteTd(hash, number, externTd); err != nil {
 		log.Crit("Failed to write header total difficulty", "err", err)
 	}
-	rawdb.WriteHeader(hc.chainDb, header)
+	rawdb.WriteHeader(hc.chainDb, header, hc.config.IsFinalChain)
 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
@@ -159,11 +159,11 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 		// Delete any canonical number assignments above the new head
 		batch := hc.chainDb.NewBatch()
 		for i := number + 1; ; i++ {
-			hash := rawdb.ReadCanonicalHash(hc.chainDb, i)
+			hash := rawdb.ReadCanonicalHash(hc.chainDb, i, hc.config.IsFinalChain)
 			if hash == (common.Hash{}) {
 				break
 			}
-			rawdb.DeleteCanonicalHash(batch, i)
+			rawdb.DeleteCanonicalHash(batch, i, hc.config.IsFinalChain)
 		}
 		batch.Write()
 
@@ -173,16 +173,16 @@ func (hc *HeaderChain) WriteHeader(header *types.Header) (status WriteStatus, er
 			headNumber = header.Number.Uint64() - 1
 			headHeader = hc.GetHeader(headHash, headNumber)
 		)
-		for rawdb.ReadCanonicalHash(hc.chainDb, headNumber) != headHash {
-			rawdb.WriteCanonicalHash(hc.chainDb, headHash, headNumber)
+		for rawdb.ReadCanonicalHash(hc.chainDb, headNumber, hc.config.IsFinalChain) != headHash {
+			rawdb.WriteCanonicalHash(hc.chainDb, headHash, headNumber, hc.config.IsFinalChain)
 
 			headHash = headHeader.ParentHash
 			headNumber = headHeader.Number.Uint64() - 1
 			headHeader = hc.GetHeader(headHash, headNumber)
 		}
 		// Extend the canonical chain with the new header
-		rawdb.WriteCanonicalHash(hc.chainDb, hash, number)
-		rawdb.WriteHeadHeaderHash(hc.chainDb, hash)
+		rawdb.WriteCanonicalHash(hc.chainDb, hash, number, hc.config.IsFinalChain)
+		rawdb.WriteHeadHeaderHash(hc.chainDb, hash, hc.config.IsFinalChain)
 
 		hc.currentHeaderHash = hash
 		hc.currentHeader.Store(types.CopyHeader(header))
@@ -348,9 +348,9 @@ func (hc *HeaderChain) GetAncestor(hash common.Hash, number, ancestor uint64, ma
 		}
 	}
 	for ancestor != 0 {
-		if rawdb.ReadCanonicalHash(hc.chainDb, number) == hash {
+		if rawdb.ReadCanonicalHash(hc.chainDb, number, hc.config.IsFinalChain) == hash {
 			number -= ancestor
-			return rawdb.ReadCanonicalHash(hc.chainDb, number), number
+			return rawdb.ReadCanonicalHash(hc.chainDb, number, hc.config.IsFinalChain), number
 		}
 		if *maxNonCanonical == 0 {
 			return common.Hash{}, 0
@@ -374,7 +374,7 @@ func (hc *HeaderChain) GetTd(hash common.Hash, number uint64) *big.Int {
 	if cached, ok := hc.tdCache.Get(hash); ok {
 		return cached.(*big.Int)
 	}
-	td := rawdb.ReadTd(hc.chainDb, hash, number)
+	td := rawdb.ReadTd(hc.chainDb, hash, number, hc.config.IsFinalChain)
 	if td == nil {
 		return nil
 	}
@@ -396,7 +396,7 @@ func (hc *HeaderChain) GetTdByHash(hash common.Hash) *big.Int {
 // WriteTd stores a block's total difficulty into the database, also caching it
 // along the way.
 func (hc *HeaderChain) WriteTd(hash common.Hash, number uint64, td *big.Int) error {
-	rawdb.WriteTd(hc.chainDb, hash, number, td)
+	rawdb.WriteTd(hc.chainDb, hash, number, td, hc.config.IsFinalChain)
 	hc.tdCache.Add(hash, new(big.Int).Set(td))
 	return nil
 }
@@ -408,7 +408,7 @@ func (hc *HeaderChain) GetHeader(hash common.Hash, number uint64) *types.Header 
 	if header, ok := hc.headerCache.Get(hash); ok {
 		return header.(*types.Header)
 	}
-	header := rawdb.ReadHeader(hc.chainDb, hash, number)
+	header := rawdb.ReadHeader(hc.chainDb, hash, number, hc.config.IsFinalChain)
 	if header == nil {
 		return nil
 	}
@@ -432,13 +432,13 @@ func (hc *HeaderChain) HasHeader(hash common.Hash, number uint64) bool {
 	if hc.numberCache.Contains(hash) || hc.headerCache.Contains(hash) {
 		return true
 	}
-	return rawdb.HasHeader(hc.chainDb, hash, number)
+	return rawdb.HasHeader(hc.chainDb, hash, number, hc.config.IsFinalChain)
 }
 
 // GetHeaderByNumber retrieves a block header from the database by number,
 // caching it (associated with its hash) if found.
 func (hc *HeaderChain) GetHeaderByNumber(number uint64) *types.Header {
-	hash := rawdb.ReadCanonicalHash(hc.chainDb, number)
+	hash := rawdb.ReadCanonicalHash(hc.chainDb, number, hc.config.IsFinalChain)
 	if hash == (common.Hash{}) {
 		return nil
 	}
@@ -453,7 +453,7 @@ func (hc *HeaderChain) CurrentHeader() *types.Header {
 
 // SetCurrentHeader sets the current head header of the canonical chain.
 func (hc *HeaderChain) SetCurrentHeader(head *types.Header) {
-	rawdb.WriteHeadHeaderHash(hc.chainDb, head.Hash())
+	rawdb.WriteHeadHeaderHash(hc.chainDb, head.Hash(), hc.config.IsFinalChain)
 
 	hc.currentHeader.Store(head)
 	hc.currentHeaderHash = head.Hash()
@@ -497,16 +497,16 @@ func (hc *HeaderChain) SetHead(head uint64, updateFn UpdateHeadBlocksCallback, d
 			updateFn(hc.chainDb, parent)
 		}
 		// Update head header then.
-		rawdb.WriteHeadHeaderHash(hc.chainDb, parentHash)
+		rawdb.WriteHeadHeaderHash(hc.chainDb, parentHash, hc.config.IsFinalChain)
 
 		// Remove the relative data from the database.
 		if delFn != nil {
 			delFn(batch, hash, num)
 		}
 		// Rewind header chain to new head.
-		rawdb.DeleteHeader(batch, hash, num)
-		rawdb.DeleteTd(batch, hash, num)
-		rawdb.DeleteCanonicalHash(batch, num)
+		rawdb.DeleteHeader(batch, hash, num, hc.config.IsFinalChain)
+		rawdb.DeleteTd(batch, hash, num, hc.config.IsFinalChain)
+		rawdb.DeleteCanonicalHash(batch, num, hc.config.IsFinalChain)
 
 		hc.currentHeader.Store(parent)
 		hc.currentHeaderHash = parentHash

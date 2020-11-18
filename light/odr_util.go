@@ -32,10 +32,10 @@ var sha3Nil = crypto.Keccak256Hash(nil)
 
 func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*types.Header, error) {
 	db := odr.Database()
-	hash := rawdb.ReadCanonicalHash(db, number)
+	hash := rawdb.ReadCanonicalHash(db, number, odr.IndexerConfig().IsFinalChain)
 	if (hash != common.Hash{}) {
 		// if there is a canonical hash, there is a header too
-		header := rawdb.ReadHeader(db, hash, number)
+		header := rawdb.ReadHeader(db, hash, number, odr.IndexerConfig().IsFinalChain)
 		if header == nil {
 			panic("Canonical hash present but header not found")
 		}
@@ -48,14 +48,14 @@ func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*typ
 	)
 	if odr.ChtIndexer() != nil {
 		chtCount, sectionHeadNum, sectionHead = odr.ChtIndexer().Sections()
-		canonicalHash := rawdb.ReadCanonicalHash(db, sectionHeadNum)
+		canonicalHash := rawdb.ReadCanonicalHash(db, sectionHeadNum, odr.IndexerConfig().IsFinalChain)
 		// if the CHT was injected as a trusted checkpoint, we have no canonical hash yet so we accept zero hash too
 		for chtCount > 0 && canonicalHash != sectionHead && canonicalHash != (common.Hash{}) {
 			chtCount--
 			if chtCount > 0 {
 				sectionHeadNum = chtCount*odr.IndexerConfig().ChtSize - 1
 				sectionHead = odr.ChtIndexer().SectionHead(chtCount - 1)
-				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum)
+				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum, odr.IndexerConfig().IsFinalChain)
 			}
 		}
 	}
@@ -70,7 +70,7 @@ func GetHeaderByNumber(ctx context.Context, odr OdrBackend, number uint64) (*typ
 }
 
 func GetCanonicalHash(ctx context.Context, odr OdrBackend, number uint64) (common.Hash, error) {
-	hash := rawdb.ReadCanonicalHash(odr.Database(), number)
+	hash := rawdb.ReadCanonicalHash(odr.Database(), number, odr.IndexerConfig().IsFinalChain)
 	if (hash != common.Hash{}) {
 		return hash, nil
 	}
@@ -83,7 +83,7 @@ func GetCanonicalHash(ctx context.Context, odr OdrBackend, number uint64) (commo
 
 // GetBodyRLP retrieves the block body (transactions and uncles) in RLP encoding.
 func GetBodyRLP(ctx context.Context, odr OdrBackend, hash common.Hash, number uint64) (rlp.RawValue, error) {
-	if data := rawdb.ReadBodyRLP(odr.Database(), hash, number); data != nil {
+	if data := rawdb.ReadBodyRLP(odr.Database(), hash, number, odr.IndexerConfig().IsFinalChain); data != nil {
 		return data, nil
 	}
 	r := &BlockRequest{Hash: hash, Number: number}
@@ -112,7 +112,7 @@ func GetBody(ctx context.Context, odr OdrBackend, hash common.Hash, number uint6
 // back from the stored header and body.
 func GetBlock(ctx context.Context, odr OdrBackend, hash common.Hash, number uint64) (*types.Block, error) {
 	// Retrieve the block header and body contents
-	header := rawdb.ReadHeader(odr.Database(), hash, number)
+	header := rawdb.ReadHeader(odr.Database(), hash, number, odr.IndexerConfig().IsFinalChain)
 	if header == nil {
 		return nil, ErrNoHeader
 	}
@@ -128,7 +128,7 @@ func GetBlock(ctx context.Context, odr OdrBackend, hash common.Hash, number uint
 // in a block given by its hash.
 func GetBlockReceipts(ctx context.Context, odr OdrBackend, hash common.Hash, number uint64) (types.Receipts, error) {
 	// Assume receipts are already stored locally and attempt to retrieve.
-	receipts := rawdb.ReadRawReceipts(odr.Database(), hash, number)
+	receipts := rawdb.ReadRawReceipts(odr.Database(), hash, number, odr.IndexerConfig().IsFinalChain)
 	if receipts == nil {
 		r := &ReceiptsRequest{Hash: hash, Number: number}
 		if err := odr.Retrieve(ctx, r); err != nil {
@@ -142,13 +142,13 @@ func GetBlockReceipts(ctx context.Context, odr OdrBackend, hash common.Hash, num
 		if err != nil {
 			return nil, err
 		}
-		genesis := rawdb.ReadCanonicalHash(odr.Database(), 0)
-		config := rawdb.ReadChainConfig(odr.Database(), genesis)
+		genesis := rawdb.ReadCanonicalHash(odr.Database(), 0, odr.IndexerConfig().IsFinalChain)
+		config := rawdb.ReadChainConfig(odr.Database(), genesis, odr.IndexerConfig().IsFinalChain)
 
 		if err := receipts.DeriveFields(config, block.Hash(), block.NumberU64(), block.Transactions()); err != nil {
 			return nil, err
 		}
-		rawdb.WriteReceipts(odr.Database(), hash, number, receipts)
+		rawdb.WriteReceipts(odr.Database(), hash, number, receipts, odr.IndexerConfig().IsFinalChain)
 	}
 	return receipts, nil
 }
@@ -184,24 +184,24 @@ func GetBloomBits(ctx context.Context, odr OdrBackend, bitIdx uint, sectionIdxLi
 	)
 	if odr.BloomTrieIndexer() != nil {
 		bloomTrieCount, sectionHeadNum, sectionHead = odr.BloomTrieIndexer().Sections()
-		canonicalHash := rawdb.ReadCanonicalHash(db, sectionHeadNum)
+		canonicalHash := rawdb.ReadCanonicalHash(db, sectionHeadNum, odr.IndexerConfig().IsFinalChain)
 		// if the BloomTrie was injected as a trusted checkpoint, we have no canonical hash yet so we accept zero hash too
 		for bloomTrieCount > 0 && canonicalHash != sectionHead && canonicalHash != (common.Hash{}) {
 			bloomTrieCount--
 			if bloomTrieCount > 0 {
 				sectionHeadNum = bloomTrieCount*odr.IndexerConfig().BloomTrieSize - 1
 				sectionHead = odr.BloomTrieIndexer().SectionHead(bloomTrieCount - 1)
-				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum)
+				canonicalHash = rawdb.ReadCanonicalHash(db, sectionHeadNum, odr.IndexerConfig().IsFinalChain)
 			}
 		}
 	}
 
 	for i, sectionIdx := range sectionIdxList {
-		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*odr.IndexerConfig().BloomSize-1)
+		sectionHead := rawdb.ReadCanonicalHash(db, (sectionIdx+1)*odr.IndexerConfig().BloomSize-1, odr.IndexerConfig().IsFinalChain)
 		// if we don't have the canonical hash stored for this section head number, we'll still look for
 		// an entry with a zero sectionHead (we store it with zero section head too if we don't know it
 		// at the time of the retrieval)
-		bloomBits, err := rawdb.ReadBloomBits(db, bitIdx, sectionIdx, sectionHead)
+		bloomBits, err := rawdb.ReadBloomBits(db, bitIdx, sectionIdx, sectionHead, odr.IndexerConfig().IsFinalChain)
 		if err == nil {
 			result[i] = bloomBits
 		} else {

@@ -56,6 +56,8 @@ type IndexerConfig struct {
 
 	// The number of confirmations needed to generate/accept a bloom trie.
 	BloomTrieConfirms uint64
+
+	IsFinalChain bool
 }
 
 var (
@@ -137,7 +139,7 @@ type ChtIndexerBackend struct {
 }
 
 // NewChtIndexer creates a Cht chain indexer
-func NewChtIndexer(db evrdb.Database, odr OdrBackend, size, confirms uint64) *core.ChainIndexer {
+func NewChtIndexer(db evrdb.Database, odr OdrBackend, size, confirms uint64, isFinalChain bool) *core.ChainIndexer {
 	trieTable := rawdb.NewTable(db, ChtTablePrefix)
 	backend := &ChtIndexerBackend{
 		diskdb:      db,
@@ -146,7 +148,7 @@ func NewChtIndexer(db evrdb.Database, odr OdrBackend, size, confirms uint64) *co
 		triedb:      trie.NewDatabaseWithCache(trieTable, 1), // Use a tiny cache only to keep memory down
 		sectionSize: size,
 	}
-	return core.NewChainIndexer(db, rawdb.NewTable(db, "chtIndexV2-"), backend, size, confirms, time.Millisecond*100, "cht")
+	return core.NewChainIndexer(db, rawdb.NewTable(db, "chtIndexV2-"), backend, size, confirms, time.Millisecond*100, "cht", isFinalChain)
 }
 
 // fetchMissingNodes tries to retrieve the last entry of the latest trusted CHT from the
@@ -199,7 +201,7 @@ func (c *ChtIndexerBackend) Process(ctx context.Context, header *types.Header) e
 	hash, num := header.Hash(), header.Number.Uint64()
 	c.lastHash = hash
 
-	td := rawdb.ReadTd(c.diskdb, hash, num)
+	td := rawdb.ReadTd(c.diskdb, hash, num, c.odr.IndexerConfig().IsFinalChain)
 	if td == nil {
 		panic(nil)
 	}
@@ -211,7 +213,7 @@ func (c *ChtIndexerBackend) Process(ctx context.Context, header *types.Header) e
 }
 
 // Commit implements core.ChainIndexerBackend
-func (c *ChtIndexerBackend) Commit() error {
+func (c *ChtIndexerBackend) Commit(isFinalChain bool) error {
 	root, err := c.trie.Commit(nil)
 	if err != nil {
 		return err
@@ -257,7 +259,7 @@ type BloomTrieIndexerBackend struct {
 }
 
 // NewBloomTrieIndexer creates a BloomTrie chain indexer
-func NewBloomTrieIndexer(db evrdb.Database, odr OdrBackend, parentSize, size uint64) *core.ChainIndexer {
+func NewBloomTrieIndexer(db evrdb.Database, odr OdrBackend, parentSize, size uint64, isFinalChain bool) *core.ChainIndexer {
 	trieTable := rawdb.NewTable(db, BloomTrieTablePrefix)
 	backend := &BloomTrieIndexerBackend{
 		diskdb:     db,
@@ -269,7 +271,7 @@ func NewBloomTrieIndexer(db evrdb.Database, odr OdrBackend, parentSize, size uin
 	}
 	backend.bloomTrieRatio = size / parentSize
 	backend.sectionHeads = make([]common.Hash, backend.bloomTrieRatio)
-	return core.NewChainIndexer(db, rawdb.NewTable(db, "bltIndex-"), backend, size, 0, time.Millisecond*100, "bloomtrie")
+	return core.NewChainIndexer(db, rawdb.NewTable(db, "bltIndex-"), backend, size, 0, time.Millisecond*100, "bloomtrie", isFinalChain)
 }
 
 // fetchMissingNodes tries to retrieve the last entries of the latest trusted bloom trie from the
@@ -347,7 +349,7 @@ func (b *BloomTrieIndexerBackend) Process(ctx context.Context, header *types.Hea
 }
 
 // Commit implements core.ChainIndexerBackend
-func (b *BloomTrieIndexerBackend) Commit() error {
+func (b *BloomTrieIndexerBackend) Commit(isFinalChain bool) error {
 	var compSize, decompSize uint64
 
 	for i := uint(0); i < types.BloomBitLength; i++ {
@@ -356,7 +358,7 @@ func (b *BloomTrieIndexerBackend) Commit() error {
 		binary.BigEndian.PutUint64(encKey[2:10], b.section)
 		var decomp []byte
 		for j := uint64(0); j < b.bloomTrieRatio; j++ {
-			data, err := rawdb.ReadBloomBits(b.diskdb, i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j])
+			data, err := rawdb.ReadBloomBits(b.diskdb, i, b.section*b.bloomTrieRatio+j, b.sectionHeads[j], isFinalChain)
 			if err != nil {
 				return err
 			}

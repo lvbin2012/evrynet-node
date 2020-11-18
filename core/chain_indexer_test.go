@@ -59,7 +59,7 @@ func testChainIndexer(t *testing.T, count int) {
 			confirmsReq = uint64(rand.Intn(10))
 		)
 		backends[i] = &testChainIndexBackend{t: t, processCh: make(chan uint64)}
-		backends[i].indexer = NewChainIndexer(db, rawdb.NewTable(db, string([]byte{byte(i)})), backends[i], sectionSize, confirmsReq, 0, fmt.Sprintf("indexer-%d", i))
+		backends[i].indexer = NewChainIndexer(db, rawdb.NewTable(db, string([]byte{byte(i)})), backends[i], sectionSize, confirmsReq, 0, fmt.Sprintf("indexer-%d", i), false)
 
 		if sections, _, _ := backends[i].indexer.Sections(); sections != 0 {
 			t.Fatalf("Canonical section count mismatch: have %v, want %v", sections, 0)
@@ -93,10 +93,10 @@ func testChainIndexer(t *testing.T, count int) {
 	inject := func(number uint64) {
 		header := &types.Header{Number: big.NewInt(int64(number)), Extra: big.NewInt(rand.Int63()).Bytes()}
 		if number > 0 {
-			header.ParentHash = rawdb.ReadCanonicalHash(db, number-1)
+			header.ParentHash = rawdb.ReadCanonicalHash(db, number-1, false)
 		}
-		rawdb.WriteHeader(db, header)
-		rawdb.WriteCanonicalHash(db, header.Hash(), number)
+		rawdb.WriteHeader(db, header, false)
+		rawdb.WriteCanonicalHash(db, header.Hash(), number, false)
 	}
 	// Start indexer with an already existing chain
 	for i := uint64(0); i <= 100; i++ {
@@ -230,7 +230,7 @@ func (b *testChainIndexBackend) Process(ctx context.Context, header *types.Heade
 	return nil
 }
 
-func (b *testChainIndexBackend) Commit() error {
+func (b *testChainIndexBackend) Commit(isFinalChain bool) error {
 	if b.headerCnt != b.indexer.sectionSize {
 		b.t.Error("Not enough headers processed")
 	}

@@ -146,7 +146,7 @@ func (lc *LightChain) Odr() OdrBackend {
 // loadLastState loads the last known chain state from the database. This method
 // assumes that the chain manager mutex is held.
 func (lc *LightChain) loadLastState() error {
-	if head := rawdb.ReadHeadHeaderHash(lc.chainDb); head == (common.Hash{}) {
+	if head := rawdb.ReadHeadHeaderHash(lc.chainDb, lc.hc.Config().IsFinalChain); head == (common.Hash{}) {
 		// Corrupt or empty database, init from scratch
 		lc.Reset()
 	} else {
@@ -193,8 +193,8 @@ func (lc *LightChain) ResetWithGenesisBlock(genesis *types.Block) {
 	defer lc.chainmu.Unlock()
 
 	// Prepare the genesis block and reinitialise the chain
-	rawdb.WriteTd(lc.chainDb, genesis.Hash(), genesis.NumberU64(), genesis.Difficulty())
-	rawdb.WriteBlock(lc.chainDb, genesis)
+	rawdb.WriteTd(lc.chainDb, genesis.Hash(), genesis.NumberU64(), genesis.Difficulty(), lc.hc.Config().IsFinalChain)
+	rawdb.WriteBlock(lc.chainDb, genesis,  lc.hc.Config().IsFinalChain)
 
 	lc.genesisBlock = genesis
 	lc.hc.SetGenesis(lc.genesisBlock.Header())

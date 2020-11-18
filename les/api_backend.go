@@ -93,14 +93,14 @@ func (b *LesApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*t
 }
 
 func (b *LesApiBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	if number := rawdb.ReadHeaderNumber(b.evr.chainDb, hash); number != nil {
+	if number := rawdb.ReadHeaderNumber(b.evr.chainDb, hash, b.evr.chainConfig.IsFinalChain); number != nil {
 		return light.GetBlockReceipts(ctx, b.evr.odr, hash, *number)
 	}
 	return nil, nil
 }
 
 func (b *LesApiBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
-	if number := rawdb.ReadHeaderNumber(b.evr.chainDb, hash); number != nil {
+	if number := rawdb.ReadHeaderNumber(b.evr.chainDb, hash, b.evr.chainConfig.IsFinalChain); number != nil {
 		return light.GetBlockLogs(ctx, b.evr.odr, hash, *number)
 	}
 	return nil, nil

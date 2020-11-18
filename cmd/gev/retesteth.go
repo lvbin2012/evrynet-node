@@ -392,8 +392,8 @@ func (api *RetestethAPI) MineBlocks(ctx context.Context, number uint64) (bool, e
 }
 
 func (api *RetestethAPI) mineBlock() error {
-	parentHash := rawdb.ReadCanonicalHash(api.ethDb, api.blockNumber)
-	parent := rawdb.ReadBlock(api.ethDb, parentHash, api.blockNumber)
+	parentHash := rawdb.ReadCanonicalHash(api.ethDb, api.blockNumber, api.chainConfig.IsFinalChain)
+	parent := rawdb.ReadBlock(api.ethDb, parentHash, api.blockNumber, api.chainConfig.IsFinalChain)
 	var timestamp uint64
 	if api.blockInterval == 0 {
 		timestamp = uint64(time.Now().Unix())

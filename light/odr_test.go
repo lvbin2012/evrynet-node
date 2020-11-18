@@ -72,14 +72,14 @@ func (odr *testOdr) Retrieve(ctx context.Context, req OdrRequest) error {
 	}
 	switch req := req.(type) {
 	case *BlockRequest:
-		number := rawdb.ReadHeaderNumber(odr.sdb, req.Hash)
+		number := rawdb.ReadHeaderNumber(odr.sdb, req.Hash, odr.indexerConfig.IsFinalChain)
 		if number != nil {
-			req.Rlp = rawdb.ReadBodyRLP(odr.sdb, req.Hash, *number)
+			req.Rlp = rawdb.ReadBodyRLP(odr.sdb, req.Hash, *number, odr.indexerConfig.IsFinalChain)
 		}
 	case *ReceiptsRequest:
-		number := rawdb.ReadHeaderNumber(odr.sdb, req.Hash)
+		number := rawdb.ReadHeaderNumber(odr.sdb, req.Hash, odr.indexerConfig.IsFinalChain)
 		if number != nil {
-			req.Receipts = rawdb.ReadRawReceipts(odr.sdb, req.Hash, *number)
+			req.Receipts = rawdb.ReadRawReceipts(odr.sdb, req.Hash, *number, odr.indexerConfig.IsFinalChain)
 		}
 	case *TrieRequest:
 		t, _ := trie.New(req.Id.Root, trie.NewDatabase(odr.sdb))
@@ -120,12 +120,12 @@ func TestOdrGetReceiptsLes2(t *testing.T) { testChainOdr(t, 1, odrGetReceipts) }
 func odrGetReceipts(ctx context.Context, db evrdb.Database, bc *core.BlockChain, lc *LightChain, bhash common.Hash) ([]byte, error) {
 	var receipts types.Receipts
 	if bc != nil {
-		number := rawdb.ReadHeaderNumber(db, bhash)
+		number := rawdb.ReadHeaderNumber(db, bhash, lc.hc.Config().IsFinalChain)
 		if number != nil {
 			receipts = rawdb.ReadReceipts(db, bhash, *number, bc.Config())
 		}
 	} else {
-		number := rawdb.ReadHeaderNumber(db, bhash)
+		number := rawdb.ReadHeaderNumber(db, bhash, lc.hc.Config().IsFinalChain)
 		if number != nil {
 			receipts, _ = GetBlockReceipts(ctx, lc.Odr(), bhash, *number)
 		}
@@ -303,7 +303,7 @@ func testChainOdr(t *testing.T, protocol int, fn odrTestFn) {
 
 	test := func(expFail int) {
 		for i := uint64(0); i <= blockchain.CurrentHeader().Number.Uint64(); i++ {
-			bhash := rawdb.ReadCanonicalHash(sdb, i)
+			bhash := rawdb.ReadCanonicalHash(sdb, i, gspec.Config.IsFinalChain)
 			b1, err := fn(NoOdr, sdb, blockchain, nil, bhash)
 			if err != nil {
 				t.Fatalf("error in full-node test for block %d: %v", i, err)

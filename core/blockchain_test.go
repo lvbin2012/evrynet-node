@@ -158,8 +158,8 @@ func testBlockChainImport(chain types.Blocks, blockchain *BlockChain) error {
 			return err
 		}
 		blockchain.chainmu.Lock()
-		rawdb.WriteTd(blockchain.db, block.Hash(), block.NumberU64(), new(big.Int).Add(block.Difficulty(), blockchain.GetTdByHash(block.ParentHash())))
-		rawdb.WriteBlock(blockchain.db, block)
+		rawdb.WriteTd(blockchain.db, block.Hash(), block.NumberU64(), new(big.Int).Add(block.Difficulty(), blockchain.GetTdByHash(block.ParentHash())), blockchain.chainConfig.IsFinalChain)
+		rawdb.WriteBlock(blockchain.db, block, blockchain.chainConfig.IsFinalChain)
 		statedb.Commit(false)
 		blockchain.chainmu.Unlock()
 	}
@@ -176,8 +176,8 @@ func testHeaderChainImport(chain []*types.Header, blockchain *BlockChain) error 
 		}
 		// Manually insert the header into the database, but don't reorganise (allows subsequent testing)
 		blockchain.chainmu.Lock()
-		rawdb.WriteTd(blockchain.db, header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, blockchain.GetTdByHash(header.ParentHash)))
-		rawdb.WriteHeader(blockchain.db, header)
+		rawdb.WriteTd(blockchain.db, header.Hash(), header.Number.Uint64(), new(big.Int).Add(header.Difficulty, blockchain.GetTdByHash(header.ParentHash)), blockchain.chainConfig.IsFinalChain)
+		rawdb.WriteHeader(blockchain.db, header, blockchain.chainConfig.IsFinalChain)
 		blockchain.chainmu.Unlock()
 	}
 	return nil
@@ -194,7 +194,7 @@ func TestLastBlock(t *testing.T) {
 	if _, err := blockchain.InsertChain(blocks); err != nil {
 		t.Fatalf("Failed to insert block: %v", err)
 	}
-	if blocks[len(blocks)-1].Hash() != rawdb.ReadHeadBlockHash(blockchain.db) {
+	if blocks[len(blocks)-1].Hash() != rawdb.ReadHeadBlockHash(blockchain.db, blockchain.chainConfig.IsFinalChain) {
 		t.Fatalf("Write/Get HeadBlockHash failed")
 	}
 }
@@ -653,7 +653,7 @@ func TestFastVsFullChains(t *testing.T) {
 		t.Fatalf("failed to create temp freezer dir: %v", err)
 	}
 	defer os.Remove(frdir)
-	ancientDb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "")
+	ancientDb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "", gspec.Config.IsFinalChain)
 	if err != nil {
 		t.Fatalf("failed to create temp freezer db: %v", err)
 	}
@@ -690,16 +690,16 @@ func TestFastVsFullChains(t *testing.T) {
 		} else if types.CalcUncleHash(fblock.Uncles()) != types.CalcUncleHash(arblock.Uncles()) || types.CalcUncleHash(anblock.Uncles()) != types.CalcUncleHash(arblock.Uncles()) {
 			t.Errorf("block #%d [%x]: uncles mismatch: fastdb %v, ancientdb %v, archivedb %v", num, hash, fblock.Uncles(), anblock, arblock.Uncles())
 		}
-		if freceipts, anreceipts, areceipts := rawdb.ReadReceipts(fastDb, hash, *rawdb.ReadHeaderNumber(fastDb, hash), fast.Config()), rawdb.ReadReceipts(ancientDb, hash, *rawdb.ReadHeaderNumber(ancientDb, hash), fast.Config()), rawdb.ReadReceipts(archiveDb, hash, *rawdb.ReadHeaderNumber(archiveDb, hash), fast.Config()); types.DeriveSha(freceipts) != types.DeriveSha(areceipts) {
+		if freceipts, anreceipts, areceipts := rawdb.ReadReceipts(fastDb, hash, *rawdb.ReadHeaderNumber(fastDb, hash, fast.Config().IsFinalChain), fast.Config()), rawdb.ReadReceipts(ancientDb, hash, *rawdb.ReadHeaderNumber(ancientDb, hash, fast.Config().IsFinalChain), fast.Config()), rawdb.ReadReceipts(archiveDb, hash, *rawdb.ReadHeaderNumber(archiveDb, hash, fast.Config().IsFinalChain), fast.Config()); types.DeriveSha(freceipts) != types.DeriveSha(areceipts) {
 			t.Errorf("block #%d [%x]: receipts mismatch: fastdb %v, ancientdb %v, archivedb %v", num, hash, freceipts, anreceipts, areceipts)
 		}
 	}
 	// Check that the canonical chains are the same between the databases
 	for i := 0; i < len(blocks)+1; i++ {
-		if fhash, ahash := rawdb.ReadCanonicalHash(fastDb, uint64(i)), rawdb.ReadCanonicalHash(archiveDb, uint64(i)); fhash != ahash {
+		if fhash, ahash := rawdb.ReadCanonicalHash(fastDb, uint64(i), fast.Config().IsFinalChain), rawdb.ReadCanonicalHash(archiveDb, uint64(i), archive.Config().IsFinalChain); fhash != ahash {
 			t.Errorf("block #%d: canonical hash mismatch: fastdb %v, archivedb %v", i, fhash, ahash)
 		}
-		if anhash, arhash := rawdb.ReadCanonicalHash(ancientDb, uint64(i)), rawdb.ReadCanonicalHash(archiveDb, uint64(i)); anhash != arhash {
+		if anhash, arhash := rawdb.ReadCanonicalHash(ancientDb, uint64(i), fast.Config().IsFinalChain), rawdb.ReadCanonicalHash(archiveDb, uint64(i), archive.Config().IsFinalChain); anhash != arhash {
 			t.Errorf("block #%d: canonical hash mismatch: ancientdb %v, archivedb %v", i, anhash, arhash)
 		}
 	}
@@ -727,7 +727,7 @@ func TestLightVsFastVsFullChainHeads(t *testing.T) {
 			t.Fatalf("failed to create temp freezer dir: %v", err)
 		}
 		defer os.Remove(dir)
-		db, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), dir, "")
+		db, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), dir, "", gspec.Config.IsFinalChain)
 		if err != nil {
 			t.Fatalf("failed to create temp freezer db: %v", err)
 		}
@@ -1293,14 +1293,14 @@ func TestCanonicalBlockRetrieval(t *testing.T) {
 
 			// try to retrieve a block by its canonical hash and see if the block data can be retrieved.
 			for {
-				ch := rawdb.ReadCanonicalHash(blockchain.db, block.NumberU64())
+				ch := rawdb.ReadCanonicalHash(blockchain.db, block.NumberU64(), blockchain.Config().IsFinalChain)
 				if ch == (common.Hash{}) {
 					continue // busy wait for canonical hash to be written
 				}
 				if ch != block.Hash() {
 					t.Fatalf("unknown canonical hash, want %s, got %s", block.Hash().Hex(), ch.Hex())
 				}
-				fb := rawdb.ReadBlock(blockchain.db, ch, block.NumberU64())
+				fb := rawdb.ReadBlock(blockchain.db, ch, block.NumberU64(), blockchain.Config().IsFinalChain)
 				if fb == nil {
 					t.Fatalf("unable to retrieve block %d for canonical hash: %s", block.NumberU64(), ch.Hex())
 				}
@@ -1484,7 +1484,7 @@ func TestBlockchainRecovery(t *testing.T) {
 		t.Fatalf("failed to create temp freezer dir: %v", err)
 	}
 	defer os.Remove(frdir)
-	ancientDb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "")
+	ancientDb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "", gspec.Config.IsFinalChain)
 	if err != nil {
 		t.Fatalf("failed to create temp freezer db: %v", err)
 	}
@@ -1505,7 +1505,7 @@ func TestBlockchainRecovery(t *testing.T) {
 
 	// Destroy head fast block manually
 	midBlock := blocks[len(blocks)/2]
-	rawdb.WriteHeadFastBlockHash(ancientDb, midBlock.Hash())
+	rawdb.WriteHeadFastBlockHash(ancientDb, midBlock.Hash(), ancient.Config().IsFinalChain)
 
 	// Reopen broken blockchain again
 	ancient, _ = NewBlockChain(ancientDb, nil, gspec.Config, ethash.NewFaker(), vm.Config{}, nil)
@@ -1540,7 +1540,7 @@ func TestIncompleteAncientReceiptChainInsertion(t *testing.T) {
 		t.Fatalf("failed to create temp freezer dir: %v", err)
 	}
 	defer os.Remove(frdir)
-	ancientDb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "")
+	ancientDb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), frdir, "", gspec.Config.IsFinalChain)
 	if err != nil {
 		t.Fatalf("failed to create temp freezer db: %v", err)
 	}
@@ -1739,7 +1739,7 @@ func testInsertKnownChainData(t *testing.T, typ string) {
 		t.Fatalf("failed to create temp freezer dir: %v", err)
 	}
 	defer os.Remove(dir)
-	chaindb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), dir, "")
+	chaindb, err := rawdb.NewDatabaseWithFreezer(rawdb.NewMemoryDatabase(), dir, "", false)
 	if err != nil {
 		t.Fatalf("failed to create temp freezer db: %v", err)
 	}

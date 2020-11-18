@@ -61,8 +61,8 @@ func (evr *Evrynet) startBloomHandlers(sectionSize uint64) {
 					task := <-request
 					task.Bitsets = make([][]byte, len(task.Sections))
 					for i, section := range task.Sections {
-						head := rawdb.ReadCanonicalHash(evr.chainDb, (section+1)*sectionSize-1)
-						if compVector, err := rawdb.ReadBloomBits(evr.chainDb, task.Bit, section, head); err == nil {
+						head := rawdb.ReadCanonicalHash(evr.chainDb, (section+1)*sectionSize-1, evr.config.Genesis.Config.IsFinalChain)
+						if compVector, err := rawdb.ReadBloomBits(evr.chainDb, task.Bit, section, head, evr.config.Genesis.Config.IsFinalChain); err == nil {
 							if blob, err := bitutil.DecompressBytes(compVector, int(sectionSize/8)); err == nil {
 								task.Bitsets[i] = blob
 							} else {
@@ -97,14 +97,14 @@ type BloomIndexer struct {
 
 // NewBloomIndexer returns a chain indexer that generates bloom bits data for the
 // canonical chain for fast logs filtering.
-func NewBloomIndexer(db evrdb.Database, size, confirms uint64) *core.ChainIndexer {
+func NewBloomIndexer(db evrdb.Database, size, confirms uint64, isFinalChain bool) *core.ChainIndexer {
 	backend := &BloomIndexer{
 		db:   db,
 		size: size,
 	}
 	table := rawdb.NewTable(db, string(rawdb.BloomBitsIndexPrefix))
 
-	return core.NewChainIndexer(db, table, backend, size, confirms, bloomThrottling, "bloombits")
+	return core.NewChainIndexer(db, table, backend, size, confirms, bloomThrottling, "bloombits", isFinalChain)
 }
 
 // Reset implements core.ChainIndexerBackend, starting a new bloombits index
@@ -125,14 +125,14 @@ func (b *BloomIndexer) Process(ctx context.Context, header *types.Header) error 
 
 // Commit implements core.ChainIndexerBackend, finalizing the bloom section and
 // writing it out into the database.
-func (b *BloomIndexer) Commit() error {
+func (b *BloomIndexer) Commit(isFinalChain bool) error {
 	batch := b.db.NewBatch()
 	for i := 0; i < types.BloomBitLength; i++ {
 		bits, err := b.gen.Bitset(uint(i))
 		if err != nil {
 			return err
 		}
-		rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits))
+		rawdb.WriteBloomBits(batch, uint(i), b.section, b.head, bitutil.CompressBytes(bits), isFinalChain)
 	}
 	return batch.Write()
 }

@@ -180,7 +180,7 @@ func (b *EvrAPIBackend) GetPoolTransaction(hash common.Hash) *types.Transaction 
 }
 
 func (b *EvrAPIBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
-	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.evr.ChainDb(), txHash)
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(b.evr.ChainDb(), txHash, false)
 	return tx, blockHash, blockNumber, index, nil
 }
 

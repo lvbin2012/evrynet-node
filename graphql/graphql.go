@@ -144,7 +144,7 @@ type Transaction struct {
 // resolve returns the internal transaction object, fetching it if needed.
 func (t *Transaction) resolve(ctx context.Context) (*types.Transaction, error) {
 	if t.tx == nil {
-		tx, blockHash, _, index := rawdb.ReadTransaction(t.backend.ChainDb(), t.hash)
+		tx, blockHash, _, index := rawdb.ReadTransaction(t.backend.ChainDb(), t.hash, false)
 		if tx != nil {
 			t.tx = tx
 			t.block = &Block{

@@ -297,7 +297,7 @@ func (f *lightFetcher) announce(p *peer, head *announceData) {
 			// if one of root's children is canonical, keep it, delete other branches and root itself
 			var newRoot *fetcherTreeNode
 			for i, nn := range fp.root.children {
-				if rawdb.ReadCanonicalHash(f.pm.chainDb, nn.number) == nn.hash {
+				if rawdb.ReadCanonicalHash(f.pm.chainDb, nn.number, f.chain.Config().IsFinalChain) == nn.hash {
 					fp.root.children = append(fp.root.children[:i], fp.root.children[i+1:]...)
 					nn.parent = nil
 					newRoot = nn
@@ -390,7 +390,7 @@ func (f *lightFetcher) peerHasBlock(p *peer, hash common.Hash, number uint64, ha
 	//
 	// when syncing, just check if it is part of the known chain, there is nothing better we
 	// can do since we do not know the most recent block hash yet
-	return rawdb.ReadCanonicalHash(f.pm.chainDb, fp.root.number) == fp.root.hash && rawdb.ReadCanonicalHash(f.pm.chainDb, number) == hash
+	return rawdb.ReadCanonicalHash(f.pm.chainDb, fp.root.number, f.chain.Config().IsFinalChain) == fp.root.hash && rawdb.ReadCanonicalHash(f.pm.chainDb, number, f.chain.Config().IsFinalChain) == hash
 }
 
 // requestAmount calculates the amount of headers to be downloaded starting
@@ -754,7 +754,7 @@ func (f *lightFetcher) lastTrustedTreeNode(p *peer) (*types.Header, []common.Has
 	if canonical.Number.Uint64() > f.lastTrustedHeader.Number.Uint64() {
 		canonical = f.chain.GetHeaderByNumber(f.lastTrustedHeader.Number.Uint64())
 	}
-	commonAncestor := rawdb.FindCommonAncestor(f.pm.chainDb, canonical, f.lastTrustedHeader)
+	commonAncestor := rawdb.FindCommonAncestor(f.pm.chainDb, canonical, f.lastTrustedHeader, f.chain.Config().IsFinalChain)
 	if commonAncestor == nil {
 		log.Error("Common ancestor of last trusted header and canonical header is nil", "canonical hash", canonical.Hash(), "trusted hash", f.lastTrustedHeader.Hash())
 		return current, unapprovedHashes

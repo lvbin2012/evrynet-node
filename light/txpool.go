@@ -183,7 +183,7 @@ func (pool *TxPool) checkMinedTxs(ctx context.Context, hash common.Hash, number 
 		if _, err := GetBlockReceipts(ctx, pool.odr, hash, number); err != nil { // ODR caches, ignore results
 			return err
 		}
-		rawdb.WriteTxLookupEntries(pool.chainDb, block)
+		rawdb.WriteTxLookupEntries(pool.chainDb, block, pool.config.IsFinalChain)
 
 		// Update the transaction pool's state
 		for _, tx := range list {
@@ -202,7 +202,7 @@ func (pool *TxPool) rollbackTxs(hash common.Hash, txc txStateChanges) {
 	if list, ok := pool.mined[hash]; ok {
 		for _, tx := range list {
 			txHash := tx.Hash()
-			rawdb.DeleteTxLookupEntry(batch, txHash)
+			rawdb.DeleteTxLookupEntry(batch, txHash, pool.config.IsFinalChain)
 			pool.pending[txHash] = tx
 			txc.setState(txHash, false)
 		}
@@ -259,7 +259,7 @@ func (pool *TxPool) reorgOnNewHead(ctx context.Context, newHeader *types.Header)
 		idx2 := idx - txPermanent
 		if len(pool.mined) > 0 {
 			for i := pool.clearIdx; i < idx2; i++ {
-				hash := rawdb.ReadCanonicalHash(pool.chainDb, i)
+				hash := rawdb.ReadCanonicalHash(pool.chainDb, i, false)
 				if list, ok := pool.mined[hash]; ok {
 					hashes := make([]common.Hash, len(list))
 					for i, tx := range list {
