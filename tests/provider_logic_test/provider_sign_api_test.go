@@ -27,13 +27,13 @@ func TestProviderSignTransaction(t *testing.T) {
 	assert.NoError(t, err)
 	senderAddr, _ := common.EvryAddressStringToAddressCheck(senderAddrStr)
 	providerAddr, _ := common.EvryAddressStringToAddressCheck(providerAddrStr)
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	id, err := ethClient.ChainID(context.Background())
+	id, err := evrClient.ChainID(context.Background())
 	signer := types.NewOmahaSigner(id)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), senderAddr)
 	assert.NoError(t, err)
-	gasPrice, err := ethClient.SuggestGasPrice(context.Background())
+	gasPrice, err := evrClient.SuggestGasPrice(context.Background())
 	assert.NoError(t, err)
 
 	tx := types.NewTransaction(nonce, *contractAddr, big.NewInt(1000000), testGasLimit, gasPrice, nil)
@@ -46,7 +46,7 @@ func TestProviderSignTransaction(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Get Tx via RPC
-	pTxSigned, err := ethClient.ProviderSignTx(context.Background(), txSigned, &providerAddr)
+	pTxSigned, err := evrClient.ProviderSignTx(context.Background(), txSigned, &providerAddr)
 	assert.NoError(t, err)
 	assert.NotEqual(t, nil, pTxSigned)
 }
@@ -67,11 +67,11 @@ func prepareNewContract(hasProvider bool) *common.Address {
 	if err != nil {
 		return nil
 	}
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	if err != nil {
 		return nil
 	}
-	nonce, err := ethClient.PendingNonceAt(context.Background(), sender)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), sender)
 	if err != nil {
 		return nil
 	}
@@ -90,13 +90,13 @@ func prepareNewContract(hasProvider bool) *common.Address {
 		return nil
 	}
 
-	err = ethClient.SendTransaction(context.Background(), tx)
+	err = evrClient.SendTransaction(context.Background(), tx)
 	if err != nil {
 		panic(err)
 	}
 	for i := 0; i < 10; i++ {
 		var receipt *types.Receipt
-		receipt, err = ethClient.TransactionReceipt(context.Background(), tx.Hash())
+		receipt, err = evrClient.TransactionReceipt(context.Background(), tx.Hash())
 		if err == nil && receipt.Status == uint64(1) {
 			return &receipt.ContractAddress
 		}

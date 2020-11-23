@@ -28,7 +28,7 @@ const (
 	testGasLimit   = 1000000
 	testGasPrice   = 1000000000
 	testAmountSend = 1000000000
-	ethRPCEndpoint = "http://localhost:22001"
+	evrRPCEndpoint = "http://localhost:22001"
 
 	getReceiptMaxRetries = 20
 

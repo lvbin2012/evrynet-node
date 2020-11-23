@@ -24,9 +24,9 @@ func TestSendTxCreateContractWithProviderAndOwner(t *testing.T) {
 	assert.NoError(t, err)
 	data := hexutil.Bytes(payLoadBytes)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	gasPrice, err := ethClient.SuggestGasPrice(context.Background())
+	gasPrice, err := evrClient.SuggestGasPrice(context.Background())
 	assert.NoError(t, err)
 	gPrice := hexutil.Big(*big.NewInt(gasPrice.Int64()))
 	value := hexutil.Big(*big.NewInt(0))
@@ -44,15 +44,15 @@ func TestSendTxCreateContractWithProviderAndOwner(t *testing.T) {
 	}
 
 	emptyHash := common.Hash{}
-	hash, err := ethClient.SendTx(context.Background(), args)
+	hash, err := evrClient.SendTx(context.Background(), args)
 	assert.NoError(t, err)
 	assert.NotEqual(t, emptyHash, hash)
 	if hash != emptyHash {
-		tx, _, err := ethClient.TransactionByHash(context.Background(), hash)
+		tx, _, err := evrClient.TransactionByHash(context.Background(), hash)
 		assert.Equal(t, args.Provider, tx.Provider())
 		assert.Equal(t, args.Owner, tx.Owner())
 		assert.NoError(t, err)
-		assertTransactionSuccess(t, ethClient, hash, false, sender)
+		assertTransactionSuccess(t, evrClient, hash, false, sender)
 	}
 }
 
@@ -66,7 +66,7 @@ func TestSendTxCreateContractNormal(t *testing.T) {
 	assert.NoError(t, err)
 	data := hexutil.Bytes(payLoadBytes)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
 	gPrice := hexutil.Big(*big.NewInt(testGasPrice))
 	gas := hexutil.Uint64(testGasLimit)
@@ -82,10 +82,10 @@ func TestSendTxCreateContractNormal(t *testing.T) {
 	}
 
 	emptyHash := common.Hash{}
-	hash, err := ethClient.SendTx(context.Background(), args)
+	hash, err := evrClient.SendTx(context.Background(), args)
 	assert.NoError(t, err)
 	assert.NotEqual(t, emptyHash, hash)
-	assertTransactionSuccess(t, ethClient, hash, true, sender)
+	assertTransactionSuccess(t, evrClient, hash, true, sender)
 }
 
 //TestSendTxNormal test send normal tx without a provider and not create a contract.
@@ -96,9 +96,9 @@ func TestSendTxNormal(t *testing.T) {
 	sender, _ := common.EvryAddressStringToAddressCheck(senderAddrStr)
 	data := hexutil.Bytes(payload)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	gasPrice, err := ethClient.SuggestGasPrice(context.Background())
+	gasPrice, err := evrClient.SuggestGasPrice(context.Background())
 	assert.NoError(t, err)
 	gPrice := hexutil.Big(*big.NewInt(gasPrice.Int64()))
 	gas := hexutil.Uint64(1000000)
@@ -114,10 +114,10 @@ func TestSendTxNormal(t *testing.T) {
 	}
 
 	emptyHash := common.Hash{}
-	hash, err := ethClient.SendTx(context.Background(), args)
+	hash, err := evrClient.SendTx(context.Background(), args)
 	assert.NoError(t, err)
 	assert.NotEqual(t, emptyHash, hash)
 	if hash != emptyHash {
-		assertTransactionSuccess(t, ethClient, hash, false, sender)
+		assertTransactionSuccess(t, evrClient, hash, false, sender)
 	}
 }

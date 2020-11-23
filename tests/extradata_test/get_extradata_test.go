@@ -18,7 +18,7 @@ import (
 // curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"evr_getBlockSignerByNumber","params":["0x5"],"id":1}' http://localhost:8545
 // curl -H "Content-Type: application/json" -X POST --data '{"jsonrpc":"2.0","method":"evr_getBlockSignerByHash","params":["0x4cddd578050781138591684e16674e7056ce89fb2706cf72b9f946e7e168d73b"],"id":1}' http://localhost:8545
 func TestGetExtraData(t *testing.T) {
-	ethClient, err := evrclient.Dial("http://localhost:8454")
+	evrClient, err := evrclient.Dial("http://localhost:8454")
 	assert.NoError(t, err)
 	fakeBlockNumber := big.NewInt(5)
 
@@ -28,15 +28,15 @@ func TestGetExtraData(t *testing.T) {
 			t.Error("You have to run a node and start miner before")
 			break
 		}
-		block, err := ethClient.BlockByNumber(context.Background(), fakeBlockNumber)
+		block, err := evrClient.BlockByNumber(context.Background(), fakeBlockNumber)
 		if err == nil {
-			extra, err := ethClient.GetBlockSignerByNumber(context.Background(), block.Number())
+			extra, err := evrClient.GetBlockSignerByNumber(context.Background(), block.Number())
 			assert.NoError(t, err)
 			assert.NotNil(t, extra)
 			assert.NotNil(t, extra.BlockProposer)
 			assert.NotEqual(t, common.Address{}, extra.BlockProposer)
 
-			extra, err = ethClient.GetBlockSignerByHash(context.Background(), block.Hash())
+			extra, err = evrClient.GetBlockSignerByHash(context.Background(), block.Hash())
 			assert.NoError(t, err)
 			assert.NotNil(t, extra)
 			assert.NotNil(t, extra.BlockProposer)

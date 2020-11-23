@@ -28,22 +28,22 @@ func TestModifyProviders(t *testing.T) {
 	contractAddr := prepareNewContract(true)
 	require.NotNil(t, contractAddr)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	require.NoError(t, err)
 
-	nonce, err := ethClient.PendingNonceAt(context.Background(), ownerAddr)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), ownerAddr)
 	require.NoError(t, err)
 	removeProviderTx, err := types.NewModifyProvidersTransaction(nonce, *contractAddr, 21000, gasPrice, providerAddr, false)
 	require.NoError(t, err)
 	removeProviderTx, err = types.SignTx(removeProviderTx, signer, ownerKey)
 	require.NoError(t, err)
-	require.NoError(t, ethClient.SendTransaction(context.Background(), removeProviderTx))
-	assertTransactionSuccess(t, ethClient, removeProviderTx.Hash(), false, ownerAddr)
+	require.NoError(t, evrClient.SendTransaction(context.Background(), removeProviderTx))
+	assertTransactionSuccess(t, evrClient, removeProviderTx.Hash(), false, ownerAddr)
 	nonce++
 
 	// create a contract interaction tx to enterprise contract from owner
 	// expected to failed
-	senderNonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
+	senderNonce, err := evrClient.PendingNonceAt(context.Background(), senderAddr)
 	require.NoError(t, err)
 	dataBytes := []byte("0x3fb5c1cb0000000000000000000000000000000000000000000000000000000000000002")
 	tx := types.NewTransaction(senderNonce, *contractAddr, big.NewInt(0), testGasLimit, gasPrice, dataBytes)
@@ -51,14 +51,14 @@ func TestModifyProviders(t *testing.T) {
 	require.NoError(t, err)
 	tx, err = types.ProviderSignTx(tx, signer, ownerKey)
 	require.NoError(t, err)
-	require.Error(t, ethClient.SendTransaction(context.Background(), tx))
+	require.Error(t, evrClient.SendTransaction(context.Background(), tx))
 
 	addProviderTx, err := types.NewModifyProvidersTransaction(nonce, *contractAddr, 21000, big.NewInt(params.GasPriceConfig), providerAddr, true)
 	require.NoError(t, err)
 	addProviderTx, err = types.SignTx(addProviderTx, types.NewOmahaSigner(big.NewInt(chainId)), ownerKey)
 	require.NoError(t, err)
-	require.NoError(t, ethClient.SendTransaction(context.Background(), addProviderTx))
-	assertTransactionSuccess(t, ethClient, addProviderTx.Hash(), false, ownerAddr)
+	require.NoError(t, evrClient.SendTransaction(context.Background(), addProviderTx))
+	assertTransactionSuccess(t, evrClient, addProviderTx.Hash(), false, ownerAddr)
 	nonce++
 
 	tx = types.NewTransaction(senderNonce, *contractAddr, big.NewInt(0), testGasLimit, gasPrice, dataBytes)
@@ -66,6 +66,6 @@ func TestModifyProviders(t *testing.T) {
 	require.NoError(t, err)
 	tx, err = types.ProviderSignTx(tx, signer, providerKey)
 	require.NoError(t, err)
-	require.NoError(t, ethClient.SendTransaction(context.Background(), tx))
-	assertTransactionSuccess(t, ethClient, tx.Hash(), false, providerAddr)
+	require.NoError(t, evrClient.SendTransaction(context.Background(), tx))
+	assertTransactionSuccess(t, evrClient, tx.Hash(), false, providerAddr)
 }

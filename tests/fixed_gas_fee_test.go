@@ -39,13 +39,13 @@ func TestSendNormalTxWithFixedFee(t *testing.T) {
 	spk, err := crypto.HexToECDSA(senderPK)
 	assert.NoError(t, err)
 	signer := types.BaseSigner{}
-	ethClient, err := evrclient.Dial("http://localhost:22001")
+	evrClient, err := evrclient.Dial("http://localhost:22001")
 	assert.NoError(t, err)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), senderAddr)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), senderAddr)
 	assert.NoError(t, err)
 
 	//SuggestGasPrice will return fixedGasPrice
-	gasPrice, err := ethClient.SuggestGasPrice(context.Background())
+	gasPrice, err := evrClient.SuggestGasPrice(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, gasPrice, fixedGasPrice)
 
@@ -53,10 +53,10 @@ func TestSendNormalTxWithFixedFee(t *testing.T) {
 	transaction := types.NewTransaction(nonce, normalAddr, big.NewInt(1000000), 1000000, big.NewInt(2000000), nil)
 	transaction, err = types.SignTx(transaction, signer, spk)
 	assert.NoError(t, err)
-	assert.NotEqual(t, nil, ethClient.SendTransaction(context.Background(), transaction))
+	assert.NotEqual(t, nil, evrClient.SendTransaction(context.Background(), transaction))
 
 	//only transaction with gixedGasPrice/nil gas price is success
 	transaction = types.NewTransaction(nonce, normalAddr, big.NewInt(1000000), 1000000, fixedGasPrice, nil)
 	transaction, err = types.SignTx(transaction, signer, spk)
-	assert.NoError(t, ethClient.SendTransaction(context.Background(), transaction))
+	assert.NoError(t, evrClient.SendTransaction(context.Background(), transaction))
 }

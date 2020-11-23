@@ -30,12 +30,12 @@ Adjust these params to match deployment on local machine:
 */
 
 func TestMain(m *testing.M) {
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	if err != nil {
 		panic(err)
 	}
 	for {
-		block, err := ethClient.BlockByNumber(context.Background(), nil)
+		block, err := evrClient.BlockByNumber(context.Background(), nil)
 		if err != nil {
 			panic(err)
 		}
@@ -57,15 +57,15 @@ func TestCreateContractWithProviderAddress(t *testing.T) {
 	var option types.CreateAccountOption
 	option.ProviderAddress = &providerAddr
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.NonceAt(context.Background(), sender, nil)
+	nonce, err := evrClient.NonceAt(context.Background(), sender, nil)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes, option)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
 	assert.NoError(t, err)
 	err = errors.New("owner is required")
-	assert.Error(t, err, ethClient.SendTransaction(context.Background(), tx))
+	assert.Error(t, err, evrClient.SendTransaction(context.Background(), tx))
 }
 
 func TestCreateContractWithProviderAndOwner(t *testing.T) {
@@ -79,15 +79,15 @@ func TestCreateContractWithProviderAndOwner(t *testing.T) {
 	option.OwnerAddress = &sender
 	option.ProviderAddress = &providerAddr
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.NonceAt(context.Background(), sender, nil)
+	nonce, err := evrClient.NonceAt(context.Background(), sender, nil)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes, option)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
 	assert.NoError(t, err)
-	require.NoError(t, ethClient.SendTransaction(context.Background(), tx))
-	assertTransactionSuccess(t, ethClient, tx.Hash(), true, sender)
+	require.NoError(t, evrClient.SendTransaction(context.Background(), tx))
+	assertTransactionSuccess(t, evrClient, tx.Hash(), true, sender)
 }
 
 func TestCreateContractWithoutProviderAddress(t *testing.T) {
@@ -97,16 +97,16 @@ func TestCreateContractWithoutProviderAddress(t *testing.T) {
 	payLoadBytes, err := hexutil.Decode(payload)
 	assert.NoError(t, err)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), sender)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), sender)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
 	assert.NoError(t, err)
 
-	require.NoError(t, ethClient.SendTransaction(context.Background(), tx))
-	assertTransactionSuccess(t, ethClient, tx.Hash(), true, sender)
+	require.NoError(t, evrClient.SendTransaction(context.Background(), tx))
+	assertTransactionSuccess(t, evrClient, tx.Hash(), true, sender)
 }
 
 func TestCreateContractWithProviderSignature(t *testing.T) {
@@ -118,16 +118,16 @@ func TestCreateContractWithProviderSignature(t *testing.T) {
 	payLoadBytes, err := hexutil.Decode(payload)
 	assert.NoError(t, err)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), sender)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), sender)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
 	assert.NoError(t, err)
 	tx, err = types.ProviderSignTx(tx, types.BaseSigner{}, ppk)
 	assert.NoError(t, err)
-	require.Error(t, ethClient.SendTransaction(context.Background(), tx), "Must return error: redundant provider's signature")
+	require.Error(t, evrClient.SendTransaction(context.Background(), tx), "Must return error: redundant provider's signature")
 }
 
 func TestCreateContractWithProviderAddressWithoutGas(t *testing.T) {
@@ -141,15 +141,15 @@ func TestCreateContractWithProviderAddressWithoutGas(t *testing.T) {
 	payLoadBytes, err := hexutil.Decode(payload)
 	assert.NoError(t, err)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), sender)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), sender)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes, option)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
 	assert.NoError(t, err)
-	require.NoError(t, ethClient.SendTransaction(context.Background(), tx))
-	assertTransactionSuccess(t, ethClient, tx.Hash(), true, sender)
+	require.NoError(t, evrClient.SendTransaction(context.Background(), tx))
+	assertTransactionSuccess(t, evrClient, tx.Hash(), true, sender)
 }
 
 func TestCreateContractWithProviderAddressMustHaveOwnerAddress(t *testing.T) {
@@ -163,9 +163,9 @@ func TestCreateContractWithProviderAddressMustHaveOwnerAddress(t *testing.T) {
 	option.ProviderAddress = &providerAddr
 	option.OwnerAddress = &sender
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), sender)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), sender)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes, option)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
@@ -181,9 +181,9 @@ func TestCreateNormalContractMustHaveNoOwnerAndProviderAddress(t *testing.T) {
 	payLoadBytes, err := hexutil.Decode(payload)
 	assert.NoError(t, err)
 
-	ethClient, err := evrclient.Dial(ethRPCEndpoint)
+	evrClient, err := evrclient.Dial(evrRPCEndpoint)
 	assert.NoError(t, err)
-	nonce, err := ethClient.PendingNonceAt(context.Background(), sender)
+	nonce, err := evrClient.PendingNonceAt(context.Background(), sender)
 	assert.NoError(t, err)
 	tx := types.NewContractCreation(nonce, big.NewInt(0), testGasLimit, big.NewInt(testGasPrice), payLoadBytes)
 	tx, err = types.SignTx(tx, types.BaseSigner{}, spk)
