@@ -46,7 +46,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
-	"github.com/Evrynetlabs/evrynet-node/ethstats"
+	"github.com/Evrynetlabs/evrynet-node/evrstats"
 	"github.com/Evrynetlabs/evrynet-node/evr"
 	"github.com/Evrynetlabs/evrynet-node/evr/downloader"
 	"github.com/Evrynetlabs/evrynet-node/evrclient"
@@ -67,7 +67,7 @@ var (
 	ethPortFlag = flag.Int("ethport", 30303, "Listener port for the devp2p connection")
 	bootFlag    = flag.String("bootnodes", "", "Comma separated bootnode enode URLs to seed with")
 	netFlag     = flag.Uint64("network", 0, "Network ID to use for the Evrynet protocol")
-	statsFlag   = flag.String("ethstats", "", "Ethstats network monitoring auth string")
+	statsFlag   = flag.String("evrstats", "", "Evrstats network monitoring auth string")
 
 	netnameFlag = flag.String("faucet.name", "", "Network name to assign to the faucet")
 	payoutFlag  = flag.Int("faucet.amount", 1, "Number of Ethers to pay out per user request")
@@ -245,12 +245,12 @@ func newFaucet(genesis *core.Genesis, port int, enodes []*discv5.Node, network u
 	}); err != nil {
 		return nil, err
 	}
-	// Assemble the ethstats monitoring and reporting service'
+	// Assemble the evrstats monitoring and reporting service'
 	if stats != "" {
 		if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 			var serv *les.LightEvrynet
 			ctx.Service(&serv)
-			return ethstats.New(stats, nil, serv)
+			return evrstats.New(stats, nil, serv)
 		}); err != nil {
 			return nil, err
 		}

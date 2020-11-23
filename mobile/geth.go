@@ -25,7 +25,7 @@ import (
 	"path/filepath"
 
 	"github.com/Evrynetlabs/evrynet-node/core"
-	"github.com/Evrynetlabs/evrynet-node/ethstats"
+	"github.com/Evrynetlabs/evrynet-node/evrstats"
 	"github.com/Evrynetlabs/evrynet-node/evr"
 	"github.com/Evrynetlabs/evrynet-node/evr/downloader"
 	"github.com/Evrynetlabs/evrynet-node/evrclient"
@@ -175,7 +175,7 @@ func NewNode(datadir string, config *NodeConfig) (stack *Node, _ error) {
 				var lesServ *les.LightEvrynet
 				ctx.Service(&lesServ)
 
-				return ethstats.New(config.EvrynetNetStats, nil, lesServ)
+				return evrstats.New(config.EvrynetNetStats, nil, lesServ)
 			}); err != nil {
 				return nil, fmt.Errorf("netstats init: %v", err)
 			}
