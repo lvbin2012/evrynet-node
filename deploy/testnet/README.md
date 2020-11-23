@@ -137,7 +137,7 @@ The bellow example explains how to deploy 3 nodes manually.
     | Welcome to puppeth, your Evrynet private network manager |
     |                                                           |
     | This tool lets you create a new Evrynet network down to  |
-    | the genesis block, bootnodes, miners and ethstats servers |
+    | the genesis block, bootnodes, miners and evrstats servers |
     | without the hassle that it would normally entail.         |
     |                                                           |
     | Puppeth uses SSH to dial in to remote servers, and builds |

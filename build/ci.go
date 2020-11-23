@@ -214,7 +214,7 @@ func doTest(cmdline []string) {
 	case *full:
 		packages = []string{
 			"./accounts/...", "./cmd/...", "./core/...", "./common/...", "./consensus/...", "./crypto/...",
-			"./dashboard/...", "./ethstats/...", "./event/...", "./evr/...", "./evrclient/...", "./evrdb/...",
+			"./dashboard/...", "./evrstats/...", "./event/...", "./evr/...", "./evrclient/...", "./evrdb/...",
 			"./graphql/...", "./internal/...", "./les/...", "./light/...", "./log/...",
 			"./metrics/...", "./miner/...", "./mobile/...", "./node/...", "./p2p/...", "./params/...",
 			"./rlp/...", "./rpc/...", "./signer/...", "./trie/...", "./whisper/...",

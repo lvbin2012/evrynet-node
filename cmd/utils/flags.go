@@ -44,7 +44,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/core/vm"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/dashboard"
-	"github.com/Evrynetlabs/evrynet-node/ethstats"
+	"github.com/Evrynetlabs/evrynet-node/evrstats"
 	"github.com/Evrynetlabs/evrynet-node/evr"
 	"github.com/Evrynetlabs/evrynet-node/evr/downloader"
 	"github.com/Evrynetlabs/evrynet-node/evr/gasprice"
@@ -450,9 +450,9 @@ var (
 		Usage: "Sets a cap on gas that can be used in Gevcall/estimateGas",
 	}
 	// Logging and debug settings
-	EthStatsURLFlag = cli.StringFlag{
-		Name:  "ethstats",
-		Usage: "Reporting URL of a ethstats service (nodename:secret@host:port)",
+	EvrStatsURLFlag = cli.StringFlag{
+		Name:  "evrstats",
+		Usage: "Reporting URL of a evrstats service (nodename:secret@host:port)",
 	}
 	FakePoWFlag = cli.BoolFlag{
 		Name:  "fakepow",
@@ -1649,9 +1649,9 @@ func RegisterShhService(stack *node.Node, cfg *whisper.Config) {
 	}
 }
 
-// RegisterEthStatsService configures the Evrynet Stats daemon and adds it to
+// RegisterEvrStatsService configures the Evrynet Stats daemon and adds it to
 // the given node.
-func RegisterEthStatsService(stack *node.Node, url string) {
+func RegisterEvrStatsService(stack *node.Node, url string) {
 	if err := stack.Register(func(ctx *node.ServiceContext) (node.Service, error) {
 		// Retrieve both evr and les services
 		var ethServ *evr.Evrynet
@@ -1660,7 +1660,7 @@ func RegisterEthStatsService(stack *node.Node, url string) {
 		var lesServ *les.LightEvrynet
 		ctx.Service(&lesServ)
 
-		return ethstats.New(url, ethServ, lesServ)
+		return evrstats.New(url, ethServ, lesServ)
 	}); err != nil {
 		Fatalf("Failed to register the Evrynet Stats service: %v", err)
 	}
