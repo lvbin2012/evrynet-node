@@ -28,23 +28,23 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/log"
 )
 
-// ethstatsDockerfile is the Dockerfile required to build an ethstats backend
+// evrstatsDockerfile is the Dockerfile required to build an evrstats backend
 // and associated monitoring site.
-var ethstatsDockerfile = `
-FROM puppeth/ethstats:latest
+var evrstatsDockerfile = `
+FROM puppeth/evrstats:latest
 
 RUN echo 'module.exports = {trusted: [{{.Trusted}}], banned: [{{.Banned}}], reserved: ["yournode"]};' > lib/utils/config.js
 `
 
-// ethstatsComposefile is the docker-compose.yml file required to deploy and
-// maintain an ethstats monitoring site.
-var ethstatsComposefile = `
+// evrstatsComposefile is the docker-compose.yml file required to deploy and
+// maintain an evrstats monitoring site.
+var evrstatsComposefile = `
 version: '2'
 services:
-  ethstats:
+  evrstats:
     build: .
-    image: {{.Network}}/ethstats
-    container_name: {{.Network}}_ethstats_1{{if not .VHost}}
+    image: {{.Network}}/evrstats
+    container_name: {{.Network}}_evrstats_1{{if not .VHost}}
     ports:
       - "{{.Port}}:3000"{{end}}
     environment:
@@ -59,10 +59,10 @@ services:
     restart: always
 `
 
-// deployEthstats deploys a new ethstats container to a remote machine via SSH,
+// deployEvrstats deploys a new evrstats container to a remote machine via SSH,
 // docker and docker-compose. If an instance with the specified network name
 // already exists there, it will be overwritten!
-func deployEthstats(client *sshClient, network string, port int, secret string, vhost string, trusted []string, banned []string, nocache bool) ([]byte, error) {
+func deployEvrstats(client *sshClient, network string, port int, secret string, vhost string, trusted []string, banned []string, nocache bool) ([]byte, error) {
 	// Generate the content to upload to the server
 	workdir := fmt.Sprintf("%d", rand.Int63())
 	files := make(map[string][]byte)
@@ -77,14 +77,14 @@ func deployEthstats(client *sshClient, network string, port int, secret string, 
 	}
 
 	dockerfile := new(bytes.Buffer)
-	template.Must(template.New("").Parse(ethstatsDockerfile)).Execute(dockerfile, map[string]interface{}{
+	template.Must(template.New("").Parse(evrstatsDockerfile)).Execute(dockerfile, map[string]interface{}{
 		"Trusted": strings.Join(trustedLabels, ", "),
 		"Banned":  strings.Join(bannedLabels, ", "),
 	})
 	files[filepath.Join(workdir, "Dockerfile")] = dockerfile.Bytes()
 
 	composefile := new(bytes.Buffer)
-	template.Must(template.New("").Parse(ethstatsComposefile)).Execute(composefile, map[string]interface{}{
+	template.Must(template.New("").Parse(evrstatsComposefile)).Execute(composefile, map[string]interface{}{
 		"Network": network,
 		"Port":    port,
 		"Secret":  secret,
@@ -99,16 +99,16 @@ func deployEthstats(client *sshClient, network string, port int, secret string, 
 	}
 	defer client.Run("rm -rf " + workdir)
 
-	// Build and deploy the ethstats service
+	// Build and deploy the evrstats service
 	if nocache {
 		return nil, client.Stream(fmt.Sprintf("cd %s && docker-compose -p %s build --pull --no-cache && docker-compose -p %s up -d --force-recreate --timeout 60", workdir, network, network))
 	}
 	return nil, client.Stream(fmt.Sprintf("cd %s && docker-compose -p %s up -d --build --force-recreate --timeout 60", workdir, network))
 }
 
-// ethstatsInfos is returned from an ethstats status check to allow reporting
+// evrstatsInfos is returned from an evrstats status check to allow reporting
 // various configuration parameters.
-type ethstatsInfos struct {
+type evrstatsInfos struct {
 	host   string
 	port   int
 	secret string
@@ -118,7 +118,7 @@ type ethstatsInfos struct {
 
 // Report converts the typed struct into a plain string->string map, containing
 // most - but not all - fields for reporting to the user.
-func (info *ethstatsInfos) Report() map[string]string {
+func (info *evrstatsInfos) Report() map[string]string {
 	return map[string]string{
 		"Website address":       info.host,
 		"Website listener port": strconv.Itoa(info.port),
@@ -127,11 +127,11 @@ func (info *ethstatsInfos) Report() map[string]string {
 	}
 }
 
-// checkEthstats does a health-check against an ethstats server to verify whether
+// checkEvrstats does a health-check against an evrstats server to verify whether
 // it's running, and if yes, gathering a collection of useful infos about it.
-func checkEthstats(client *sshClient, network string) (*ethstatsInfos, error) {
-	// Inspect a possible ethstats container on the host
-	infos, err := inspectContainer(client, fmt.Sprintf("%s_ethstats_1", network))
+func checkEvrstats(client *sshClient, network string) (*evrstatsInfos, error) {
+	// Inspect a possible evrstats container on the host
+	infos, err := inspectContainer(client, fmt.Sprintf("%s_evrstats_1", network))
 	if err != nil {
 		return nil, err
 	}
@@ -163,10 +163,10 @@ func checkEthstats(client *sshClient, network string) (*ethstatsInfos, error) {
 
 	// Run a sanity check to see if the port is reachable
 	if err = checkPort(host, port); err != nil {
-		log.Warn("Ethstats service seems unreachable", "server", host, "port", port, "err", err)
+		log.Warn("Evrstats service seems unreachable", "server", host, "port", port, "err", err)
 	}
 	// Container available, assemble and return the useful infos
-	return &ethstatsInfos{
+	return &evrstatsInfos{
 		host:   host,
 		port:   port,
 		secret: secret,

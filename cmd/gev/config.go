@@ -70,19 +70,19 @@ var tomlSettings = toml.Config{
 	},
 }
 
-type ethstatsConfig struct {
+type evrstatsConfig struct {
 	URL string `toml:",omitempty"`
 }
 
-type gethConfig struct {
-	Eth       evr.Config
+type gevConfig struct {
+	Evr       evr.Config
 	Shh       whisper.Config
 	Node      node.Config
-	Ethstats  ethstatsConfig
+	Evrstats  evrstatsConfig
 	Dashboard dashboard.Config
 }
 
-func loadConfig(file string, cfg *gethConfig) error {
+func loadConfig(file string, cfg *gevConfig) error {
 	f, err := os.Open(file)
 	if err != nil {
 		return err
@@ -107,10 +107,10 @@ func defaultNodeConfig() node.Config {
 	return cfg
 }
 
-func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
+func makeConfigNode(ctx *cli.Context) (*node.Node, gevConfig) {
 	// Load defaults.
-	cfg := gethConfig{
-		Eth:       evr.DefaultConfig,
+	cfg := gevConfig{
+		Evr:       evr.DefaultConfig,
 		Shh:       whisper.DefaultConfig,
 		Node:      defaultNodeConfig(),
 		Dashboard: dashboard.DefaultConfig,
@@ -124,15 +124,15 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	}
 
 	// Apply flags.
-	utils.SetULC(ctx, &cfg.Eth)
+	utils.SetULC(ctx, &cfg.Evr)
 	utils.SetNodeConfig(ctx, &cfg.Node)
 	stack, err := node.New(&cfg.Node)
 	if err != nil {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
-	utils.SetEvrConfig(ctx, stack, &cfg.Eth)
-	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
-		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
+	utils.SetEvrConfig(ctx, stack, &cfg.Evr)
+	if ctx.GlobalIsSet(utils.EvrStatsURLFlag.Name) {
+		cfg.Evrstats.URL = ctx.GlobalString(utils.EvrStatsURLFlag.Name)
 	}
 
 	utils.SetShhConfig(ctx, stack, &cfg.Shh)
@@ -153,7 +153,7 @@ func enableWhisper(ctx *cli.Context) bool {
 
 func makeFullNode(ctx *cli.Context) *node.Node {
 	stack, cfg := makeConfigNode(ctx)
-	utils.RegisterEvrService(stack, &cfg.Eth)
+	utils.RegisterEvrService(stack, &cfg.Evr)
 
 	if ctx.GlobalBool(utils.DashboardEnabledFlag.Name) {
 		utils.RegisterDashboardService(stack, &cfg.Dashboard, gitCommit)
@@ -182,8 +182,8 @@ func makeFullNode(ctx *cli.Context) *node.Node {
 	}
 
 	// Add the Evrynet Stats daemon if requested.
-	if cfg.Ethstats.URL != "" {
-		utils.RegisterEthStatsService(stack, cfg.Ethstats.URL)
+	if cfg.Evrstats.URL != "" {
+		utils.RegisterEvrStatsService(stack, cfg.Evrstats.URL)
 	}
 	return stack
 }
@@ -193,8 +193,8 @@ func dumpConfig(ctx *cli.Context) error {
 	_, cfg := makeConfigNode(ctx)
 	comment := ""
 
-	if cfg.Eth.Genesis != nil {
-		cfg.Eth.Genesis = nil
+	if cfg.Evr.Genesis != nil {
+		cfg.Evr.Genesis = nil
 		comment += "# Note: this config doesn't contain the genesis block.\n\n"
 	}
 
