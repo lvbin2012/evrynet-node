@@ -178,6 +178,7 @@ func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis, isFinalC
 	// We have the genesis block in database(perhaps in ancient database)
 	// but the corresponding state is missing.
 	header := rawdb.ReadHeader(db, stored, 0, isFinalChain)
+	fmt.Println("Genesis", header.Hash().String(), isFinalChain)
 	if _, err := state.New(header.Root, state.NewDatabaseWithCache(db, 0)); err != nil {
 		if genesis == nil {
 			genesis = DefaultGenesisBlock()

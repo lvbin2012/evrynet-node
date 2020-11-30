@@ -72,6 +72,21 @@ func (b *EvrAPIBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNum
 	return b.evr.blockchain.GetHeaderByNumber(uint64(blockNr)), nil
 }
 
+// Test by lvbin
+func (b *EvrAPIBackend) FHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+	// Pending block is only known by the miner
+	//if blockNr == rpc.PendingBlockNumber {
+	//	block := b.evr.miner.PendingBlock()
+	//	return block.Header(), nil
+	//}
+	//// Otherwise resolve and return the block
+	if blockNr == rpc.LatestBlockNumber {
+		return b.evr.fBlockchain.CurrentBlock().Header(), nil
+	}
+	return b.evr.fBlockchain.GetHeaderByNumber(uint64(blockNr)), nil
+}
+
+
 func (b *EvrAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
 	return b.evr.blockchain.GetHeaderByHash(hash), nil
 }
@@ -87,6 +102,21 @@ func (b *EvrAPIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 		return b.evr.blockchain.CurrentBlock(), nil
 	}
 	return b.evr.blockchain.GetBlockByNumber(uint64(blockNr)), nil
+}
+
+
+// Test by lvbin
+func (b *EvrAPIBackend) FBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
+	// Pending block is only known by the miner
+	if blockNr == rpc.PendingBlockNumber {
+		block := b.evr.miner.PendingBlock()
+		return block, nil
+	}
+	// Otherwise resolve and return the block
+	if blockNr == rpc.LatestBlockNumber {
+		return b.evr.fBlockchain.CurrentBlock(), nil
+	}
+	return b.evr.fBlockchain.GetBlockByNumber(uint64(blockNr)), nil
 }
 
 func (b *EvrAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
@@ -109,6 +139,11 @@ func (b *EvrAPIBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.
 
 func (b *EvrAPIBackend) GetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return b.evr.blockchain.GetBlockByHash(hash), nil
+}
+
+// Test by lvbin
+func (b *EvrAPIBackend) FGetBlock(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	return b.evr.fBlockchain.GetBlockByHash(hash), nil
 }
 
 func (b *EvrAPIBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {

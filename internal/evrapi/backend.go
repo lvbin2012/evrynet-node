@@ -72,6 +72,11 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
+
+	// Test by lvbin
+	FHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
+	FBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
+	FGetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

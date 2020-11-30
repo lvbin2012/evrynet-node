@@ -217,3 +217,22 @@ func (b *LesApiBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 		go session.Multiplex(bloomRetrievalBatch, bloomRetrievalWait, b.evr.bloomRequests)
 	}
 }
+
+func (b *LesApiBackend) FHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.PendingBlockNumber {
+		return b.evr.blockchain.CurrentHeader(), nil
+	}
+	return b.evr.blockchain.GetHeaderByNumberOdr(ctx, uint64(blockNr))
+}
+
+func (b *LesApiBackend) FBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
+	header, err := b.FHeaderByNumber(ctx, blockNr)
+	if header == nil || err != nil {
+		return nil, err
+	}
+	return b.GetBlock(ctx, header.Hash())
+}
+
+func (b *LesApiBackend) FGetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error) {
+	return b.evr.blockchain.GetBlockByHash(ctx, blockHash)
+}

@@ -576,6 +576,12 @@ func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
 	return hexutil.Uint64(header.Number.Uint64())
 }
 
+// Test by lvbin
+func (s *PublicBlockChainAPI) FBlockNumber() hexutil.Uint64 {
+	header, _ := s.b.FHeaderByNumber(context.Background(), rpc.LatestBlockNumber)
+	return hexutil.Uint64(header.Number.Uint64())
+}
+
 // GetBalance returns the amount of wei for the given address in the state of the
 // given block number. The rpc.LatestBlockNumber and rpc.PendingBlockNumber meta
 // block numbers are also allowed.
@@ -688,10 +694,36 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 	return nil, err
 }
 
+// Test by lvbin
+func (s *PublicBlockChainAPI) GetFBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
+	block, err := s.b.FBlockByNumber(ctx, blockNr)
+	if block != nil {
+		response, err := s.rpcOutputBlock(block, true, fullTx)
+		if err == nil && blockNr == rpc.PendingBlockNumber {
+			// Pending blocks need to nil out a few fields
+			for _, field := range []string{"hash", "nonce", "miner"} {
+				response[field] = nil
+			}
+		}
+		return response, err
+	}
+	return nil, err
+}
+
+
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
 	block, err := s.b.GetBlock(ctx, blockHash)
+	if block != nil {
+		return s.rpcOutputBlock(block, true, fullTx)
+	}
+	return nil, err
+}
+
+// Test by lvbin
+func (s *PublicBlockChainAPI) GetFBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
+	block, err := s.b.FGetBlock(ctx, blockHash)
 	if block != nil {
 		return s.rpcOutputBlock(block, true, fullTx)
 	}

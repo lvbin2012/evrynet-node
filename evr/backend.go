@@ -71,7 +71,8 @@ type Evrynet struct {
 	// Handlers
 	txPool          *core.TxPool
 	blockchain      *core.BlockChain
-	fblockchain      *core.BlockChain
+	fBlockchain     *core.BlockChain
+	fb              *FBManager
 	protocolManager *ProtocolManager
 	lesServer       LesServer
 
@@ -131,6 +132,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if _, ok := fgenesisErr.(*params.ConfigCompatError); fgenesisErr != nil && !ok {
 		return nil, fgenesisErr
 	}
+
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
 	evr := &Evrynet{
@@ -180,10 +182,11 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if err != nil {
 		return nil, err
 	}
-	evr.fblockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, evr.engine, vmConfig, evr.shouldPreserve)
+	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, evr.engine, vmConfig, evr.shouldPreserve)
 	if err != nil {
 		return nil, err
 	}
+	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain)
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -193,7 +196,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 
 	if compat, ok := fgenesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		evr.fblockchain.SetHead(compat.RewindTo)
+		evr.fBlockchain.SetHead(compat.RewindTo)
 		rawdb.WriteChainConfig(chainDb, fgenesisHash, fchainConfig)
 	}
 
@@ -477,6 +480,9 @@ func (s *Evrynet) StartMining(threads int) error {
 				return fmt.Errorf("signer missing: %v", err)
 			}
 			clique.Authorize(eb, wallet.SignData)
+
+			// Test by lvbin
+			s.fb.Authorize(eb, wallet.SignData)
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
@@ -549,6 +555,7 @@ func (s *Evrynet) Start(srvr *p2p.Server) error {
 	if s.lesServer != nil {
 		s.lesServer.Start(srvr)
 	}
+	s.fb.Start()
 	return nil
 }
 
@@ -559,6 +566,7 @@ func (s *Evrynet) GetPm() *ProtocolManager {
 // Stop implements node.Service, terminating all internal goroutines used by the
 // Evrynet protocol.
 func (s *Evrynet) Stop() error {
+	s.fb.Stop()
 	s.bloomIndexer.Close()
 	s.blockchain.Stop()
 	s.engine.Close()
