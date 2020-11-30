@@ -71,6 +71,7 @@ type Evrynet struct {
 	// Handlers
 	txPool          *core.TxPool
 	blockchain      *core.BlockChain
+	fblockchain      *core.BlockChain
 	protocolManager *ProtocolManager
 	lesServer       LesServer
 
@@ -122,9 +123,13 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if err != nil {
 		return nil, err
 	}
-	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis)
+	chainConfig, genesisHash, genesisErr := core.SetupGenesisBlockWithOverride(chainDb, config.Genesis, false)
 	if _, ok := genesisErr.(*params.ConfigCompatError); genesisErr != nil && !ok {
 		return nil, genesisErr
+	}
+	fchainConfig, fgenesisHash, fgenesisErr := core.SetupGenesisBlockWithOverride(chainDb, nil, true)
+	if _, ok := fgenesisErr.(*params.ConfigCompatError); fgenesisErr != nil && !ok {
+		return nil, fgenesisErr
 	}
 	log.Info("Initialised chain configuration", "config", chainConfig)
 
@@ -175,12 +180,23 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if err != nil {
 		return nil, err
 	}
+	evr.fblockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, evr.engine, vmConfig, evr.shouldPreserve)
+	if err != nil {
+		return nil, err
+	}
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
 		evr.blockchain.SetHead(compat.RewindTo)
 		rawdb.WriteChainConfig(chainDb, genesisHash, chainConfig)
 	}
+
+	if compat, ok := fgenesisErr.(*params.ConfigCompatError); ok {
+		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
+		evr.fblockchain.SetHead(compat.RewindTo)
+		rawdb.WriteChainConfig(chainDb, fgenesisHash, fchainConfig)
+	}
+
 	evr.bloomIndexer.Start(evr.blockchain)
 
 	if config.TxPool.Journal != "" {

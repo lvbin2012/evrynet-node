@@ -316,7 +316,7 @@ func (api *RetestethAPI) SetChainParams(ctx context.Context, chainParams ChainPa
 		ParentHash: chainParams.Genesis.ParentHash,
 		Alloc:      accounts,
 	}
-	chainConfig, genesisHash, err := core.SetupGenesisBlock(ethDb, genesis)
+	chainConfig, genesisHash, err := core.SetupGenesisBlock(ethDb, genesis, genesis.Config.IsFinalChain)
 	if err != nil {
 		return false, err
 	}

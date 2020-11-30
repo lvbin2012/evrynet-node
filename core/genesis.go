@@ -57,9 +57,9 @@ type Genesis struct {
 
 	// These fields are used for consensus tests. Please don't use them
 	// in actual genesis blocks.
-	Number       uint64      `json:"number"`
-	GasUsed      uint64      `json:"gasUsed"`
-	ParentHash   common.Hash `json:"parentHash"`
+	Number     uint64      `json:"number"`
+	GasUsed    uint64      `json:"gasUsed"`
+	ParentHash common.Hash `json:"parentHash"`
 }
 
 // GenesisAlloc specifies the initial state that is part of the genesis block.
@@ -150,15 +150,17 @@ func (e *GenesisMismatchError) Error() string {
 // error is a *params.ConfigCompatError and the new, unwritten config is returned.
 //
 // The returned chain configuration is never nil.
-func SetupGenesisBlock(db evrdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
-	return SetupGenesisBlockWithOverride(db, genesis)
+func SetupGenesisBlock(db evrdb.Database, genesis *Genesis, isFinalChain bool) (*params.ChainConfig, common.Hash, error) {
+	return SetupGenesisBlockWithOverride(db, genesis, isFinalChain)
 }
-func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis) (*params.ChainConfig, common.Hash, error) {
+func SetupGenesisBlockWithOverride(db evrdb.Database, genesis *Genesis, isFinalChain bool) (*params.ChainConfig, common.Hash, error) {
 	if genesis != nil && genesis.Config == nil {
 		return params.AllEthashProtocolChanges, common.Hash{}, errGenesisNoConfig
 	}
+	if genesis != nil && genesis.Config != nil {
+		isFinalChain = genesis.Config.IsFinalChain
+	}
 	// Just commit the new block if there is no stored genesis block.
-	isFinalChain := false
 
 	//TODO isFinalChain give value
 	stored := rawdb.ReadCanonicalHash(db, 0, isFinalChain)
@@ -289,12 +291,12 @@ func (g *Genesis) Commit(db evrdb.Database) (*types.Block, error) {
 		return nil, fmt.Errorf("can't commit genesis block with number > 0")
 	}
 	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), g.Difficulty, g.Config.IsFinalChain)
-	rawdb.WriteBlock(db, block,g.Config.IsFinalChain)
+	rawdb.WriteBlock(db, block, g.Config.IsFinalChain)
 	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), nil, g.Config.IsFinalChain)
-	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64(),g.Config.IsFinalChain)
-	rawdb.WriteHeadBlockHash(db, block.Hash(),g.Config.IsFinalChain)
-	rawdb.WriteHeadFastBlockHash(db, block.Hash(),g.Config.IsFinalChain)
-	rawdb.WriteHeadHeaderHash(db, block.Hash(),g.Config.IsFinalChain)
+	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64(), g.Config.IsFinalChain)
+	rawdb.WriteHeadBlockHash(db, block.Hash(), g.Config.IsFinalChain)
+	rawdb.WriteHeadFastBlockHash(db, block.Hash(), g.Config.IsFinalChain)
+	rawdb.WriteHeadHeaderHash(db, block.Hash(), g.Config.IsFinalChain)
 
 	config := g.Config
 	if config == nil {

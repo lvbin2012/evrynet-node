@@ -201,7 +201,7 @@ func NewDatabaseWithFreezer(db evrdb.KeyValueStore, freezer string, namespace st
 			// store, otherwise we'll end up missing data. We check block #1 to decide
 			// if we froze anything previously or not, but do take care of databases with
 			// only the genesis block.
-			if ReadHeadHeaderHash(db, false) != common.BytesToHash(kvgenesis) {
+			if ReadHeadHeaderHash(db, true) != common.BytesToHash(kvgenesis) {
 				// Key-value store contains more data than the genesis block, make sure we
 				// didn't freeze anything yet.
 				if kvblob, _ := db.Get(getFinalKey(headerHashKey(1), true)); len(kvblob) == 0 {
