@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"github.com/Evrynetlabs/evrynet-node/accounts"
 	"github.com/Evrynetlabs/evrynet-node/common"
-	"github.com/Evrynetlabs/evrynet-node/consensus/clique"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/core/vm"
 	"github.com/Evrynetlabs/evrynet-node/log"
+	"github.com/Evrynetlabs/evrynet-node/rlp"
 	"math/big"
 	"time"
 )
@@ -57,7 +58,7 @@ func (fb *FBManager) CreateFinaliseBlock(epoch int64, b *types.Block) *types.Blo
 
 	extra := makeExtraData(nil)
 	if len(extra) < 32 {
-		extra = append(extra, bytes.Repeat([]byte{0x00}, 97-len(extra))...)
+		extra = append(extra, bytes.Repeat([]byte{0x00}, 32-len(extra))...)
 	}
 
 	parent := fb.finaliseBlockchain.CurrentBlock()
@@ -86,6 +87,7 @@ func (fb *FBManager) CreateFinaliseBlock(epoch int64, b *types.Block) *types.Blo
 	}
 	// 考虑之后只存区块hash更加合适
 	var txs []*types.Transaction
+	lastestBlock :=  fb.blockchain.GetBlockByNumber(uint64(end))
 	for start < end {
 		b := fb.blockchain.GetBlockByNumber(uint64(end))
 		term := b.Transactions()
@@ -125,12 +127,36 @@ func (fb *FBManager) CreateFinaliseBlock(epoch int64, b *types.Block) *types.Blo
 	hash := block.Hash()
 
 	header = block.Header()
-	sighash, err := fb.signFn(accounts.Account{Address: fb.signer}, accounts.MimetypeClique, clique.CliqueRLP(header))
+	fce := fconsensus.FConExtra{EvilHeader: lastestBlock.Header(), CurrentBlock: lastestBlock.Hash()}
+	rlpbytes, err := rlp.EncodeToBytes(&fce)
+	if err != nil{
+		log.Error("FBManager rlp extra failed", "err", err.Error())
+		return nil
+	}
+	header.Extra = append(header.Extra, rlpbytes...)
+
+	signHash, err := fb.signFn(accounts.Account{Address: fb.signer}, accounts.MimetypeClique, fconsensus.FConRLP(header))
 	if err != nil {
 		log.Error("FBManager Sign block failed", "err", err.Error())
 		return nil
 	}
-	copy(header.Extra[32:], sighash)
+
+	fceWithSign, err := fconsensus.ExtractFConExtra(header)
+	if err != nil {
+		return nil
+	}
+
+	fceWithSign.Seal = signHash
+	byteBuffer := new(bytes.Buffer)
+	err = rlp.Encode(byteBuffer, &fceWithSign)
+	if err != nil {
+		return nil
+	}
+	header.Extra = append(header.Extra[:fconsensus.ExtraVanity], byteBuffer.Bytes()...)
+	if err != nil {
+		log.Error("FBManager Sign block failed", "err", err.Error())
+		return nil
+	}
 	block = block.WithSeal(header)
 
 	for i, receipt := range receipts {
@@ -150,7 +176,7 @@ func (fb *FBManager) CreateFinaliseBlock(epoch int64, b *types.Block) *types.Blo
 }
 
 func (fb *FBManager) Start() {
-	epoch := int64(5)
+	epoch := int64(2)
 	go func() {
 		for {
 			select {

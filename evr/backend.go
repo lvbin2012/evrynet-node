@@ -20,6 +20,7 @@ package evr
 import (
 	"errors"
 	"fmt"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"math/big"
 	"runtime"
 	"sync"
@@ -182,7 +183,18 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if err != nil {
 		return nil, err
 	}
-	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, evr.engine, vmConfig, evr.shouldPreserve)
+
+
+	fengin := fconsensus.New(chainDb)
+	coinbase, _ := evr.Etherbase()
+	wallet, err := evr.accountManager.Find(accounts.Account{Address: coinbase})
+	if wallet == nil || err != nil {
+		log.Error("Etherbase account unavailable locally", "err", err)
+		return nil, fmt.Errorf("signer missing: %v", err)
+	}
+	fengin.Authorize(coinbase, wallet.SignData)
+
+	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, fengin, vmConfig, evr.shouldPreserve)
 	if err != nil {
 		return nil, err
 	}
