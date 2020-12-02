@@ -247,7 +247,7 @@ func (fc *FConsensus) verifySeal(chain consensus.ChainReader, header *types.Head
 }
 
 func (fc *FConsensus) Prepare(chain consensus.FullChainReader, header *types.Header) error {
-	panic("implement me Prepare")
+	return nil
 }
 
 func (fc *FConsensus) Finalize(chain consensus.FullChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) error {
@@ -257,7 +257,9 @@ func (fc *FConsensus) Finalize(chain consensus.FullChainReader, header *types.He
 }
 
 func (fc *FConsensus) FinalizeAndAssemble(chain consensus.FullChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	panic("implement me FinalizeAndAssemble")
+	header.Root = state.IntermediateRoot(true)
+	header.UncleHash = types.CalcUncleHash(nil)
+	return types.NewBlock(header, txs, nil, receipts), nil
 }
 
 func (fc *FConsensus) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
@@ -293,7 +295,6 @@ func (fc *FConsensus) Seal(chain consensus.ChainReader, block *types.Block, resu
 	}
 	header.Extra = append(header.Extra[:ExtraVanity], byteBuffer.Bytes()...)
 	go func() {
-
 		select {
 		case <-stop:
 			return
@@ -323,7 +324,6 @@ func (fc *FConsensus) APIs(chain consensus.ChainReader) []rpc.API {
 
 func (fc *FConsensus) Close() error {
 	return nil
-	//panic("implement me")
 }
 
 func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, error) {
@@ -395,9 +395,7 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 		copy.MixDigest,
 		copy.Nonce,
 	})
-
 	if err != nil {
 		panic("can't encode: " + err.Error())
 	}
-
 }
