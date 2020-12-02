@@ -92,7 +92,7 @@ func (fce *FConExtra) DecodeRLP(s *rlp.Stream) error {
 	}
 	fce.Seal, fce.CurrentBlock = extra.Seal, extra.CurrentBlock
 
-	if len(extra.EvilBytes) > 0 {
+	if len(extra.EvilBytes) > 1 {
 		var header types.Header
 		if err := rlp.DecodeBytes(extra.EvilBytes, &header); err != nil {
 			return err
@@ -363,7 +363,7 @@ func SealHash(header *types.Header) (hash common.Hash) {
 }
 
 func encodeSigHeader(w io.Writer, header *types.Header) {
-	copy := *header
+	copy := types.CopyHeader(header)
 	if len(header.Extra) <= ExtraVanity {
 		panic(errInvalidHeaderExtra)
 	}

@@ -48,15 +48,12 @@ func TestRLPFconExtra(t *testing.T){
 		fmt.Println(hex.EncodeToString(res))
 	}
 
-	var fcenew FConExtra
-
-	err = rlp.DecodeBytes(res, &fcenew)
+	var fceNew FConExtra
+	err = rlp.DecodeBytes(res, &fceNew)
 	if err != nil{
 		t.Fatal(err)
 	}
-	fmt.Println(fcenew.EvilHeader.Hash().String(), fcenew.CurrentBlock.String())
-
-
+	fmt.Println(fceNew.EvilHeader.Hash().String(), fceNew.CurrentBlock.String())
 
 
 
