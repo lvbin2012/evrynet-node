@@ -87,7 +87,7 @@ func TestRLPFconExtra(t *testing.T) {
 }
 
 func TestExtractFConExtra(t *testing.T) {
-	extraStr := "d8830105008367657688676f312e31352e348664617277696e00000000000000f866b8410ed05e7efb80a6bb5e04abe48fb8d3a0b2c3c2ad2737301b21a8aeb762bfe0930327ce81f5ebeef58e91f356d7815e50d0ddb8ed5e9f7498825fac600bfb972400a036b13fd969212f319e5530049d69289813fe08628bceb59e35d4b3910a33699981c0"
+	extraStr := "d8830105008367657688676f312e31352e348664617277696e00000000000000f87cb841f63e8add5efc97ac894849dfd11b08a8a4b1c42e2b19c214465f354a3245e17232323e38d0cf7911fd64eab7d55f3baef0cfd22d8b48c01d3d21c08342bb678401a05ff77c3f46102ee446007fb59b355d5a46ff2efeee173d501792624e6fee5ce081c0d5941232fda40c3baf755a6a62b15f5c9d5a7faa64b6"
 	extra, err := hex.DecodeString(extraStr)
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestExtractFConExtra(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expect := common.HexToHash("0x36b13fd969212f319e5530049d69289813fe08628bceb59e35d4b3910a336999")
+	expect := common.HexToHash("0x5ff77c3f46102ee446007fb59b355d5a46ff2efeee173d501792624e6fee5ce0")
 	if expect != fce.CurrentBlock {
 		t.Errorf("FConExtra.Conrrent not match, expect:%s, but get:%s", expect.String(), fce.CurrentBlock.String())
 	}

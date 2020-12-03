@@ -178,6 +178,11 @@ type CliqueConfig struct {
 	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
 }
 
+type FConConfig struct {
+	Period uint64 `json:"period"` // Number of seconds between blocks to enforce
+	Epoch  uint64 `json:"epoch"`  // Epoch length to reset votes and checkpoint
+}
+
 // String implements the stringer interface, returning the consensus engine details.
 func (c *CliqueConfig) String() string {
 	return "clique"

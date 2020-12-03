@@ -184,8 +184,12 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 		return nil, err
 	}
 
-
-	fengin := fconsensus.New(chainDb)
+	conf := &params.FConConfig{}
+	if fchainConfig.Clique!= nil{
+		conf.Epoch = fchainConfig.Clique.Epoch
+		conf.Period = fchainConfig.Clique.Period
+	}
+	fengin := fconsensus.New(conf, chainDb)
 	coinbase, _ := evr.Etherbase()
 	wallet, err := evr.accountManager.Find(accounts.Account{Address: coinbase})
 	if wallet == nil || err != nil {
@@ -198,7 +202,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if err != nil {
 		return nil, err
 	}
-	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain)
+	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fengin)
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)

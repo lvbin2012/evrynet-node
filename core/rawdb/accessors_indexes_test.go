@@ -35,7 +35,7 @@ func TestLookupStorage(t *testing.T) {
 		{
 			"DatabaseV6",
 			func(db evrdb.Writer, block *types.Block) {
-				WriteTxLookupEntries(db, block)
+				WriteTxLookupEntries(db, block, false)
 			},
 		},
 		{
@@ -75,17 +75,17 @@ func TestLookupStorage(t *testing.T) {
 
 			// Check that no transactions entries are in a pristine database
 			for i, tx := range txs {
-				if txn, _, _, _ := ReadTransaction(db, tx.Hash()); txn != nil {
+				if txn, _, _, _ := ReadTransaction(db, tx.Hash(), false); txn != nil {
 					t.Fatalf("tx #%d [%x]: non existent transaction returned: %v", i, tx.Hash(), txn)
 				}
 			}
 			// Insert all the transactions into the database, and verify contents
-			WriteCanonicalHash(db, block.Hash(), block.NumberU64())
-			WriteBlock(db, block)
+			WriteCanonicalHash(db, block.Hash(), block.NumberU64(), false)
+			WriteBlock(db, block, false)
 			tc.writeTxLookupEntries(db, block)
 
 			for i, tx := range txs {
-				if txn, hash, number, index := ReadTransaction(db, tx.Hash()); txn == nil {
+				if txn, hash, number, index := ReadTransaction(db, tx.Hash(), false); txn == nil {
 					t.Fatalf("tx #%d [%x]: transaction not found", i, tx.Hash())
 				} else {
 					if hash != block.Hash() || number != block.NumberU64() || index != uint64(i) {
@@ -98,8 +98,8 @@ func TestLookupStorage(t *testing.T) {
 			}
 			// Delete the transactions and check purge
 			for i, tx := range txs {
-				DeleteTxLookupEntry(db, tx.Hash())
-				if txn, _, _, _ := ReadTransaction(db, tx.Hash()); txn != nil {
+				DeleteTxLookupEntry(db, tx.Hash(), false)
+				if txn, _, _, _ := ReadTransaction(db, tx.Hash(), false); txn != nil {
 					t.Fatalf("tx #%d [%x]: deleted transaction returned: %v", i, tx.Hash(), txn)
 				}
 			}

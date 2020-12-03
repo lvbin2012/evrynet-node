@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/Evrynetlabs/evrynet-node/accounts"
 	"github.com/Evrynetlabs/evrynet-node/common"
+	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
@@ -18,11 +19,12 @@ import (
 )
 
 const (
-	M = uint64(5)
-	K = uint64(5)
+	M = uint64(2)
+	K = uint64(2)
 )
 
 type FBManager struct {
+	engine             consensus.Engine
 	blockchain         *core.BlockChain
 	finaliseBlockchain *core.BlockChain
 	chainHeadCh        chan core.ChainHeadEvent
@@ -33,8 +35,9 @@ type FBManager struct {
 
 type SignerFn func(accounts.Account, string, []byte) ([]byte, error)
 
-func NewFBManager(bc, fbc *core.BlockChain) *FBManager {
+func NewFBManager(bc, fbc *core.BlockChain, engine consensus.Engine) *FBManager {
 	fb := &FBManager{
+		engine:             engine,
 		blockchain:         bc,
 		finaliseBlockchain: fbc,
 		chainHeadCh:        make(chan core.ChainHeadEvent, 10),
@@ -76,7 +79,7 @@ func (fb *FBManager) GetBlockSections(newBlock *types.Block) (uint64, uint64, bo
 
 }
 
-func (fb *FBManager) PrepareHeader() *types.Header {
+func (fb *FBManager) PrepareHeader() (*types.Header, error) {
 	extra := makeExtraData(nil)
 	if len(extra) < 32 {
 		extra = append(extra, bytes.Repeat([]byte{0x00}, 32-len(extra))...)
@@ -96,7 +99,7 @@ func (fb *FBManager) PrepareHeader() *types.Header {
 
 	num := parent.Number()
 
-	return &types.Header{
+	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     num.Add(num, common.Big1),
 		GasLimit:   core.CalcGasLimit(parent, 8000000, 8000000),
@@ -106,6 +109,10 @@ func (fb *FBManager) PrepareHeader() *types.Header {
 		Extra:      extra,
 		Difficulty: new(big.Int).SetInt64(2),
 	}
+
+	err := fb.engine.Prepare(fb.finaliseBlockchain, header)
+
+	return header, err
 }
 
 func (fb *FBManager) VerifyBlock(block *types.Block, statedb *state.StateDB) (types.Transactions, types.Receipts, uint64, error) {
@@ -151,7 +158,11 @@ func (fb *FBManager) CreateFinaliseBlock(newBlock *types.Block) *types.Block {
 		return nil
 	}
 	log.Info("FBManager: pack section", "start", start, "end", end)
-	header := fb.PrepareHeader()
+	header, err := fb.PrepareHeader()
+	if err != nil {
+		log.Error("FBManager: PrepareHeader failed", "err", err)
+		return nil
+	}
 	parent := fb.finaliseBlockchain.CurrentBlock()
 	statedb, err := state.New(parent.Root(), fb.finaliseBlockchain.StateCache())
 	var (
@@ -181,40 +192,35 @@ func (fb *FBManager) CreateFinaliseBlock(newBlock *types.Block) *types.Block {
 	latestRoot := packBlock.Root()
 	copy(header.Root[:], latestRoot[:])
 	header.GasUsed = gasUsedSum
-	block := types.NewBlock(header, txsSum, nil, receiptsSum)
-	header = block.Header()
+	//block := types.NewBlock(header, txsSum, nil, receiptsSum)
+	//header = block.Header()
 
-	fce := fconsensus.FConExtra{EvilHeader: evilHeader, CurrentBlock: currentHash}
+	fce, err := fconsensus.ExtractFConExtra(header)
+	if err != nil {
+		log.Error("FBManager ExtractFConExtra  failed", "err", err.Error())
+		return nil
+	}
+	fce.EvilHeader = evilHeader
+	fce.CurrentBlock = currentHash
 	rlpbytes, err := rlp.EncodeToBytes(&fce)
 	if err != nil {
 		log.Error("FBManager rlp extra failed", "err", err.Error())
 		return nil
 	}
-	header.Extra = append(header.Extra, rlpbytes...)
+	header.Extra = append(header.Extra[:fconsensus.ExtraVanity], rlpbytes...)
+	block := types.NewBlock(header, txsSum, nil, receiptsSum)
 
-	signHash, err := fb.signFn(accounts.Account{Address: fb.signer}, accounts.MimetypeClique, fconsensus.FConRLP(header))
-	if err != nil {
-		log.Error("FBManager Sign block failed", "err", err.Error())
-		return nil
-	}
+	results := make(chan *types.Block)
 
-	fceWithSign, err := fconsensus.ExtractFConExtra(header)
-	if err != nil {
-		return nil
-	}
+	go func(b *types.Block) {
+		fb.engine.Seal(fb.finaliseBlockchain, b, results, fb.abort)
+	}(block)
 
-	fceWithSign.Seal = signHash
-	byteBuffer := new(bytes.Buffer)
-	err = rlp.Encode(byteBuffer, &fceWithSign)
-	if err != nil {
+	select {
+	case block = <-results:
+	case <-fb.abort:
 		return nil
 	}
-	header.Extra = append(header.Extra[:fconsensus.ExtraVanity], byteBuffer.Bytes()...)
-	if err != nil {
-		log.Error("FBManager Sign block failed", "err", err.Error())
-		return nil
-	}
-	block = block.WithSeal(header)
 	hash := block.Hash()
 
 	for i, receipt := range receiptsSum {
