@@ -115,25 +115,28 @@ func (fb *FBManager) PrepareHeader() (*types.Header, error) {
 	return header, err
 }
 
-func (fb *FBManager) VerifyBlock(block *types.Block, statedb *state.StateDB) (types.Transactions, types.Receipts, uint64, error) {
+func (fb *FBManager) VerifyBlock(block *types.Block, statedb *state.StateDB, fheader *types.Header, tcount *int, gasUsed *uint64) (types.Transactions, types.Receipts, uint64, error) {
 	var (
 		receipts types.Receipts
-		gasUsed  = new(uint64)
-		header   = block.Header()
-		gp       = new(core.GasPool).AddGas(block.GasLimit())
+		//header   = block.Header()
+		gp = new(core.GasPool).AddGas(block.GasLimit())
 	)
+	gasUsedPre := *gasUsed
 	txs := block.Transactions()
 	for _, tx := range txs {
 		fb.finaliseBlockchain.GetVMConfig()
+		statedb.Prepare(tx.Hash(), common.Hash{}, *tcount)
 		receipt, _, err := core.ApplyTransaction(fb.finaliseBlockchain.Config(), fb.finaliseBlockchain, nil, gp,
-			statedb, header, tx, gasUsed, vm.Config{})
+			statedb, fheader, tx, gasUsed, vm.Config{})
 		if err != nil {
 			log.Error("FBManager Apply transactions failed", "err", err.Error())
 			return nil, nil, 0, err
 		}
 		receipts = append(receipts, receipt)
+		*tcount ++
 	}
 	root := statedb.IntermediateRoot(true)
+
 	if root != block.Root() {
 		errStr := fmt.Sprintf("block: %s, number: %d  stateRoot is not equal, we get: %s, expect: %s", block.Hash().String(),
 			block.Number().String(), root.String(), block.Root().String())
@@ -141,7 +144,7 @@ func (fb *FBManager) VerifyBlock(block *types.Block, statedb *state.StateDB) (ty
 		return nil, nil, 0, errors.New(errStr)
 	}
 
-	if *gasUsed != block.GasUsed() {
+	if (*gasUsed - gasUsedPre) != block.GasUsed() {
 		errStr := fmt.Sprintf("block: %s, number: %d  gasUsed is not equal, we get: %s, expect: %s", block.Hash().String(),
 			block.Number().String(), *gasUsed, block.GasUsed())
 		log.Error("FBManager Apply transactions failed", "err", errStr)
@@ -164,36 +167,37 @@ func (fb *FBManager) CreateFinaliseBlock(newBlock *types.Block) *types.Block {
 		return nil
 	}
 	parent := fb.finaliseBlockchain.CurrentBlock()
+
 	statedb, err := state.New(parent.Root(), fb.finaliseBlockchain.StateCache())
 	var (
 		txsSum      types.Transactions
 		receiptsSum types.Receipts
-		gasUsedSum  uint64
 		evilHeader  *types.Header
+		txCount     = 0
+		gasUsedSum  = new(uint64)
 	)
-
 	for start <= end {
 		blockTerm := fb.blockchain.GetBlockByNumber(start)
 		start++
-		txs, receipts, gasUsed, err := fb.VerifyBlock(blockTerm, statedb)
+		txs, receipts, _, err := fb.VerifyBlock(blockTerm, statedb, header, &txCount, gasUsedSum)
 		if err != nil {
 			evilHeader = blockTerm.Header()
 			break
 		}
 		txsSum = append(txsSum, txs...)
 		receiptsSum = append(receiptsSum, receipts...)
-		gasUsedSum += gasUsed
+
 	}
+
 	packBlock := fb.blockchain.GetBlockByNumber(start - 1)
 	log.Info("FBManager: latest package block", "hash", packBlock.Hash().String(), "number", packBlock.Number().String())
 	log.Info("FBManager: pack transactions", "len", len(txsSum), "gasUsed", gasUsedSum)
 
 	currentHash := packBlock.Hash()
 	latestRoot := packBlock.Root()
+
 	copy(header.Root[:], latestRoot[:])
-	header.GasUsed = gasUsedSum
-	//block := types.NewBlock(header, txsSum, nil, receiptsSum)
-	//header = block.Header()
+	header.GasUsed = *gasUsedSum
 
 	fce, err := fconsensus.ExtractFConExtra(header)
 	if err != nil {
