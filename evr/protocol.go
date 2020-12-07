@@ -36,16 +36,17 @@ const (
 	//The Tendermint consensus implementation
 	//TODO: official declaration of this protocol with an EIP
 	eth64 = 64
+	eth65 = 65
 )
 
 // ProtocolName is the official short name of the protocol used during capability negotiation.
 var ProtocolName = "evr"
 
 // ProtocolVersions are the supported versions of the evr protocol (first is primary).
-var ProtocolVersions = []uint{eth64, eth63, eth62}
+var ProtocolVersions = []uint{eth65, eth64, eth63, eth62}
 
 // ProtocolLengths are the number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = []uint64{18, 17, 8}
+var ProtocolLengths = []uint64{49, 18, 17, 8}
 
 const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 
@@ -69,7 +70,21 @@ const (
 
 	// TendermintMsg is the new message belong to evr/64.
 	// However due to packages importability it is kept at ./consensus/
+	// TendermintMsg = 0x11
 
+	// Final blockChain msg
+	NewFBlockHashesMsg  = 0x21
+	FTxMsg              = 0x22
+	GetFBlockHeadersMsg = 0x23
+	FBlockHeadersMsg    = 0x24
+	GetFBlockBodiesMsg  = 0x25
+	FBlockBodiesMsg     = 0x26
+	FNewBlockMsg        = 0x27
+	// Protocol messages belonging to evr/63
+	GetFNodeDataMsg = 0x2d
+	FNodeDataMsg    = 0x2e
+	GetFReceiptsMsg = 0x2f
+	FReceiptsMsg    = 0x30
 )
 
 type errCode int
