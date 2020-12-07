@@ -85,14 +85,19 @@ type Peer struct {
 
 	head common.Hash
 	td   *big.Int
+
+	fHead common.Hash
+	fTD   *big.Int
+
 	lock sync.RWMutex
 
-	knownTxs    mapset.Set                // Set of transaction hashes known to be known by this Peer
-	knownBlocks mapset.Set                // Set of block hashes known to be known by this Peer
-	queuedTxs   chan []*types.Transaction // Queue of transactions to broadcast to the Peer
-	queuedProps chan *propEvent           // Queue of blocks to broadcast to the Peer
-	queuedAnns  chan *types.Block         // Queue of blocks to announce to the Peer
-	term        chan struct{}             // Termination channel to stop the broadcaster
+	knownTxs     mapset.Set                // Set of transaction hashes known to be known by this Peer
+	knownBlocks  mapset.Set                // Set of block hashes known to be known by this Peer
+	fKnownBlocks mapset.Set                // Set of block hashes known to be known by this Peer
+	queuedTxs    chan []*types.Transaction // Queue of transactions to broadcast to the Peer
+	queuedProps  chan *propEvent           // Queue of blocks to broadcast to the Peer
+	queuedAnns   chan *types.Block         // Queue of blocks to announce to the Peer
+	term         chan struct{}             // Termination channel to stop the broadcaster
 }
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
@@ -361,7 +366,7 @@ func (p *Peer) RequestReceipts(hashes []common.Hash) error {
 
 // Handshake executes the evr protocol handshake, negotiating version number,
 // network IDs, difficulties, head and genesis blocks.
-func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis common.Hash) error {
+func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis common.Hash, fTD *big.Int, fHead common.Hash, fGenesis common.Hash) error {
 	// Send out own handshake in a new thread
 	errc := make(chan error, 2)
 	var status statusData // safe to read after two values have been received from errc
@@ -373,10 +378,13 @@ func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis 
 			TD:              td,
 			CurrentBlock:    head,
 			GenesisBlock:    genesis,
+			FTD:             fTD,
+			FCurrentBlock:   fHead,
+			FGenesisBlock:   fGenesis,
 		})
 	}()
 	go func() {
-		errc <- p.readStatus(network, &status, genesis)
+		errc <- p.readStatus(network, &status, genesis, fGenesis)
 	}()
 	timeout := time.NewTimer(handshakeTimeout)
 	defer timeout.Stop()
@@ -390,11 +398,11 @@ func (p *Peer) Handshake(network uint64, td *big.Int, head common.Hash, genesis 
 			return p2p.DiscReadTimeout
 		}
 	}
-	p.td, p.head = status.TD, status.CurrentBlock
+	p.td, p.head, p.fTD, p.fHead = status.TD, status.CurrentBlock, status.FTD, status.FCurrentBlock
 	return nil
 }
 
-func (p *Peer) readStatus(network uint64, status *statusData, genesis common.Hash) (err error) {
+func (p *Peer) readStatus(network uint64, status *statusData, genesis common.Hash, fGenesis common.Hash) (err error) {
 	msg, err := p.rw.ReadMsg()
 	if err != nil {
 		return err
@@ -411,6 +419,9 @@ func (p *Peer) readStatus(network uint64, status *statusData, genesis common.Has
 	}
 	if status.GenesisBlock != genesis {
 		return errResp(ErrGenesisBlockMismatch, "%x (!= %x)", status.GenesisBlock[:8], genesis[:8])
+	}
+	if status.FGenesisBlock != fGenesis {
+		return errResp(ErrGenesisBlockMismatch, " fGenesis %x (!= %x)", status.GenesisBlock[:8], genesis[:8])
 	}
 	if status.NetworkId != network {
 		return errResp(ErrNetworkIdMismatch, "%d (!= %d)", status.NetworkId, network)

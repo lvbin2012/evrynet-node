@@ -77,10 +77,12 @@ type ProtocolManager struct {
 	checkpointNumber uint64      // Block number for the sync progress validator to cross reference
 	checkpointHash   common.Hash // Block hash for the sync progress validator to cross reference
 
-	txpool      txPool
-	blockchain  *core.BlockChain
-	chainconfig *params.ChainConfig
-	maxPeers    int
+	txpool       txPool
+	blockchain   *core.BlockChain
+	fblockchain  *core.BlockChain
+	chainconfig  *params.ChainConfig
+	fchainconfig *params.ChainConfig
+	maxPeers     int
 
 	downloader *downloader.Downloader
 	fetcher    *fetcher.Fetcher
@@ -103,27 +105,31 @@ type ProtocolManager struct {
 
 	// wait group is used for graceful shutdowns during downloading
 	// and processing
-	wg     sync.WaitGroup
-	engine consensus.Engine
+	wg      sync.WaitGroup
+	engine  consensus.Engine
+	fengine consensus.Engine
 }
 
 // NewProtocolManager returns a new Evrynet sub protocol manager. The Evrynet sub protocol manages peers capable
 // with the Evrynet network.
-func NewProtocolManager(config *params.ChainConfig, mode downloader.SyncMode, networkID uint64, mux *event.TypeMux, txpool txPool, engine consensus.Engine, blockchain *core.BlockChain, chaindb evrdb.Database, cacheLimit int, whitelist map[uint64]common.Hash) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, fConfig *params.ChainConfig, mode downloader.SyncMode, networkID uint64, mux *event.TypeMux, txpool txPool, engine consensus.Engine, fEngine consensus.Engine, blockchain *core.BlockChain, fBlockchain *core.BlockChain, chaindb evrdb.Database, cacheLimit int, whitelist map[uint64]common.Hash) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
-		networkID:   networkID,
-		eventMux:    mux,
-		txpool:      txpool,
-		blockchain:  blockchain,
-		chainconfig: config,
-		peers:       newPeerSet(),
-		whitelist:   whitelist,
-		newPeerCh:   make(chan *Peer),
-		noMorePeers: make(chan struct{}),
-		txsyncCh:    make(chan *txsync),
-		quitSync:    make(chan struct{}),
-		engine:      engine,
+		networkID:    networkID,
+		eventMux:     mux,
+		txpool:       txpool,
+		blockchain:   blockchain,
+		chainconfig:  config,
+		fchainconfig: fConfig,
+		fblockchain:  fBlockchain,
+		peers:        newPeerSet(),
+		whitelist:    whitelist,
+		newPeerCh:    make(chan *Peer),
+		noMorePeers:  make(chan struct{}),
+		txsyncCh:     make(chan *txsync),
+		quitSync:     make(chan struct{}),
+		engine:       engine,
+		fengine:      fEngine,
 	}
 
 	if handler, ok := engine.(consensus.Handler); ok {
@@ -303,12 +309,17 @@ func (pm *ProtocolManager) handle(p *Peer) error {
 	// Execute the Evrynet handshake
 	var (
 		genesis = pm.blockchain.Genesis()
+		fGeneis = pm.fblockchain.Genesis()
 		head    = pm.blockchain.CurrentHeader()
+		fHead   = pm.fblockchain.CurrentHeader()
 		hash    = head.Hash()
+		fHash   = fHead.Hash()
 		number  = head.Number.Uint64()
+		fnumber = fHead.Number.Uint64()
 		td      = pm.blockchain.GetTd(hash, number)
+		fTD     = pm.fblockchain.GetTd(fHash, fnumber)
 	)
-	if err := p.Handshake(pm.networkID, td, hash, genesis.Hash()); err != nil {
+	if err := p.Handshake(pm.networkID, td, hash, genesis.Hash(), fTD, fHash, fGeneis.Hash()); err != nil {
 		p.Log().Debug("Evrynet handshake failed", "err", err)
 		return err
 	}

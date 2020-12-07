@@ -138,14 +138,14 @@ func (fb *FBManager) VerifyBlock(block *types.Block, statedb *state.StateDB, fhe
 	root := statedb.IntermediateRoot(true)
 
 	if root != block.Root() {
-		errStr := fmt.Sprintf("block: %s, number: %d  stateRoot is not equal, we get: %s, expect: %s", block.Hash().String(),
+		errStr := fmt.Sprintf("block: %s, number: %s  stateRoot is not equal, we get: %s, expect: %s", block.Hash().String(),
 			block.Number().String(), root.String(), block.Root().String())
 		log.Error("FBManager Apply transactions failed", "err", errStr)
 		return nil, nil, 0, errors.New(errStr)
 	}
 
 	if (*gasUsed - gasUsedPre) != block.GasUsed() {
-		errStr := fmt.Sprintf("block: %s, number: %d  gasUsed is not equal, we get: %s, expect: %s", block.Hash().String(),
+		errStr := fmt.Sprintf("block: %s, number: %s  gasUsed is not equal, we get: %d, expect: %d", block.Hash().String(),
 			block.Number().String(), *gasUsed, block.GasUsed())
 		log.Error("FBManager Apply transactions failed", "err", errStr)
 		return nil, nil, 0, errors.New(errStr)

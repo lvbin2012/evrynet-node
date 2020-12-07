@@ -138,6 +138,9 @@ type statusData struct {
 	TD              *big.Int
 	CurrentBlock    common.Hash
 	GenesisBlock    common.Hash
+	FTD             *big.Int
+	FCurrentBlock   common.Hash
+	FGenesisBlock   common.Hash
 }
 
 // newBlockHashesData is the network packet for the block announcements.

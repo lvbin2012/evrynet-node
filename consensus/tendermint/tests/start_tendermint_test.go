@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/backend"
 	core2 "github.com/Evrynetlabs/evrynet-node/consensus/tendermint/core"
@@ -63,11 +64,11 @@ func TestStartingTendermint(t *testing.T) {
 	// Must Handshake for peer to init peer.td, peer.head
 	genesisHash := core.DefaultGenesisBlock().ToBlock(nil).Hash()
 	go func() {
-		err := p1.Handshake(evr.DefaultConfig.NetworkId, big.NewInt(0), headHash, genesisHash)
+		err := p1.Handshake(evr.DefaultConfig.NetworkId, big.NewInt(0), headHash, genesisHash, nil, common.Hash{}, common.Hash{})
 		assert.NoError(t, err)
 	}()
 	go func() {
-		err := p2.Handshake(evr.DefaultConfig.NetworkId, big.NewInt(0), headHash, genesisHash)
+		err := p2.Handshake(evr.DefaultConfig.NetworkId, big.NewInt(0), headHash, genesisHash, nil, common.Hash{}, common.Hash{})
 		assert.NoError(t, err)
 	}()
 	time.Sleep(2 * time.Second) // Wait for handshaking

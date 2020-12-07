@@ -521,10 +521,12 @@ func testCheckpointChallenge(t *testing.T, syncmode downloader.SyncMode, checkpo
 
 	// Initialize a chain and generate a fake CHT if checkpointing is enabled
 	var (
-		db      = rawdb.NewMemoryDatabase()
-		config  = new(params.ChainConfig)
-		genesis = (&core.Genesis{Config: config}).MustCommit(db)
+		db       = rawdb.NewMemoryDatabase()
+		config   = new(params.ChainConfig)
+		genesis  = (&core.Genesis{Config: config}).MustCommit(db)
+		fConfig  = new(params.ChainConfig)
 	)
+
 	// If checkpointing is enabled, create and inject a fake CHT and the corresponding
 	// chllenge response.
 	var response *types.Header
@@ -545,7 +547,12 @@ func testCheckpointChallenge(t *testing.T, syncmode downloader.SyncMode, checkpo
 	if err != nil {
 		t.Fatalf("failed to create new blockchain: %v", err)
 	}
-	pm, err := NewProtocolManager(config, syncmode, DefaultConfig.NetworkId, new(event.TypeMux), new(testTxPool), ethash.NewFaker(), blockchain, db, 1, nil)
+	fBlockchain, err := core.NewBlockChain(db, nil, fConfig, ethash.NewFaker(), vm.Config{}, nil)
+	if err != nil {
+		t.Fatalf("failed to create new blockchain: %v", err)
+	}
+	pm, err := NewProtocolManager(config, fConfig, syncmode, DefaultConfig.NetworkId, new(event.TypeMux), new(testTxPool),
+		ethash.NewFaker(), ethash.NewFaker(), blockchain, fBlockchain, db, 1, nil)
 	if err != nil {
 		t.Fatalf("failed to start test protocol manager: %v", err)
 	}
@@ -553,7 +560,7 @@ func testCheckpointChallenge(t *testing.T, syncmode downloader.SyncMode, checkpo
 	defer pm.Stop()
 
 	// Connect a new Peer and check that we receive the checkpoint challenge
-	peer, _ := newTestPeer("Peer", eth63, pm, true)
+	peer, _ := newTestPeer("Peer", eth65, pm, true)
 	defer peer.close()
 
 	if checkpoint {
@@ -632,7 +639,7 @@ func testBroadcastBlock(t *testing.T, totalPeers, broadcastExpected int) {
 	if err != nil {
 		t.Fatalf("failed to create new blockchain: %v", err)
 	}
-	pm, err := NewProtocolManager(config, downloader.FullSync, DefaultConfig.NetworkId, evmux, new(testTxPool), pow, blockchain, db, 1, nil)
+	pm, err := NewProtocolManager(config, nil, downloader.FullSync, DefaultConfig.NetworkId, evmux, new(testTxPool), pow, nil, blockchain, nil, db, 1, nil)
 	if err != nil {
 		t.Fatalf("failed to start test protocol manager: %v", err)
 	}

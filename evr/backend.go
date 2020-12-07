@@ -185,24 +185,24 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	}
 
 	conf := &params.FConConfig{}
-	if fchainConfig.Clique!= nil{
+	if fchainConfig.Clique != nil {
 		conf.Epoch = fchainConfig.Clique.Epoch
 		conf.Period = fchainConfig.Clique.Period
 	}
-	fengin := fconsensus.New(conf, chainDb)
+	fEngin := fconsensus.New(conf, chainDb)
 	coinbase, _ := evr.Etherbase()
 	wallet, err := evr.accountManager.Find(accounts.Account{Address: coinbase})
 	if wallet == nil || err != nil {
 		log.Error("Etherbase account unavailable locally", "err", err)
 		return nil, fmt.Errorf("signer missing: %v", err)
 	}
-	fengin.Authorize(coinbase, wallet.SignData)
+	fEngin.Authorize(coinbase, wallet.SignData)
 
-	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, fengin, vmConfig, evr.shouldPreserve)
+	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, fEngin, vmConfig, evr.shouldPreserve)
 	if err != nil {
 		return nil, err
 	}
-	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fengin)
+	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fEngin)
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -225,7 +225,9 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 
 	// Permit the downloader to use the trie cache allowance during fast sync
 	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit
-	if evr.protocolManager, err = NewProtocolManager(chainConfig, config.SyncMode, config.NetworkId, evr.eventMux, evr.txPool, evr.engine, evr.blockchain, chainDb, cacheLimit, config.Whitelist); err != nil {
+	if evr.protocolManager, err = NewProtocolManager(chainConfig, fchainConfig, config.SyncMode, config.NetworkId,
+		evr.eventMux, evr.txPool, evr.engine, fEngin, evr.blockchain, evr.fBlockchain, chainDb, cacheLimit,
+		config.Whitelist); err != nil {
 		return nil, err
 	}
 	evr.miner = miner.New(evr, &config.Miner, chainConfig, evr.EventMux(), evr.engine, evr.isLocalBlock)
