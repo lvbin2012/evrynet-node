@@ -93,7 +93,7 @@ type Peer struct {
 
 	knownTxs     mapset.Set                // Set of transaction hashes known to be known by this Peer
 	knownBlocks  mapset.Set                // Set of block hashes known to be known by this Peer
-	fKnownBlocks mapset.Set                // Set of block hashes known to be known by this Peer
+	knownFBlocks mapset.Set                // Set of block hashes known to be known by this Peer
 	queuedTxs    chan []*types.Transaction // Queue of transactions to broadcast to the Peer
 	queuedProps  chan *propEvent           // Queue of blocks to broadcast to the Peer
 	queuedAnns   chan *types.Block         // Queue of blocks to announce to the Peer
@@ -102,16 +102,17 @@ type Peer struct {
 
 func newPeer(version int, p *p2p.Peer, rw p2p.MsgReadWriter) *Peer {
 	return &Peer{
-		Peer:        p,
-		rw:          rw,
-		version:     version,
-		id:          fmt.Sprintf("%x", p.ID().Bytes()[:8]),
-		knownTxs:    mapset.NewSet(),
-		knownBlocks: mapset.NewSet(),
-		queuedTxs:   make(chan []*types.Transaction, maxQueuedTxs),
-		queuedProps: make(chan *propEvent, maxQueuedProps),
-		queuedAnns:  make(chan *types.Block, maxQueuedAnns),
-		term:        make(chan struct{}),
+		Peer:         p,
+		rw:           rw,
+		version:      version,
+		id:           fmt.Sprintf("%x", p.ID().Bytes()[:8]),
+		knownTxs:     mapset.NewSet(),
+		knownBlocks:  mapset.NewSet(),
+		knownFBlocks: mapset.NewSet(),
+		queuedTxs:    make(chan []*types.Transaction, maxQueuedTxs),
+		queuedProps:  make(chan *propEvent, maxQueuedProps),
+		queuedAnns:   make(chan *types.Block, maxQueuedAnns),
+		term:         make(chan struct{}),
 	}
 }
 
@@ -171,6 +172,13 @@ func (p *Peer) Head() (hash common.Hash, td *big.Int) {
 	return hash, new(big.Int).Set(p.td)
 }
 
+func (p *Peer) FHead() (hash common.Hash, td *big.Int) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	copy(hash[:], p.fHead[:])
+	return hash, new(big.Int).Set(p.fTD)
+}
 // SetHead updates the head hash and total difficulty of the Peer.
 func (p *Peer) SetHead(hash common.Hash, td *big.Int) {
 	p.lock.Lock()
@@ -178,6 +186,14 @@ func (p *Peer) SetHead(hash common.Hash, td *big.Int) {
 
 	copy(p.head[:], hash[:])
 	p.td.Set(td)
+}
+
+func (p *Peer) SetFHead(hash common.Hash, td *big.Int) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	copy(p.fHead[:], hash[:])
+	p.fTD.Set(td)
 }
 
 // MarkBlock marks a block as known for the Peer, ensuring that the block will
@@ -254,6 +270,22 @@ func (p *Peer) SendNewBlockHashes(hashes []common.Hash, numbers []uint64) error 
 	return p2p.Send(p.rw, NewBlockHashesMsg, request)
 }
 
+func (p *Peer) SendNewFBlockHashes(hashes []common.Hash, numbers []uint64) error {
+	// Mark all the block hashes as known, but ensure we don't overflow our limits
+	for _, hash := range hashes {
+		p.knownFBlocks.Add(hash)
+	}
+	for p.knownFBlocks.Cardinality() >= maxKnownBlocks {
+		p.knownFBlocks.Pop()
+	}
+	request := make(newBlockHashesData, len(hashes))
+	for i := 0; i < len(hashes); i++ {
+		request[i].Hash = hashes[i]
+		request[i].Number = numbers[i]
+	}
+	return p2p.Send(p.rw, NewFBlockHashesMsg, request)
+}
+
 // AsyncSendNewBlockHash queues the availability of a block for propagation to a
 // remote Peer. If the Peer's broadcast queue is full, the event is silently
 // dropped.
@@ -280,6 +312,15 @@ func (p *Peer) SendNewBlock(block *types.Block, td *big.Int) error {
 	return p2p.Send(p.rw, NewBlockMsg, []interface{}{block, td})
 }
 
+func (p *Peer) SendNewFBlock(block *types.Block, td *big.Int) error {
+	// Mark all the block hash as known, but ensure we don't overflow our limits
+	p.knownFBlocks.Add(block.Hash())
+	for p.knownFBlocks.Cardinality() >= maxKnownBlocks {
+		p.knownFBlocks.Pop()
+	}
+	return p2p.Send(p.rw, NewFBlockMsg, []interface{}{block, td})
+}
+
 // AsyncSendNewBlock queues an entire block for propagation to a remote Peer. If
 // the Peer's broadcast queue is full, the event is silently dropped.
 func (p *Peer) AsyncSendNewBlock(block *types.Block, td *big.Int) {
@@ -300,9 +341,17 @@ func (p *Peer) SendBlockHeaders(headers []*types.Header) error {
 	return p2p.Send(p.rw, BlockHeadersMsg, headers)
 }
 
+func (p *Peer) SendFBlockHeaders(headers []*types.Header) error {
+	return p2p.Send(p.rw, FBlockHeadersMsg, headers)
+}
+
 // SendBlockBodies sends a batch of block contents to the remote Peer.
 func (p *Peer) SendBlockBodies(bodies []*blockBody) error {
 	return p2p.Send(p.rw, BlockBodiesMsg, blockBodiesData(bodies))
+}
+
+func (p *Peer) SendFBlockBodies(bodies []*blockBody) error {
+	return p2p.Send(p.rw, FBlockBodiesMsg, blockBodiesData(bodies))
 }
 
 // SendBlockBodiesRLP sends a batch of block contents to the remote Peer from
@@ -311,16 +360,28 @@ func (p *Peer) SendBlockBodiesRLP(bodies []rlp.RawValue) error {
 	return p2p.Send(p.rw, BlockBodiesMsg, bodies)
 }
 
+func (p *Peer) SendFBlockBodiesRLP(bodies []rlp.RawValue) error {
+	return p2p.Send(p.rw, FBlockBodiesMsg, bodies)
+}
+
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
 func (p *Peer) SendNodeData(data [][]byte) error {
 	return p2p.Send(p.rw, NodeDataMsg, data)
 }
 
+func (p *Peer) SendFNodeData(data [][]byte) error {
+	return p2p.Send(p.rw, FNodeDataMsg, data)
+}
+
 // SendReceiptsRLP sends a batch of transaction receipts, corresponding to the
 // ones requested from an already RLP encoded format.
 func (p *Peer) SendReceiptsRLP(receipts []rlp.RawValue) error {
 	return p2p.Send(p.rw, ReceiptsMsg, receipts)
+}
+
+func (p *Peer) SendFReceiptsRLP(receipts []rlp.RawValue) error {
+	return p2p.Send(p.rw, FReceiptsMsg, receipts)
 }
 
 // RequestOneHeader is a wrapper around the header query functions to fetch a
@@ -330,11 +391,21 @@ func (p *Peer) RequestOneHeader(hash common.Hash) error {
 	return p2p.Send(p.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: hash}, Amount: uint64(1), Skip: uint64(0), Reverse: false})
 }
 
+func (p *Peer) RequestOneFHeader(hash common.Hash) error {
+	p.Log().Debug("Fetching Final chain single header", "hash", hash)
+	return p2p.Send(p.rw, GetFBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: hash}, Amount: uint64(1), Skip: uint64(0), Reverse: false})
+}
+
 // RequestHeadersByHash fetches a batch of blocks' headers corresponding to the
 // specified header query, based on the hash of an origin block.
 func (p *Peer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
 	p.Log().Debug("Fetching batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
 	return p2p.Send(p.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+}
+
+func (p *Peer) RequestFHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+	p.Log().Debug("Fetching Final chain batch of headers", "count", amount, "fromhash", origin, "skip", skip, "reverse", reverse)
+	return p2p.Send(p.rw, GetFBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Hash: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
 // RequestHeadersByNumber fetches a batch of blocks' headers corresponding to the
@@ -344,11 +415,21 @@ func (p *Peer) RequestHeadersByNumber(origin uint64, amount int, skip int, rever
 	return p2p.Send(p.rw, GetBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
 }
 
+func (p *Peer) RequestFHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
+	p.Log().Debug("Fetching Final chain batch of headers", "count", amount, "fromnum", origin, "skip", skip, "reverse", reverse)
+	return p2p.Send(p.rw, GetFBlockHeadersMsg, &getBlockHeadersData{Origin: hashOrNumber{Number: origin}, Amount: uint64(amount), Skip: uint64(skip), Reverse: reverse})
+}
+
 // RequestBodies fetches a batch of blocks' bodies corresponding to the hashes
 // specified.
 func (p *Peer) RequestBodies(hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of block bodies", "count", len(hashes))
 	return p2p.Send(p.rw, GetBlockBodiesMsg, hashes)
+}
+
+func (p *Peer) RequestFBodies(hashes []common.Hash) error {
+	p.Log().Debug("Fetching Final chain batch of block bodies", "count", len(hashes))
+	return p2p.Send(p.rw, GetFBlockBodiesMsg, hashes)
 }
 
 // RequestNodeData fetches a batch of arbitrary data from a node's known state
@@ -358,10 +439,20 @@ func (p *Peer) RequestNodeData(hashes []common.Hash) error {
 	return p2p.Send(p.rw, GetNodeDataMsg, hashes)
 }
 
+func (p *Peer) RequestFNodeData(hashes []common.Hash) error {
+	p.Log().Debug("Fetching Final chain batch of state data", "count", len(hashes))
+	return p2p.Send(p.rw, GetFNodeDataMsg, hashes)
+}
+
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
 func (p *Peer) RequestReceipts(hashes []common.Hash) error {
 	p.Log().Debug("Fetching batch of receipts", "count", len(hashes))
 	return p2p.Send(p.rw, GetReceiptsMsg, hashes)
+}
+
+func (p *Peer) RequestFReceipts(hashes []common.Hash) error {
+	p.Log().Debug("Fetching Final chain batch of receipts", "count", len(hashes))
+	return p2p.Send(p.rw, GetFReceiptsMsg, hashes)
 }
 
 // Handshake executes the evr protocol handshake, negotiating version number,

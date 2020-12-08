@@ -315,9 +315,9 @@ func (pm *ProtocolManager) handle(p *Peer) error {
 		hash    = head.Hash()
 		fHash   = fHead.Hash()
 		number  = head.Number.Uint64()
-		fnumber = fHead.Number.Uint64()
+		fNumber = fHead.Number.Uint64()
 		td      = pm.blockchain.GetTd(hash, number)
-		fTD     = pm.fblockchain.GetTd(fHash, fnumber)
+		fTD     = pm.fblockchain.GetTd(fHash, fNumber)
 	)
 	if err := p.Handshake(pm.networkID, td, hash, genesis.Hash(), fTD, fHash, fGeneis.Hash()); err != nil {
 		p.Log().Debug("Evrynet handshake failed", "err", err)

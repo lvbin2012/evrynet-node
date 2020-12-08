@@ -79,7 +79,7 @@ const (
 	FBlockHeadersMsg    = 0x24
 	GetFBlockBodiesMsg  = 0x25
 	FBlockBodiesMsg     = 0x26
-	FNewBlockMsg        = 0x27
+	NewFBlockMsg        = 0x27
 	// Protocol messages belonging to evr/63
 	GetFNodeDataMsg = 0x2d
 	FNodeDataMsg    = 0x2e
