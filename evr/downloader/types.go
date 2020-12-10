@@ -45,6 +45,11 @@ func (p *headerPack) IsFinalChain() bool { return p.isFinalChain }
 func (p *headerPack) Items() int         { return len(p.headers) }
 func (p *headerPack) Stats() string      { return fmt.Sprintf("%d", len(p.headers)) }
 
+type headerProcEvent struct {
+	headers      []*types.Header
+	isFinalChain bool
+}
+
 // bodyPack is a batch of block bodies returned by a peer.
 type bodyPack struct {
 	peerID       string

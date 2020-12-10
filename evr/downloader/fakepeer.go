@@ -50,7 +50,7 @@ func (p *FakePeer) Head() (common.Hash, *big.Int) {
 
 // RequestHeadersByHash implements downloader.Peer, returning a batch of headers
 // defined by the origin hash and the associated query parameters.
-func (p *FakePeer) RequestHeadersByHash(hash common.Hash, amount int, skip int, reverse bool) error {
+func (p *FakePeer) RequestHeadersByHash(hash common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
 	var (
 		headers []*types.Header
 		unknown bool
@@ -88,13 +88,13 @@ func (p *FakePeer) RequestHeadersByHash(hash common.Hash, amount int, skip int, 
 			}
 		}
 	}
-	p.dl.DeliverHeaders(p.id, false, headers)
+	p.dl.DeliverHeaders(p.id, isFinalChain, headers)
 	return nil
 }
 
 // RequestHeadersByNumber implements downloader.Peer, returning a batch of headers
 // defined by the origin number and the associated query parameters.
-func (p *FakePeer) RequestHeadersByNumber(number uint64, amount int, skip int, reverse bool) error {
+func (p *FakePeer) RequestHeadersByNumber(number uint64, amount int, skip int, reverse bool, isFinalChain bool) error {
 	var (
 		headers []*types.Header
 		unknown bool
@@ -115,47 +115,47 @@ func (p *FakePeer) RequestHeadersByNumber(number uint64, amount int, skip int, r
 		}
 		headers = append(headers, origin)
 	}
-	p.dl.DeliverHeaders(p.id, false, headers)
+	p.dl.DeliverHeaders(p.id, isFinalChain, headers)
 	return nil
 }
 
 // RequestBodies implements downloader.Peer, returning a batch of block bodies
 // corresponding to the specified block hashes.
-func (p *FakePeer) RequestBodies(hashes []common.Hash) error {
+func (p *FakePeer) RequestBodies(hashes []common.Hash, isFinalChain bool) error {
 	var (
 		txs    [][]*types.Transaction
 		uncles [][]*types.Header
 	)
 	for _, hash := range hashes {
-		block := rawdb.ReadBlock(p.db, hash, *p.hc.GetBlockNumber(hash), false)
+		block := rawdb.ReadBlock(p.db, hash, *p.hc.GetBlockNumber(hash), isFinalChain)
 
 		txs = append(txs, block.Transactions())
 		uncles = append(uncles, block.Uncles())
 	}
-	p.dl.DeliverBodies(p.id, false, txs, uncles)
+	p.dl.DeliverBodies(p.id, isFinalChain, txs, uncles)
 	return nil
 }
 
 // RequestReceipts implements downloader.Peer, returning a batch of transaction
 // receipts corresponding to the specified block hashes.
-func (p *FakePeer) RequestReceipts(hashes []common.Hash) error {
+func (p *FakePeer) RequestReceipts(hashes []common.Hash, isFinalChain bool) error {
 	var receipts [][]*types.Receipt
 	for _, hash := range hashes {
-		receipts = append(receipts, rawdb.ReadRawReceipts(p.db, hash, *p.hc.GetBlockNumber(hash), false))
+		receipts = append(receipts, rawdb.ReadRawReceipts(p.db, hash, *p.hc.GetBlockNumber(hash), isFinalChain))
 	}
-	p.dl.DeliverReceipts(p.id, false, receipts)
+	p.dl.DeliverReceipts(p.id, isFinalChain, receipts)
 	return nil
 }
 
 // RequestNodeData implements downloader.Peer, returning a batch of state trie
 // nodes corresponding to the specified trie hashes.
-func (p *FakePeer) RequestNodeData(hashes []common.Hash) error {
+func (p *FakePeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
 	var data [][]byte
 	for _, hash := range hashes {
 		if entry, err := p.db.Get(hash.Bytes()); err == nil {
 			data = append(data, entry)
 		}
 	}
-	p.dl.DeliverNodeData(p.id, false, data)
+	p.dl.DeliverNodeData(p.id, isFinalChain, data)
 	return nil
 }

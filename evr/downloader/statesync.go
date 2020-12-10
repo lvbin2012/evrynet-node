@@ -58,9 +58,9 @@ type stateSyncStats struct {
 }
 
 // syncState starts downloading state with the given root hash.
-func (d *Downloader) syncState(root common.Hash) *stateSync {
+func (d *Downloader) syncState(root common.Hash, isFinalChain bool) *stateSync {
 	// Create the state sync
-	s := newStateSync(d, root)
+	s := newStateSync(d, root, isFinalChain)
 	select {
 	case d.stateSyncStart <- s:
 	case <-d.quitCh:
@@ -213,7 +213,8 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 // stateSync schedules requests for downloading a particular state trie defined
 // by a given state root.
 type stateSync struct {
-	d *Downloader // Downloader instance to access and manage current peerset
+	d            *Downloader // Downloader instance to access and manage current peerset
+	isFinalChain bool
 
 	sched  *trie.Sync                 // State trie sync scheduler defining the tasks
 	keccak hash.Hash                  // Keccak256 hasher to verify deliveries with
@@ -237,15 +238,16 @@ type stateTask struct {
 
 // newStateSync creates a new state trie download scheduler. This method does not
 // yet start the sync. The user needs to call run to initiate.
-func newStateSync(d *Downloader, root common.Hash) *stateSync {
+func newStateSync(d *Downloader, root common.Hash, isFinalChain bool) *stateSync {
 	return &stateSync{
-		d:       d,
-		sched:   state.NewStateSync(root, d.stateDB, d.stateBloom),
-		keccak:  sha3.NewLegacyKeccak256(),
-		tasks:   make(map[common.Hash]*stateTask),
-		deliver: make(chan *stateReq),
-		cancel:  make(chan struct{}),
-		done:    make(chan struct{}),
+		d:            d,
+		isFinalChain: isFinalChain,
+		sched:        state.NewStateSync(root, d.stateDB, d.stateBloom),
+		keccak:       sha3.NewLegacyKeccak256(),
+		tasks:        make(map[common.Hash]*stateTask),
+		deliver:      make(chan *stateReq),
+		cancel:       make(chan struct{}),
+		done:         make(chan struct{}),
 	}
 }
 
@@ -375,7 +377,7 @@ func (s *stateSync) assignTasks() {
 			req.peer.log.Trace("Requesting new batch of data", "type", "state", "count", len(req.items))
 			select {
 			case s.d.trackStateReq <- req:
-				req.peer.FetchNodeData(req.items)
+				req.peer.FetchNodeData(req.items, s.isFinalChain)
 			case <-s.cancel:
 			case <-s.d.cancelCh:
 			}

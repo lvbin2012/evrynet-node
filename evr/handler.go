@@ -344,7 +344,7 @@ func (pm *ProtocolManager) handle(p *Peer) error {
 	// If we have a trusted CHT, reject all peers below that (avoid fast sync eclipse)
 	if pm.checkpointHash != (common.Hash{}) {
 		// Request the Peer's checkpoint header for chain height/weight validation
-		if err := p.RequestHeadersByNumber(pm.checkpointNumber, 1, 0, false); err != nil {
+		if err := p.RequestHeadersByNumber(pm.checkpointNumber, 1, 0, false, false); err != nil {
 			return err
 		}
 		// Start a timer to disconnect if the Peer doesn't reply in time
@@ -362,7 +362,7 @@ func (pm *ProtocolManager) handle(p *Peer) error {
 	}
 	// If we have any explicit whitelist block hashes, request them
 	for number := range pm.whitelist {
-		if err := p.RequestHeadersByNumber(number, 1, 0, false); err != nil {
+		if err := p.RequestHeadersByNumber(number, 1, 0, false, false); err != nil {
 			return err
 		}
 	}
@@ -497,13 +497,9 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				query.Origin.Number += query.Skip + 1
 			}
 		}
-		if msg.Code == GetBlockBodiesMsg {
-			return p.SendBlockHeaders(headers)
-		} else {
-			return p.SendFBlockHeaders(headers)
-		}
+		return p.SendBlockHeaders(headers, msg.Code == GetFBlockHeadersMsg)
 
-	case msg.Code == BlockHeadersMsg || msg.Code == FBlockBodiesMsg:
+	case msg.Code == BlockHeadersMsg || msg.Code == FBlockHeadersMsg:
 		// A batch of headers arrived to one of our previous requests
 		var headers []*types.Header
 		if err := msg.Decode(&headers); err != nil {
@@ -585,11 +581,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				bytes += len(data)
 			}
 		}
-		if msg.Code == GetBlockBodiesMsg {
-			return p.SendBlockBodiesRLP(bodies)
-		} else {
-			return p.SendFBlockBodiesRLP(bodies)
-		}
+		return p.SendBlockBodiesRLP(bodies, msg.Code == GetFBlockBodiesMsg)
 
 	case msg.Code == BlockBodiesMsg || msg.Code == FBlockBodiesMsg:
 		// A batch of block bodies arrived to one of our previous requests
@@ -646,11 +638,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				bytes += len(entry)
 			}
 		}
-		if msg.Code == GetNodeDataMsg {
-			return p.SendNodeData(data)
-		} else {
-			return p.SendFNodeData(data)
-		}
+		return p.SendNodeData(data, msg.Code == GetFNodeDataMsg)
 
 	case p.version >= eth63 && (msg.Code == NodeDataMsg || msg.Code == FNodeDataMsg):
 		// A batch of node state data arrived to one of our previous requests
@@ -701,11 +689,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				bytes += len(encoded)
 			}
 		}
-		if msg.Code == GetReceiptsMsg {
-			return p.SendReceiptsRLP(receipts)
-		} else {
-			return p.SendFReceiptsRLP(receipts)
-		}
+		return p.SendReceiptsRLP(receipts, msg.Code == GetFReceiptsMsg)
 
 	case p.version >= eth63 && (msg.Code == ReceiptsMsg || msg.Code == FReceiptsMsg):
 		// A batch of receipts arrived to one of our previous requests
@@ -801,7 +785,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 
 // BroadcastBlock will either propagate a block to a subset of it's peers, or
 // will only announce it's availability (depending what's requested).
-func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
+func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool, isFinalChain bool) {
 	hash := block.Hash()
 	peers := pm.peers.PeersWithoutBlock(hash)
 
@@ -825,7 +809,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		}
 		transfer := peers[:transferLen]
 		for _, peer := range transfer {
-			peer.AsyncSendNewBlock(block, td)
+			peer.AsyncSendNewBlock(block, td, isFinalChain)
 		}
 		log.Trace("Propagated block", "hash", hash, "recipients", len(transfer), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 		return
@@ -833,7 +817,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	// Otherwise if the block is indeed in out own chain, announce it
 	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
 		for _, peer := range peers {
-			peer.AsyncSendNewBlockHash(block)
+			peer.AsyncSendNewBlockHash(block, isFinalChain)
 		}
 		log.Trace("Announced block", "hash", hash, "recipients", len(peers), "duration", common.PrettyDuration(time.Since(block.ReceivedAt)))
 	}
@@ -874,8 +858,8 @@ func (pm *ProtocolManager) minedBroadcastLoop() {
 	// automatically stops if unsubscribe
 	for obj := range pm.minedBlockSub.Chan() {
 		if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
-			pm.BroadcastBlock(ev.Block, true)  // First propagate block to peers
-			pm.BroadcastBlock(ev.Block, false) // Only then announce to the rest
+			pm.BroadcastBlock(ev.Block, true, ev.IsFinalChain)  // First propagate block to peers
+			pm.BroadcastBlock(ev.Block, false, ev.IsFinalChain) // Only then announce to the rest
 		}
 	}
 }

@@ -603,7 +603,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		if pm.fetcher != nil && pm.fetcher.requestedID(resp.ReqID) {
 			pm.fetcher.deliverHeaders(p, resp.ReqID, resp.Headers)
 		} else {
-			err := pm.downloader.DeliverHeaders(p.id, resp.Headers)
+			err := pm.downloader.DeliverHeaders(p.id, false, resp.Headers)
 			if err != nil {
 				log.Debug(fmt.Sprint(err))
 			}
@@ -1232,19 +1232,23 @@ func (pc *peerConnection) Head() (common.Hash, *big.Int) {
 	return pc.peer.HeadAndTd()
 }
 
-func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
+	msgCode := GetBlockHeadersMsg
+	if isFinalChain {
+		msgCode = GetFBlockHeadersMsg
+	}
 	reqID := genReqID()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
 			peer := dp.(*peer)
-			return peer.GetRequestCost(GetBlockHeadersMsg, amount)
+			return peer.GetRequestCost(uint64(msgCode), amount)
 		},
 		canSend: func(dp distPeer) bool {
 			return dp.(*peer) == pc.peer
 		},
 		request: func(dp distPeer) func() {
 			peer := dp.(*peer)
-			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
+			cost := peer.GetRequestCost(uint64(msgCode), amount)
 			peer.fcServer.QueuedRequest(reqID, cost)
 			return func() { peer.RequestHeadersByHash(reqID, cost, origin, amount, skip, reverse) }
 		},
@@ -1256,19 +1260,23 @@ func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, s
 	return nil
 }
 
-func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
+func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool, isFinalChain bool) error {
+	msgCode := GetBlockHeadersMsg
+	if isFinalChain {
+		msgCode = GetFBlockHeadersMsg
+	}
 	reqID := genReqID()
 	rq := &distReq{
 		getCost: func(dp distPeer) uint64 {
 			peer := dp.(*peer)
-			return peer.GetRequestCost(GetBlockHeadersMsg, amount)
+			return peer.GetRequestCost(uint64(msgCode), amount)
 		},
 		canSend: func(dp distPeer) bool {
 			return dp.(*peer) == pc.peer
 		},
 		request: func(dp distPeer) func() {
 			peer := dp.(*peer)
-			cost := peer.GetRequestCost(GetBlockHeadersMsg, amount)
+			cost := peer.GetRequestCost(uint64(msgCode), amount)
 			peer.fcServer.QueuedRequest(reqID, cost)
 			return func() { peer.RequestHeadersByNumber(reqID, cost, origin, amount, skip, reverse) }
 		},

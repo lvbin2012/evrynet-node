@@ -47,16 +47,16 @@ var (
 type blockRetrievalFn func(common.Hash) *types.Block
 
 // headerRequesterFn is a callback type for sending a header retrieval request.
-type headerRequesterFn func(common.Hash) error
+type headerRequesterFn func(common.Hash, bool) error
 
 // bodyRequesterFn is a callback type for sending a body retrieval request.
-type bodyRequesterFn func([]common.Hash) error
+type bodyRequesterFn func([]common.Hash, bool) error
 
 // headerVerifierFn is a callback type to verify a block's header for fast propagation.
 type headerVerifierFn func(header *types.Header) error
 
 // blockBroadcasterFn is a callback type for broadcasting a block to connected peers.
-type blockBroadcasterFn func(block *types.Block, propagate bool)
+type blockBroadcasterFn func(block *types.Block, propagate bool, isFinalChain bool)
 
 // chainHeightFn is a callback type to retrieve the current chain height.
 type chainHeightFn func() uint64
@@ -77,8 +77,9 @@ type announce struct {
 
 	origin string // Identifier of the peer originating the notification
 
-	fetchHeader headerRequesterFn // Fetcher function to retrieve the header of an announced block
-	fetchBodies bodyRequesterFn   // Fetcher function to retrieve the body of an announced block
+	fetchHeader  headerRequesterFn // Fetcher function to retrieve the header of an announced block
+	fetchBodies  bodyRequesterFn   // Fetcher function to retrieve the body of an announced block
+	isFinalChain bool
 }
 
 // headerFilterTask represents a batch of headers needing fetcher filtering.
@@ -99,8 +100,9 @@ type bodyFilterTask struct {
 
 // inject represents a schedules import operation.
 type inject struct {
-	origin string
-	block  *types.Block
+	origin       string
+	block        *types.Block
+	isFinalChain bool
 }
 
 // Fetcher is responsible for accumulating block announcements from various peers
@@ -308,7 +310,7 @@ func (f *Fetcher) loop() {
 				f.forgetBlock(hash)
 				continue
 			}
-			f.insert(op.origin, op.block)
+			f.insert(op.origin, op.block, op.isFinalChain)
 		}
 		// Wait for an outside event to occur
 		select {
@@ -382,14 +384,14 @@ func (f *Fetcher) loop() {
 				log.Trace("Fetching scheduled headers", "peer", peer, "list", hashes)
 
 				// Create a closure of the fetch and schedule in on a new thread
-				fetchHeader, hashes := f.fetching[hashes[0]].fetchHeader, hashes
+				fetchHeader, hashes, isFinalChain := f.fetching[hashes[0]].fetchHeader, hashes, f.fetching[hashes[0]].isFinalChain
 				go func() {
 					if f.fetchingHook != nil {
 						f.fetchingHook(hashes)
 					}
 					for _, hash := range hashes {
 						headerFetchMeter.Mark(1)
-						fetchHeader(hash) // Suboptimal, but protocol doesn't allow batch header retrievals
+						fetchHeader(hash, isFinalChain) // Suboptimal, but protocol doesn't allow batch header retrievals
 					}
 				}()
 			}
@@ -420,7 +422,8 @@ func (f *Fetcher) loop() {
 					f.completingHook(hashes)
 				}
 				bodyFetchMeter.Mark(int64(len(hashes)))
-				go f.completing[hashes[0]].fetchBodies(hashes)
+				isFinalChain := f.completing[hashes[0]].isFinalChain
+				go f.completing[hashes[0]].fetchBodies(hashes, isFinalChain)
 			}
 			// Schedule the next fetch if blocks are still pending
 			f.rescheduleComplete(completeTimer)
@@ -633,7 +636,7 @@ func (f *Fetcher) enqueue(peer string, block *types.Block) {
 // insert spawns a new goroutine to run a block insertion into the chain. If the
 // block's number is at the same height as the current import phase, it updates
 // the phase states accordingly.
-func (f *Fetcher) insert(peer string, block *types.Block) {
+func (f *Fetcher) insert(peer string, block *types.Block, isFinalChain bool) {
 	hash := block.Hash()
 
 	// Run the import on a new thread
@@ -652,7 +655,7 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 		case nil:
 			// All ok, quickly propagate to our peers
 			propBroadcastOutTimer.UpdateSince(block.ReceivedAt)
-			go f.broadcastBlock(block, true)
+			go f.broadcastBlock(block, true, isFinalChain)
 
 		case consensus.ErrFutureBlock:
 			// Weird future block, don't fail, but neither propagate
@@ -670,7 +673,7 @@ func (f *Fetcher) insert(peer string, block *types.Block) {
 		}
 		// If import succeeded, broadcast the block
 		propAnnounceOutTimer.UpdateSince(block.ReceivedAt)
-		go f.broadcastBlock(block, false)
+		go f.broadcastBlock(block, false, isFinalChain)
 
 		// Invoke the testing hook if needed
 		if f.importedHook != nil {

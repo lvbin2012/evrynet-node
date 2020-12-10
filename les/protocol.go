@@ -74,6 +74,20 @@ const (
 	// Protocol messages introduced in LPV3
 	StopMsg   = 0x16
 	ResumeMsg = 0x17
+
+	// Final blockChain msg
+	NewFBlockHashesMsg  = 0x21
+	FTxMsg              = 0x22
+	GetFBlockHeadersMsg = 0x23
+	FBlockHeadersMsg    = 0x24
+	GetFBlockBodiesMsg  = 0x25
+	FBlockBodiesMsg     = 0x26
+	NewFBlockMsg        = 0x27
+	// Protocol messages belonging to evr/63
+	GetFNodeDataMsg = 0x2d
+	FNodeDataMsg    = 0x2e
+	GetFReceiptsMsg = 0x2f
+	FReceiptsMsg    = 0x30
 )
 
 type requestInfo struct {

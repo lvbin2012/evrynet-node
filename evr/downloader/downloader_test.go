@@ -107,7 +107,7 @@ func (dl *downloadTester) sync(id string, td *big.Int, mode SyncMode) error {
 	dl.lock.RUnlock()
 
 	// Synchronise with the chosen peer and ensure proper cleanup afterwards
-	err := dl.downloader.synchronise(id, hash, td, mode)
+	err := dl.downloader.synchronise(id, hash, td, mode, false)
 	select {
 	case <-dl.downloader.cancelCh:
 		// Ok, downloader fully cancelled after sync cycle
@@ -384,51 +384,51 @@ func (dlp *downloadTesterPeer) Head() (common.Hash, *big.Int) {
 // RequestHeadersByHash constructs a GetBlockHeaders function based on a hashed
 // origin; associated with a particular peer in the download tester. The returned
 // function can be used to retrieve batches of headers from the particular peer.
-func (dlp *downloadTesterPeer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool) error {
+func (dlp *downloadTesterPeer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
 	if reverse {
 		panic("reverse header requests not supported")
 	}
 
 	result := dlp.chain.headersByHash(origin, amount, skip)
-	go dlp.dl.downloader.DeliverHeaders(dlp.id, false, result)
+	go dlp.dl.downloader.DeliverHeaders(dlp.id, isFinalChain, result)
 	return nil
 }
 
 // RequestHeadersByNumber constructs a GetBlockHeaders function based on a numbered
 // origin; associated with a particular peer in the download tester. The returned
 // function can be used to retrieve batches of headers from the particular peer.
-func (dlp *downloadTesterPeer) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool) error {
+func (dlp *downloadTesterPeer) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool, isFinalChain bool) error {
 	if reverse {
 		panic("reverse header requests not supported")
 	}
 
 	result := dlp.chain.headersByNumber(origin, amount, skip)
-	go dlp.dl.downloader.DeliverHeaders(dlp.id, false, result)
+	go dlp.dl.downloader.DeliverHeaders(dlp.id, isFinalChain, result)
 	return nil
 }
 
 // RequestBodies constructs a getBlockBodies method associated with a particular
 // peer in the download tester. The returned function can be used to retrieve
 // batches of block bodies from the particularly requested peer.
-func (dlp *downloadTesterPeer) RequestBodies(hashes []common.Hash) error {
+func (dlp *downloadTesterPeer) RequestBodies(hashes []common.Hash, isFinalChain bool) error {
 	txs, uncles := dlp.chain.bodies(hashes)
-	go dlp.dl.downloader.DeliverBodies(dlp.id, false, txs, uncles)
+	go dlp.dl.downloader.DeliverBodies(dlp.id, isFinalChain, txs, uncles)
 	return nil
 }
 
 // RequestReceipts constructs a getReceipts method associated with a particular
 // peer in the download tester. The returned function can be used to retrieve
 // batches of block receipts from the particularly requested peer.
-func (dlp *downloadTesterPeer) RequestReceipts(hashes []common.Hash) error {
+func (dlp *downloadTesterPeer) RequestReceipts(hashes []common.Hash, isFinalChain bool) error {
 	receipts := dlp.chain.receipts(hashes)
-	go dlp.dl.downloader.DeliverReceipts(dlp.id, false, receipts)
+	go dlp.dl.downloader.DeliverReceipts(dlp.id, isFinalChain, receipts)
 	return nil
 }
 
 // RequestNodeData constructs a getNodeData method associated with a particular
 // peer in the download tester. The returned function can be used to retrieve
 // batches of node state data from the particularly requested peer.
-func (dlp *downloadTesterPeer) RequestNodeData(hashes []common.Hash) error {
+func (dlp *downloadTesterPeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
 	dlp.dl.lock.RLock()
 	defer dlp.dl.lock.RUnlock()
 
@@ -440,7 +440,7 @@ func (dlp *downloadTesterPeer) RequestNodeData(hashes []common.Hash) error {
 			}
 		}
 	}
-	go dlp.dl.downloader.DeliverNodeData(dlp.id, false, results)
+	go dlp.dl.downloader.DeliverNodeData(dlp.id, isFinalChain, results)
 	return nil
 }
 
@@ -1139,7 +1139,7 @@ func testBlockHeaderAttackerDropping(t *testing.T, protocol int) {
 		// Simulate a synchronisation and check the required result
 		tester.downloader.synchroniseMock = func(string, common.Hash) error { return tt.result }
 
-		tester.downloader.Synchronise(id, tester.genesis.Hash(), big.NewInt(1000), FullSync)
+		tester.downloader.Synchronise(id, tester.genesis.Hash(), big.NewInt(1000), FullSync, false)
 		if _, ok := tester.peers[id]; !ok != tt.drop {
 			t.Errorf("test %d: peer drop mismatch for %v: have %v, want %v", i, tt.result, !ok, tt.drop)
 		}
@@ -1505,20 +1505,20 @@ type floodingTestPeer struct {
 }
 
 func (ftp *floodingTestPeer) Head() (common.Hash, *big.Int) { return ftp.peer.Head() }
-func (ftp *floodingTestPeer) RequestHeadersByHash(hash common.Hash, count int, skip int, reverse bool) error {
-	return ftp.peer.RequestHeadersByHash(hash, count, skip, reverse)
+func (ftp *floodingTestPeer) RequestHeadersByHash(hash common.Hash, count int, skip int, reverse bool, isFinalChain bool) error {
+	return ftp.peer.RequestHeadersByHash(hash, count, skip, reverse, isFinalChain)
 }
-func (ftp *floodingTestPeer) RequestBodies(hashes []common.Hash) error {
-	return ftp.peer.RequestBodies(hashes)
+func (ftp *floodingTestPeer) RequestBodies(hashes []common.Hash, isFinalChain bool) error {
+	return ftp.peer.RequestBodies(hashes, isFinalChain)
 }
-func (ftp *floodingTestPeer) RequestReceipts(hashes []common.Hash) error {
-	return ftp.peer.RequestReceipts(hashes)
+func (ftp *floodingTestPeer) RequestReceipts(hashes []common.Hash, isFinalChain bool) error {
+	return ftp.peer.RequestReceipts(hashes, isFinalChain)
 }
-func (ftp *floodingTestPeer) RequestNodeData(hashes []common.Hash) error {
-	return ftp.peer.RequestNodeData(hashes)
+func (ftp *floodingTestPeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
+	return ftp.peer.RequestNodeData(hashes, isFinalChain)
 }
 
-func (ftp *floodingTestPeer) RequestHeadersByNumber(from uint64, count, skip int, reverse bool) error {
+func (ftp *floodingTestPeer) RequestHeadersByNumber(from uint64, count, skip int, reverse bool, isFinalChain bool) error {
 	deliveriesDone := make(chan struct{}, 500)
 	for i := 0; i < cap(deliveriesDone)-1; i++ {
 		peer := fmt.Sprintf("fake-peer%d", i)
@@ -1538,7 +1538,7 @@ func (ftp *floodingTestPeer) RequestHeadersByNumber(from uint64, count, skip int
 				// Start delivering the requested headers
 				// after one of the flooding responses has arrived.
 				go func() {
-					ftp.peer.RequestHeadersByNumber(from, count, skip, reverse)
+					ftp.peer.RequestHeadersByNumber(from, count, skip, reverse, isFinalChain)
 					deliveriesDone <- struct{}{}
 				}()
 				launched = true

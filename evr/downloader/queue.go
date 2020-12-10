@@ -45,10 +45,11 @@ var (
 
 // fetchRequest is a currently running data retrieval operation.
 type fetchRequest struct {
-	Peer    *peerConnection // Peer to which the request was sent
-	From    uint64          // [eth/62] Requested chain element index (used for skeleton fills only)
-	Headers []*types.Header // [eth/62] Requested headers, sorted by request order
-	Time    time.Time       // Time when the request was made
+	Peer         *peerConnection // Peer to which the request was sent
+	From         uint64          // [eth/62] Requested chain element index (used for skeleton fills only)
+	Headers      []*types.Header // [eth/62] Requested headers, sorted by request order
+	Time         time.Time       // Time when the request was made
+	IsFinalChain bool
 }
 
 // fetchResult is a struct collecting partial results from data fetchers until
@@ -61,6 +62,7 @@ type fetchResult struct {
 	Uncles       []*types.Header
 	Transactions types.Transactions
 	Receipts     types.Receipts
+	isFinalChain bool
 }
 
 // queue represents hashes that are either need fetching or are being fetched
@@ -679,7 +681,7 @@ func (q *queue) expire(timeout time.Duration, pendPool map[string]*fetchRequest,
 // If the headers are accepted, the method makes an attempt to deliver the set
 // of ready headers to the processor to keep the pipeline full. However it will
 // not block to prevent stalling other pending deliveries.
-func (q *queue) DeliverHeaders(id string, headers []*types.Header, headerProcCh chan []*types.Header) (int, error) {
+func (q *queue) DeliverHeaders(id string, headers []*types.Header, isFinalChain bool, headerProcCh chan *headerProcEvent) (int, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -701,6 +703,9 @@ func (q *queue) DeliverHeaders(id string, headers []*types.Header, headerProcCh 
 			accepted = false
 		} else if headers[len(headers)-1].Hash() != target {
 			log.Trace("Last header broke skeleton structure ", "peer", id, "number", headers[len(headers)-1].Number, "hash", headers[len(headers)-1].Hash(), "expected", target)
+			accepted = false
+		} else if isFinalChain != request.IsFinalChain {
+			log.Trace("First header broke chain ordering", "peer", id, "isFinalChain", isFinalChain, "hash", headers[0].Hash(), request.IsFinalChain)
 			accepted = false
 		}
 	}
@@ -747,7 +752,7 @@ func (q *queue) DeliverHeaders(id string, headers []*types.Header, headerProcCh 
 		copy(process, q.headerResults[q.headerProced:q.headerProced+ready])
 
 		select {
-		case headerProcCh <- process:
+		case headerProcCh <- &headerProcEvent{headers: process, isFinalChain: isFinalChain}:
 			log.Trace("Pre-scheduled new headers", "peer", id, "count", len(process), "from", process[0].Number)
 			q.headerProced += len(process)
 		default:
