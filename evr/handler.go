@@ -408,7 +408,11 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 
 	// Block header query, collect the requested headers and reply
-	case msg.Code == GetBlockHeadersMsg:
+	case msg.Code == GetBlockHeadersMsg || msg.Code == GetFBlockHeadersMsg:
+		blockchain := pm.blockchain
+		if msg.Code == GetFBlockHeadersMsg {
+			blockchain = pm.fblockchain
+		}
 		// Decode the complex header query
 		var query getBlockHeadersData
 		if err := msg.Decode(&query); err != nil {
@@ -430,15 +434,15 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			if hashMode {
 				if first {
 					first = false
-					origin = pm.blockchain.GetHeaderByHash(query.Origin.Hash)
+					origin = blockchain.GetHeaderByHash(query.Origin.Hash)
 					if origin != nil {
 						query.Origin.Number = origin.Number.Uint64()
 					}
 				} else {
-					origin = pm.blockchain.GetHeader(query.Origin.Hash, query.Origin.Number)
+					origin = blockchain.GetHeader(query.Origin.Hash, query.Origin.Number)
 				}
 			} else {
-				origin = pm.blockchain.GetHeaderByNumber(query.Origin.Number)
+				origin = blockchain.GetHeaderByNumber(query.Origin.Number)
 			}
 			if origin == nil {
 				break
@@ -454,7 +458,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				if ancestor == 0 {
 					unknown = true
 				} else {
-					query.Origin.Hash, query.Origin.Number = pm.blockchain.GetAncestor(query.Origin.Hash, query.Origin.Number, ancestor, &maxNonCanonical)
+					query.Origin.Hash, query.Origin.Number = blockchain.GetAncestor(query.Origin.Hash, query.Origin.Number, ancestor, &maxNonCanonical)
 					unknown = (query.Origin.Hash == common.Hash{})
 				}
 			case hashMode && !query.Reverse:
@@ -468,9 +472,9 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 					p.Log().Warn("GetBlockHeaders skip overflow attack", "current", current, "skip", query.Skip, "next", next, "attacker", infos)
 					unknown = true
 				} else {
-					if header := pm.blockchain.GetHeaderByNumber(next); header != nil {
+					if header := blockchain.GetHeaderByNumber(next); header != nil {
 						nextHash := header.Hash()
-						expOldHash, _ := pm.blockchain.GetAncestor(nextHash, next, query.Skip+1, &maxNonCanonical)
+						expOldHash, _ := blockchain.GetAncestor(nextHash, next, query.Skip+1, &maxNonCanonical)
 						if expOldHash == query.Origin.Hash {
 							query.Origin.Hash, query.Origin.Number = nextHash, next
 						} else {
@@ -493,9 +497,13 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				query.Origin.Number += query.Skip + 1
 			}
 		}
-		return p.SendBlockHeaders(headers)
+		if msg.Code == GetBlockBodiesMsg {
+			return p.SendBlockHeaders(headers)
+		} else {
+			return p.SendFBlockHeaders(headers)
+		}
 
-	case msg.Code == BlockHeadersMsg:
+	case msg.Code == BlockHeadersMsg || msg.Code == FBlockBodiesMsg:
 		// A batch of headers arrived to one of our previous requests
 		var headers []*types.Header
 		if err := msg.Decode(&headers); err != nil {
@@ -548,7 +556,11 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			}
 		}
 
-	case msg.Code == GetBlockBodiesMsg:
+	case msg.Code == GetBlockBodiesMsg || msg.Code == GetFBlockBodiesMsg:
+		blockchain := pm.blockchain
+		if msg.Code == GetFBlockBodiesMsg {
+			blockchain = pm.fblockchain
+		}
 		// Decode the retrieval message
 		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
 		if _, err := msgStream.List(); err != nil {
@@ -568,14 +580,18 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
 			// Retrieve the requested block body, stopping if enough was found
-			if data := pm.blockchain.GetBodyRLP(hash); len(data) != 0 {
+			if data := blockchain.GetBodyRLP(hash); len(data) != 0 {
 				bodies = append(bodies, data)
 				bytes += len(data)
 			}
 		}
-		return p.SendBlockBodiesRLP(bodies)
+		if msg.Code == GetBlockBodiesMsg {
+			return p.SendBlockBodiesRLP(bodies)
+		} else {
+			return p.SendFBlockBodiesRLP(bodies)
+		}
 
-	case msg.Code == BlockBodiesMsg:
+	case msg.Code == BlockBodiesMsg || msg.Code == FBlockBodiesMsg:
 		// A batch of block bodies arrived to one of our previous requests
 		var request blockBodiesData
 		if err := msg.Decode(&request); err != nil {
@@ -601,7 +617,11 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			}
 		}
 
-	case p.version >= eth63 && msg.Code == GetNodeDataMsg:
+	case p.version >= eth63 && (msg.Code == GetNodeDataMsg || msg.Code == GetFNodeDataMsg):
+		blockchain := pm.blockchain
+		if msg.Code == GetFNodeDataMsg {
+			blockchain = pm.fblockchain
+		}
 		// Decode the retrieval message
 		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
 		if _, err := msgStream.List(); err != nil {
@@ -621,14 +641,18 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
 			// Retrieve the requested state entry, stopping if enough was found
-			if entry, err := pm.blockchain.TrieNode(hash); err == nil {
+			if entry, err := blockchain.TrieNode(hash); err == nil {
 				data = append(data, entry)
 				bytes += len(entry)
 			}
 		}
-		return p.SendNodeData(data)
+		if msg.Code == GetNodeDataMsg {
+			return p.SendNodeData(data)
+		} else {
+			return p.SendFNodeData(data)
+		}
 
-	case p.version >= eth63 && msg.Code == NodeDataMsg:
+	case p.version >= eth63 && (msg.Code == NodeDataMsg || msg.Code == FNodeDataMsg):
 		// A batch of node state data arrived to one of our previous requests
 		var data [][]byte
 		if err := msg.Decode(&data); err != nil {
@@ -639,7 +663,11 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			log.Debug("Failed to deliver node state data", "err", err)
 		}
 
-	case p.version >= eth63 && msg.Code == GetReceiptsMsg:
+	case p.version >= eth63 && (msg.Code == GetReceiptsMsg || msg.Code == GetFReceiptsMsg):
+		blockchain := pm.blockchain
+		if msg.Code == GetFReceiptsMsg {
+			blockchain = pm.fblockchain
+		}
 		// Decode the retrieval message
 		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
 		if _, err := msgStream.List(); err != nil {
@@ -659,9 +687,9 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				return errResp(ErrDecode, "msg %v: %v", msg, err)
 			}
 			// Retrieve the requested block's receipts, skipping if unknown to us
-			results := pm.blockchain.GetReceiptsByHash(hash)
+			results := blockchain.GetReceiptsByHash(hash)
 			if results == nil {
-				if header := pm.blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
+				if header := blockchain.GetHeaderByHash(hash); header == nil || header.ReceiptHash != types.EmptyRootHash {
 					continue
 				}
 			}
@@ -673,9 +701,13 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 				bytes += len(encoded)
 			}
 		}
-		return p.SendReceiptsRLP(receipts)
+		if msg.Code == GetReceiptsMsg {
+			return p.SendReceiptsRLP(receipts)
+		} else {
+			return p.SendFReceiptsRLP(receipts)
+		}
 
-	case p.version >= eth63 && msg.Code == ReceiptsMsg:
+	case p.version >= eth63 && (msg.Code == ReceiptsMsg || msg.Code == FReceiptsMsg):
 		// A batch of receipts arrived to one of our previous requests
 		var receipts [][]*types.Receipt
 		if err := msg.Decode(&receipts); err != nil {
@@ -686,7 +718,11 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			log.Debug("Failed to deliver receipts", "err", err)
 		}
 
-	case msg.Code == NewBlockHashesMsg:
+	case msg.Code == NewBlockHashesMsg || msg.Code == NewFBlockHashesMsg:
+		blockchain := pm.blockchain
+		if msg.Code == NewFBlockHashesMsg {
+			blockchain = pm.fblockchain
+		}
 		var announces newBlockHashesData
 		if err := msg.Decode(&announces); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
@@ -698,7 +734,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 		// Schedule all the unknown hashes for retrieval
 		unknown := make(newBlockHashesData, 0, len(announces))
 		for _, block := range announces {
-			if !pm.blockchain.HasBlock(block.Hash, block.Number) {
+			if !blockchain.HasBlock(block.Hash, block.Number) {
 				unknown = append(unknown, block)
 			}
 		}
@@ -706,7 +742,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies)
 		}
 
-	case msg.Code == NewBlockMsg:
+	case msg.Code == NewBlockMsg || msg.Code == NewFBlockMsg:
 		// Retrieve and decode the propagated block
 		var request newBlockData
 		if err := msg.Decode(&request); err != nil {
