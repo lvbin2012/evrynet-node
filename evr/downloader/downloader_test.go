@@ -290,8 +290,7 @@ func (dl *downloadTester) InsertChain(blocks types.Blocks) (i int, err error) {
 	return len(blocks), nil
 }
 
-
-func (dl*downloadTester) IsFinalChain() bool{
+func (dl *downloadTester) IsFinalChain() bool {
 	return false
 }
 
@@ -391,7 +390,7 @@ func (dlp *downloadTesterPeer) RequestHeadersByHash(origin common.Hash, amount i
 	}
 
 	result := dlp.chain.headersByHash(origin, amount, skip)
-	go dlp.dl.downloader.DeliverHeaders(dlp.id, result)
+	go dlp.dl.downloader.DeliverHeaders(dlp.id, false, result)
 	return nil
 }
 
@@ -404,7 +403,7 @@ func (dlp *downloadTesterPeer) RequestHeadersByNumber(origin uint64, amount int,
 	}
 
 	result := dlp.chain.headersByNumber(origin, amount, skip)
-	go dlp.dl.downloader.DeliverHeaders(dlp.id, result)
+	go dlp.dl.downloader.DeliverHeaders(dlp.id, false, result)
 	return nil
 }
 
@@ -413,7 +412,7 @@ func (dlp *downloadTesterPeer) RequestHeadersByNumber(origin uint64, amount int,
 // batches of block bodies from the particularly requested peer.
 func (dlp *downloadTesterPeer) RequestBodies(hashes []common.Hash) error {
 	txs, uncles := dlp.chain.bodies(hashes)
-	go dlp.dl.downloader.DeliverBodies(dlp.id, txs, uncles)
+	go dlp.dl.downloader.DeliverBodies(dlp.id, false, txs, uncles)
 	return nil
 }
 
@@ -422,7 +421,7 @@ func (dlp *downloadTesterPeer) RequestBodies(hashes []common.Hash) error {
 // batches of block receipts from the particularly requested peer.
 func (dlp *downloadTesterPeer) RequestReceipts(hashes []common.Hash) error {
 	receipts := dlp.chain.receipts(hashes)
-	go dlp.dl.downloader.DeliverReceipts(dlp.id, receipts)
+	go dlp.dl.downloader.DeliverReceipts(dlp.id, false, receipts)
 	return nil
 }
 
@@ -441,7 +440,7 @@ func (dlp *downloadTesterPeer) RequestNodeData(hashes []common.Hash) error {
 			}
 		}
 	}
-	go dlp.dl.downloader.DeliverNodeData(dlp.id, results)
+	go dlp.dl.downloader.DeliverNodeData(dlp.id, false, results)
 	return nil
 }
 
@@ -734,10 +733,10 @@ func TestInactiveDownloader62(t *testing.T) {
 	defer tester.terminate()
 
 	// Check that neither block headers nor bodies are accepted
-	if err := tester.downloader.DeliverHeaders("bad peer", []*types.Header{}); err != errNoSyncActive {
+	if err := tester.downloader.DeliverHeaders("bad peer", false, []*types.Header{}); err != errNoSyncActive {
 		t.Errorf("error mismatch: have %v, want %v", err, errNoSyncActive)
 	}
-	if err := tester.downloader.DeliverBodies("bad peer", [][]*types.Transaction{}, [][]*types.Header{}); err != errNoSyncActive {
+	if err := tester.downloader.DeliverBodies("bad peer", false, [][]*types.Transaction{}, [][]*types.Header{}); err != errNoSyncActive {
 		t.Errorf("error mismatch: have %v, want  %v", err, errNoSyncActive)
 	}
 }
@@ -751,13 +750,13 @@ func TestInactiveDownloader63(t *testing.T) {
 	defer tester.terminate()
 
 	// Check that neither block headers nor bodies are accepted
-	if err := tester.downloader.DeliverHeaders("bad peer", []*types.Header{}); err != errNoSyncActive {
+	if err := tester.downloader.DeliverHeaders("bad peer", false, []*types.Header{}); err != errNoSyncActive {
 		t.Errorf("error mismatch: have %v, want %v", err, errNoSyncActive)
 	}
-	if err := tester.downloader.DeliverBodies("bad peer", [][]*types.Transaction{}, [][]*types.Header{}); err != errNoSyncActive {
+	if err := tester.downloader.DeliverBodies("bad peer", false, [][]*types.Transaction{}, [][]*types.Header{}); err != errNoSyncActive {
 		t.Errorf("error mismatch: have %v, want %v", err, errNoSyncActive)
 	}
-	if err := tester.downloader.DeliverReceipts("bad peer", [][]*types.Receipt{}); err != errNoSyncActive {
+	if err := tester.downloader.DeliverReceipts("bad peer", false, [][]*types.Receipt{}); err != errNoSyncActive {
 		t.Errorf("error mismatch: have %v, want %v", err, errNoSyncActive)
 	}
 }
@@ -1524,7 +1523,7 @@ func (ftp *floodingTestPeer) RequestHeadersByNumber(from uint64, count, skip int
 	for i := 0; i < cap(deliveriesDone)-1; i++ {
 		peer := fmt.Sprintf("fake-peer%d", i)
 		go func() {
-			ftp.tester.downloader.DeliverHeaders(peer, []*types.Header{{}, {}, {}, {}})
+			ftp.tester.downloader.DeliverHeaders(peer, false, []*types.Header{{}, {}, {}, {}})
 			deliveriesDone <- struct{}{}
 		}()
 	}

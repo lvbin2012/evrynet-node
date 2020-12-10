@@ -88,7 +88,7 @@ func (p *FakePeer) RequestHeadersByHash(hash common.Hash, amount int, skip int, 
 			}
 		}
 	}
-	p.dl.DeliverHeaders(p.id, headers)
+	p.dl.DeliverHeaders(p.id, false, headers)
 	return nil
 }
 
@@ -115,7 +115,7 @@ func (p *FakePeer) RequestHeadersByNumber(number uint64, amount int, skip int, r
 		}
 		headers = append(headers, origin)
 	}
-	p.dl.DeliverHeaders(p.id, headers)
+	p.dl.DeliverHeaders(p.id, false, headers)
 	return nil
 }
 
@@ -132,7 +132,7 @@ func (p *FakePeer) RequestBodies(hashes []common.Hash) error {
 		txs = append(txs, block.Transactions())
 		uncles = append(uncles, block.Uncles())
 	}
-	p.dl.DeliverBodies(p.id, txs, uncles)
+	p.dl.DeliverBodies(p.id, false, txs, uncles)
 	return nil
 }
 
@@ -143,7 +143,7 @@ func (p *FakePeer) RequestReceipts(hashes []common.Hash) error {
 	for _, hash := range hashes {
 		receipts = append(receipts, rawdb.ReadRawReceipts(p.db, hash, *p.hc.GetBlockNumber(hash), false))
 	}
-	p.dl.DeliverReceipts(p.id, receipts)
+	p.dl.DeliverReceipts(p.id, false, receipts)
 	return nil
 }
 
@@ -156,6 +156,6 @@ func (p *FakePeer) RequestNodeData(hashes []common.Hash) error {
 			data = append(data, entry)
 		}
 	}
-	p.dl.DeliverNodeData(p.id, data)
+	p.dl.DeliverNodeData(p.id, false, data)
 	return nil
 }

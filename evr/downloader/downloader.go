@@ -1742,23 +1742,23 @@ func (d *Downloader) commitPivotBlock(result *fetchResult) error {
 
 // DeliverHeaders injects a new batch of block headers received from a remote
 // node into the download schedule.
-func (d *Downloader) DeliverHeaders(id string, headers []*types.Header) (err error) {
-	return d.deliver(id, d.headerCh, &headerPack{id, headers}, headerInMeter, headerDropMeter)
+func (d *Downloader) DeliverHeaders(id string, isFinalChain bool, headers []*types.Header) (err error) {
+	return d.deliver(id, d.headerCh, &headerPack{id, isFinalChain, headers}, headerInMeter, headerDropMeter)
 }
 
 // DeliverBodies injects a new batch of block bodies received from a remote node.
-func (d *Downloader) DeliverBodies(id string, transactions [][]*types.Transaction, uncles [][]*types.Header) (err error) {
-	return d.deliver(id, d.bodyCh, &bodyPack{id, transactions, uncles}, bodyInMeter, bodyDropMeter)
+func (d *Downloader) DeliverBodies(id string, isFinalChain bool, transactions [][]*types.Transaction, uncles [][]*types.Header) (err error) {
+	return d.deliver(id, d.bodyCh, &bodyPack{id, isFinalChain, transactions, uncles}, bodyInMeter, bodyDropMeter)
 }
 
 // DeliverReceipts injects a new batch of receipts received from a remote node.
-func (d *Downloader) DeliverReceipts(id string, receipts [][]*types.Receipt) (err error) {
-	return d.deliver(id, d.receiptCh, &receiptPack{id, receipts}, receiptInMeter, receiptDropMeter)
+func (d *Downloader) DeliverReceipts(id string, isFinalChain bool, receipts [][]*types.Receipt) (err error) {
+	return d.deliver(id, d.receiptCh, &receiptPack{id, isFinalChain, receipts}, receiptInMeter, receiptDropMeter)
 }
 
 // DeliverNodeData injects a new batch of node state data received from a remote node.
-func (d *Downloader) DeliverNodeData(id string, data [][]byte) (err error) {
-	return d.deliver(id, d.stateCh, &statePack{id, data}, stateInMeter, stateDropMeter)
+func (d *Downloader) DeliverNodeData(id string, isFinalChain bool, data [][]byte) (err error) {
+	return d.deliver(id, d.stateCh, &statePack{id, isFinalChain, data}, stateInMeter, stateDropMeter)
 }
 
 // deliver injects a new batch of data received from a remote node.

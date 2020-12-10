@@ -550,7 +550,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			headers = pm.fetcher.FilterHeaders(p.id, headers, time.Now())
 		}
 		if len(headers) > 0 || !filter {
-			err := pm.downloader.DeliverHeaders(p.id, headers)
+			err := pm.downloader.DeliverHeaders(p.id, msg.Code == FBlockBodiesMsg, headers)
 			if err != nil {
 				log.Debug("Failed to deliver headers", "err", err)
 			}
@@ -611,7 +611,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			transactions, uncles = pm.fetcher.FilterBodies(p.id, transactions, uncles, time.Now())
 		}
 		if len(transactions) > 0 || len(uncles) > 0 || !filter {
-			err := pm.downloader.DeliverBodies(p.id, transactions, uncles)
+			err := pm.downloader.DeliverBodies(p.id, msg.Code == FBlockBodiesMsg, transactions, uncles)
 			if err != nil {
 				log.Debug("Failed to deliver bodies", "err", err)
 			}
@@ -659,7 +659,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		// Deliver all to the downloader
-		if err := pm.downloader.DeliverNodeData(p.id, data); err != nil {
+		if err := pm.downloader.DeliverNodeData(p.id, msg.Code == GetFNodeDataMsg, data); err != nil {
 			log.Debug("Failed to deliver node state data", "err", err)
 		}
 
@@ -714,7 +714,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			return errResp(ErrDecode, "msg %v: %v", msg, err)
 		}
 		// Deliver all to the downloader
-		if err := pm.downloader.DeliverReceipts(p.id, receipts); err != nil {
+		if err := pm.downloader.DeliverReceipts(p.id, msg.Code == FReceiptsMsg, receipts); err != nil {
 			log.Debug("Failed to deliver receipts", "err", err)
 		}
 
