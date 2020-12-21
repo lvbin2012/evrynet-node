@@ -195,7 +195,8 @@ func (pm *ProtocolManager) synchronise(peer *Peer) {
 		}
 	}
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode); err != nil {
+	// TODO new split download
+	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode, false); err != nil {
 		return
 	}
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
@@ -219,6 +220,7 @@ func (pm *ProtocolManager) synchronise(peer *Peer) {
 		// scenario will most often crop up in private and hackathon networks with
 		// degenerate connectivity, but it should be healthy for the mainnet too to
 		// more reliably update peers or the local TD state.
-		go pm.BroadcastBlock(head, false)
+		// TODO new split download
+		go pm.BroadcastBlock(head, false, false)
 	}
 }
