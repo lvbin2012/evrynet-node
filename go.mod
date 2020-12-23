@@ -8,6 +8,7 @@ require (
 	github.com/apilayer/freegeoip v3.5.0+incompatible
 	github.com/aristanetworks/goarista v0.0.0-20190712234253-ed1100a1c015
 	github.com/btcsuite/btcd v0.20.0-beta
+	github.com/btcsuite/btcutil v0.0.0-20190425235716-9e5f4b9a998d
 	github.com/cespare/cp v1.1.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1

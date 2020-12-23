@@ -48,6 +48,11 @@ func (p *FakePeer) Head() (common.Hash, *big.Int) {
 	return header.Hash(), header.Number
 }
 
+func (p *FakePeer) FHead() (common.Hash, *big.Int) {
+	header := p.hc.CurrentHeader()
+	return header.Hash(), header.Number
+}
+
 // RequestHeadersByHash implements downloader.Peer, returning a batch of headers
 // defined by the origin hash and the associated query parameters.
 func (p *FakePeer) RequestHeadersByHash(hash common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {

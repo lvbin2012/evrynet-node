@@ -62,7 +62,7 @@ type fetchResult struct {
 	Uncles       []*types.Header
 	Transactions types.Transactions
 	Receipts     types.Receipts
-	isFinalChain bool
+	IsFinalChain bool
 }
 
 // queue represents hashes that are either need fetching or are being fetched
@@ -415,7 +415,7 @@ func (q *queue) countProcessableItems() int {
 
 // ReserveHeaders reserves a set of headers for the given peer, skipping any
 // previously failed batches.
-func (q *queue) ReserveHeaders(p *peerConnection, count int) *fetchRequest {
+func (q *queue) ReserveHeaders(p *peerConnection, count int, isFinalChain bool) *fetchRequest {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
@@ -445,9 +445,10 @@ func (q *queue) ReserveHeaders(p *peerConnection, count int) *fetchRequest {
 		return nil
 	}
 	request := &fetchRequest{
-		Peer: p,
-		From: send,
-		Time: time.Now(),
+		Peer:         p,
+		From:         send,
+		Time:         time.Now(),
+		IsFinalChain: isFinalChain,
 	}
 	q.headerPendPool[p.id] = request
 	return request
@@ -456,27 +457,27 @@ func (q *queue) ReserveHeaders(p *peerConnection, count int) *fetchRequest {
 // ReserveBodies reserves a set of body fetches for the given peer, skipping any
 // previously failed downloads. Beside the next batch of needed fetches, it also
 // returns a flag whether empty blocks were queued requiring processing.
-func (q *queue) ReserveBodies(p *peerConnection, count int) (*fetchRequest, bool, error) {
+func (q *queue) ReserveBodies(p *peerConnection, count int, isFinalChain bool) (*fetchRequest, bool, error) {
 	isNoop := func(header *types.Header) bool {
 		return header.TxHash == types.EmptyRootHash && header.UncleHash == types.EmptyUncleHash
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	return q.reserveHeaders(p, count, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool, q.blockDonePool, isNoop)
+	return q.reserveHeaders(p, count, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool, q.blockDonePool, isNoop, isFinalChain)
 }
 
 // ReserveReceipts reserves a set of receipt fetches for the given peer, skipping
 // any previously failed downloads. Beside the next batch of needed fetches, it
 // also returns a flag whether empty receipts were queued requiring importing.
-func (q *queue) ReserveReceipts(p *peerConnection, count int) (*fetchRequest, bool, error) {
+func (q *queue) ReserveReceipts(p *peerConnection, count int, isFinalChain bool) (*fetchRequest, bool, error) {
 	isNoop := func(header *types.Header) bool {
 		return header.ReceiptHash == types.EmptyRootHash
 	}
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	return q.reserveHeaders(p, count, q.receiptTaskPool, q.receiptTaskQueue, q.receiptPendPool, q.receiptDonePool, isNoop)
+	return q.reserveHeaders(p, count, q.receiptTaskPool, q.receiptTaskQueue, q.receiptPendPool, q.receiptDonePool, isNoop, isFinalChain)
 }
 
 // reserveHeaders reserves a set of data download operations for a given peer,
@@ -487,7 +488,7 @@ func (q *queue) ReserveReceipts(p *peerConnection, count int) (*fetchRequest, bo
 // reason the lock is not obtained in here is because the parameters already need
 // to access the queue, so they already need a lock anyway.
 func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common.Hash]*types.Header, taskQueue *prque.Prque,
-	pendPool map[string]*fetchRequest, donePool map[common.Hash]struct{}, isNoop func(*types.Header) bool) (*fetchRequest, bool, error) {
+	pendPool map[string]*fetchRequest, donePool map[common.Hash]struct{}, isNoop func(*types.Header) bool, isFinalChain bool) (*fetchRequest, bool, error) {
 	// Short circuit if the pool has been depleted, or if the peer's already
 	// downloading something (sanity check not to corrupt state)
 	if taskQueue.Empty() {
@@ -520,9 +521,10 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 				components = 2
 			}
 			q.resultCache[index] = &fetchResult{
-				Pending: components,
-				Hash:    hash,
-				Header:  header,
+				Pending:      components,
+				Hash:         hash,
+				Header:       header,
+				IsFinalChain: isFinalChain,
 			}
 		}
 		// If this fetch task is a noop, skip this fetch operation
@@ -555,9 +557,10 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 		return nil, progress, nil
 	}
 	request := &fetchRequest{
-		Peer:    p,
-		Headers: send,
-		Time:    time.Now(),
+		Peer:         p,
+		Headers:      send,
+		Time:         time.Now(),
+		IsFinalChain: isFinalChain,
 	}
 	pendPool[p.id] = request
 

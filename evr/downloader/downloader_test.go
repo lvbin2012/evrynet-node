@@ -381,6 +381,11 @@ func (dlp *downloadTesterPeer) Head() (common.Hash, *big.Int) {
 	return b.Hash(), dlp.chain.td(b.Hash())
 }
 
+func (dlp *downloadTesterPeer) FHead() (common.Hash, *big.Int) {
+	b := dlp.chain.headBlock()
+	return b.Hash(), dlp.chain.td(b.Hash())
+}
+
 // RequestHeadersByHash constructs a GetBlockHeaders function based on a hashed
 // origin; associated with a particular peer in the download tester. The returned
 // function can be used to retrieve batches of headers from the particular peer.
@@ -1505,6 +1510,7 @@ type floodingTestPeer struct {
 }
 
 func (ftp *floodingTestPeer) Head() (common.Hash, *big.Int) { return ftp.peer.Head() }
+func (ftp *floodingTestPeer) FHead() (common.Hash, *big.Int) { return ftp.peer.Head() }
 func (ftp *floodingTestPeer) RequestHeadersByHash(hash common.Hash, count int, skip int, reverse bool, isFinalChain bool) error {
 	return ftp.peer.RequestHeadersByHash(hash, count, skip, reverse, isFinalChain)
 }

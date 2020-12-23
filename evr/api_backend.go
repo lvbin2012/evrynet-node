@@ -86,7 +86,6 @@ func (b *EvrAPIBackend) FHeaderByNumber(ctx context.Context, blockNr rpc.BlockNu
 	return b.evr.fBlockchain.GetHeaderByNumber(uint64(blockNr)), nil
 }
 
-
 func (b *EvrAPIBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
 	return b.evr.blockchain.GetHeaderByHash(hash), nil
 }
@@ -103,7 +102,6 @@ func (b *EvrAPIBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumb
 	}
 	return b.evr.blockchain.GetBlockByNumber(uint64(blockNr)), nil
 }
-
 
 // Test by lvbin
 func (b *EvrAPIBackend) FBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {

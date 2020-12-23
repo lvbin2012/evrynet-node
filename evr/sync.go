@@ -17,6 +17,7 @@
 package evr
 
 import (
+	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -174,6 +175,15 @@ func (pm *ProtocolManager) synchronise(peer *Peer) {
 	if pTd.Cmp(td) <= 0 {
 		return
 	}
+	fCurrentBlock := pm.fblockchain.CurrentHeader()
+	fTD := pm.fblockchain.GetTd(fCurrentBlock.Hash(), currentBlock.NumberU64())
+	pFHead, pFTD := peer.FHead()
+
+	fmt.Println("========>", "fTD", fTD, "pFTD", pFTD, "pFHead", pFHead.String())
+	if pFTD.Cmp(fTD) <= 0 {
+		return
+	}
+
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
@@ -195,10 +205,13 @@ func (pm *ProtocolManager) synchronise(peer *Peer) {
 		}
 	}
 	// Run the sync cycle, and disable fast sync if we've went past the pivot block
-	// TODO new split download
-	if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode, false); err != nil {
+	// add by lvbin
+	if err := pm.downloader.SynchroniseTwoChain(peer.id, pHead, pTd, pFHead, pFTD, mode); err != nil{
 		return
 	}
+	//if err := pm.downloader.Synchronise(peer.id, pHead, pTd, mode, false); err != nil {
+	//	return
+	//}
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
 		log.Info("Fast sync complete, auto disabling")
 		atomic.StoreUint32(&pm.fastSync, 0)

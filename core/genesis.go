@@ -323,6 +323,13 @@ func GenesisBlockForTesting(db evrdb.Database, addr common.Address, balance *big
 	return g.MustCommit(db)
 }
 
+func GenesisBlockForNewTesting(db evrdb.Database, addr common.Address, balance *big.Int, isFinalChain bool) *types.Block {
+	g := Genesis{Alloc: GenesisAlloc{addr: {Balance: balance}}}
+	g.Config = &params.ChainConfig{big.NewInt(1), big.NewInt(params.GasPriceConfig),
+		nil, nil, new(params.EthashConfig), nil, nil, isFinalChain}
+	return g.MustCommit(db)
+}
+
 // DefaultGenesisBlock returns the Evrynet main net genesis block.
 func DefaultGenesisBlock() *Genesis {
 	return &Genesis{

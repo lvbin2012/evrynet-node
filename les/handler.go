@@ -1232,6 +1232,10 @@ func (pc *peerConnection) Head() (common.Hash, *big.Int) {
 	return pc.peer.HeadAndTd()
 }
 
+func (pc *peerConnection) FHead() (common.Hash, *big.Int) {
+	return pc.peer.HeadAndTd()
+}
+
 func (pc *peerConnection) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
 	msgCode := GetBlockHeadersMsg
 	if isFinalChain {
