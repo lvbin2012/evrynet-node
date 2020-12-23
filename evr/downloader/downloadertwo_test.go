@@ -62,17 +62,16 @@ type downloadTwoTesterPeer struct {
 	missingStates map[common.Hash]bool
 }
 
-func  (d *downloadTwoTesterPeer) Head() (common.Hash, *big.Int) {
+func (d *downloadTwoTesterPeer) Head() (common.Hash, *big.Int) {
 	b := d.chain.headBlock()
 	return b.Hash(), d.chain.td(b.Hash())
 }
-func  (d *downloadTwoTesterPeer) FHead() (common.Hash, *big.Int) {
+func (d *downloadTwoTesterPeer) FHead() (common.Hash, *big.Int) {
 	b := d.fchain.headBlock()
 	return b.Hash(), d.fchain.td(b.Hash())
 }
 
-func  (d *downloadTwoTesterPeer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
-	fmt.Println("==========>RequestHeadersByHash", origin.String(), amount, skip, reverse, isFinalChain)
+func (d *downloadTwoTesterPeer) RequestHeadersByHash(origin common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
 	if reverse {
 		panic("reverse header requests not supported")
 	}
@@ -87,8 +86,7 @@ func  (d *downloadTwoTesterPeer) RequestHeadersByHash(origin common.Hash, amount
 	return nil
 }
 
-func  (d *downloadTwoTesterPeer) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool, isFinalChain bool) error {
-	fmt.Println("==========>RequestHeadersByNumber","origin", origin, "amount", amount, "skip", skip, reverse, isFinalChain)
+func (d *downloadTwoTesterPeer) RequestHeadersByNumber(origin uint64, amount int, skip int, reverse bool, isFinalChain bool) error {
 	if reverse {
 		panic("reverse header requests not supported")
 	}
@@ -99,13 +97,11 @@ func  (d *downloadTwoTesterPeer) RequestHeadersByNumber(origin uint64, amount in
 		chain = d.chain
 	}
 	result := chain.headersByNumber(origin, amount, skip)
-	fmt.Println("RequestHeadersByNumber result", len(result), isFinalChain)
 	go d.dlt.downloader.DeliverHeaders(d.id, isFinalChain, result)
 	return nil
 }
 
-func  (d *downloadTwoTesterPeer) RequestBodies(hashes []common.Hash, isFinalChain bool) error {
-	fmt.Println("==========>RequestBodies", isFinalChain)
+func (d *downloadTwoTesterPeer) RequestBodies(hashes []common.Hash, isFinalChain bool) error {
 	var chain *testChain
 	if isFinalChain {
 		chain = d.fchain
@@ -117,8 +113,7 @@ func  (d *downloadTwoTesterPeer) RequestBodies(hashes []common.Hash, isFinalChai
 	return nil
 }
 
-func  (d *downloadTwoTesterPeer) RequestReceipts(hashes []common.Hash, isFinalChain bool) error {
-	fmt.Println("==========>RequestReceipts", isFinalChain)
+func (d *downloadTwoTesterPeer) RequestReceipts(hashes []common.Hash, isFinalChain bool) error {
 	var chain *testChain
 	if isFinalChain {
 		chain = d.fchain
@@ -130,7 +125,7 @@ func  (d *downloadTwoTesterPeer) RequestReceipts(hashes []common.Hash, isFinalCh
 	return nil
 }
 
-func  (d *downloadTwoTesterPeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
+func (d *downloadTwoTesterPeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
 	d.dlt.lock.RLock()
 	defer d.dlt.lock.RUnlock()
 
@@ -291,15 +286,12 @@ func (t *testChainInfo) CurrentFastBlock() *types.Block {
 	defer t.lock.RUnlock()
 	for i := len(t.ownHashes) - 1; i >= 0; i-- {
 		if block := t.ancientBlocks[t.ownHashes[i]]; block != nil {
-			fmt.Println("=======> currentBlock ancient", block.NumberU64(), t.isFinalChain)
 			return block
 		}
 		if block := t.ownBlocks[t.ownHashes[i]]; block != nil {
-			fmt.Println("=======> currentBlock block", block.NumberU64(), t.isFinalChain)
 			return block
 		}
 	}
-	fmt.Println("=======> currentBlock genesis", t.genesis.NumberU64(),t.isFinalChain)
 	return t.genesis
 }
 
@@ -332,8 +324,6 @@ func (t *testChainInfo) InsertChain(blocks types.Blocks) (int, error) {
 		t.dbHelp.getDB().Put(block.Root().Bytes(), []byte{0x00})
 		t.ownChainTd[block.Hash()] = new(big.Int).Add(t.ownChainTd[block.ParentHash()], block.Difficulty())
 	}
-
-	fmt.Println("===============> InsertChain  ", len(t.ownBlocks), "current", t.CurrentBlock().NumberU64(), t.isFinalChain)
 	return len(blocks), nil
 }
 
@@ -415,6 +405,7 @@ func newTwoTester() *downloadTwoTester {
 		new(event.TypeMux), tester.chainInfo, nil, tester.dropPeer)
 
 	tester.downloader.fblockchain = tester.fChainInfo
+	tester.downloader.flightchain = tester.fChainInfo
 	return tester
 }
 
@@ -450,7 +441,7 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 		ftd = dlt.peers[id].fchain.td(fHash)
 	}
 	dlt.lock.RUnlock()
-	hash = common.Hash{}
+	//fHash = common.Hash{}
 
 	err := dlt.downloader.synchroniseTwoChain(id, hash, td, fHash, ftd, mode)
 	select {
@@ -465,10 +456,8 @@ func testSynchronisation(t *testing.T, protocol int, mode SyncMode) {
 	t.Parallel()
 	tester := newTwoTester()
 	defer tester.terminate()
-	chain :=  newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
-	fChain :=  newTestChain((blockCacheItems+200)/10, tester.fChainInfo.genesis)
-	fmt.Println("chain", len(chain.chain), chain.genesis.Hash().String())
-	fmt.Println("fChain", len(fChain.chain), fChain.genesis.Hash().String())
+	chain := newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
+	fChain := newTestChain((blockCacheItems+200)/10, tester.fChainInfo.genesis)
 
 	tester.newPeer("peer", protocol, chain, fChain)
 	if err := tester.sync("peer", nil, nil, mode); err != nil {
@@ -499,7 +488,7 @@ func assertMOwnForkedChain(t *testing.T, tester *downloadTwoTester, common int, 
 			t.Fatalf("synchronised receipts mismatch: have %v, want %v", rs, receiptLen)
 		}
 	}
-	//funcChack(lengths[0], lengths[0], lengths[0], tester.chainInfo)
+	funcChack(lengths[0], lengths[0], lengths[0], tester.chainInfo)
 	funcChack(lengths[1], lengths[1], lengths[1], tester.fChainInfo)
 }
 
