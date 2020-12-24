@@ -80,6 +80,7 @@ func (d *Downloader) stateFetcher() {
 				next = d.runStateSync(next)
 			}
 		case <-d.stateCh:
+		case <-d.fStateCh:
 			// Ignore state responses while no sync is running.
 		case <-d.quitCh:
 			return
@@ -112,6 +113,11 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 	peerSub := s.d.peers.SubscribePeerDrops(peerDrop)
 	defer peerSub.Unsubscribe()
 
+	stateCh := d.stateCh
+	if s.isFinalChain {
+		stateCh = d.fStateCh
+	}
+
 	for {
 		// Enable sending of the first buffered element if there is one.
 		var (
@@ -139,7 +145,7 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 			finished = finished[:len(finished)-1]
 
 		// Handle incoming state packs:
-		case pack := <-d.stateCh:
+		case pack := <-stateCh:
 			// Discard any data not requested (or previously timed out)
 			req := active[pack.PeerId()]
 			if req == nil {

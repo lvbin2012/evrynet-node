@@ -9,8 +9,10 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/event"
 	"github.com/Evrynetlabs/evrynet-node/evrdb"
+	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/trie"
 	"math/big"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -82,6 +84,8 @@ func (d *downloadTwoTesterPeer) RequestHeadersByHash(origin common.Hash, amount 
 		chain = d.chain
 	}
 	result := chain.headersByHash(origin, amount, skip)
+	log.Debug("RequestHeadersByHash", "origin", origin.String(), "amount", amount, "skip", skip, "reverse", reverse,
+		"isFinalChain", isFinalChain, "result", len(result))
 	go d.dlt.downloader.DeliverHeaders(d.id, isFinalChain, result)
 	return nil
 }
@@ -97,11 +101,14 @@ func (d *downloadTwoTesterPeer) RequestHeadersByNumber(origin uint64, amount int
 		chain = d.chain
 	}
 	result := chain.headersByNumber(origin, amount, skip)
+	log.Debug("RequestHeadersByNumber", "origin", origin, "amount", amount, "skip", skip, "reverse", reverse,
+		"isFinalChain", isFinalChain, "result", len(result))
 	go d.dlt.downloader.DeliverHeaders(d.id, isFinalChain, result)
 	return nil
 }
 
 func (d *downloadTwoTesterPeer) RequestBodies(hashes []common.Hash, isFinalChain bool) error {
+
 	var chain *testChain
 	if isFinalChain {
 		chain = d.fchain
@@ -109,6 +116,7 @@ func (d *downloadTwoTesterPeer) RequestBodies(hashes []common.Hash, isFinalChain
 		chain = d.chain
 	}
 	txs, uncles := chain.bodies(hashes)
+	log.Debug("RequestBodies", "Hashes", len(hashes), "isFinalChain", isFinalChain, "txs", len(txs), "uncles", len(uncles))
 	go d.dlt.downloader.DeliverBodies(d.id, isFinalChain, txs, uncles)
 	return nil
 }
@@ -121,6 +129,7 @@ func (d *downloadTwoTesterPeer) RequestReceipts(hashes []common.Hash, isFinalCha
 		chain = d.chain
 	}
 	receipts := chain.receipts(hashes)
+	log.Debug("RequestReceipts", "Hashes", len(hashes), "isFinalChain", isFinalChain, "receipts", len(receipts))
 	go d.dlt.downloader.DeliverReceipts(d.id, isFinalChain, receipts)
 	return nil
 }
@@ -137,6 +146,7 @@ func (d *downloadTwoTesterPeer) RequestNodeData(hashes []common.Hash, isFinalCha
 			}
 		}
 	}
+	log.Debug("RequestNodeData", "Hashes", len(hashes), "isFinalChain", isFinalChain, "results", len(results))
 	go d.dlt.downloader.DeliverNodeData(d.id, isFinalChain, results)
 	return nil
 }
@@ -187,7 +197,10 @@ func (t *testChainInfo) GetTd(hash common.Hash, number uint64) *big.Int {
 
 func (t *testChainInfo) InsertHeaderChain(headers []*types.Header, checkFreq int) (int, error) {
 	t.lock.Lock()
-	defer t.lock.Unlock()
+	defer func(n int, isFinalChain bool) {
+		t.lock.Unlock()
+		log.Debug("Coming in InsertHeaderChain", "insert headers", n, "currentHeight", t.CurrentHeader().Number.String(), "isFinalChain", isFinalChain)
+	}(len(headers), t.isFinalChain)
 
 	if _, ok := t.ownHeaders[headers[0].ParentHash]; !ok {
 		return 0, errors.New("unknown parent")
@@ -199,13 +212,13 @@ func (t *testChainInfo) InsertHeaderChain(headers []*types.Header, checkFreq int
 		}
 	}
 
-	for i := 1; i < len(headers); i++ {
-		if headers[i].ParentHash != headers[i-1].Hash() {
-			return i, errors.New("unknown parent")
-		}
-	}
-
+	//for i := 1; i < len(headers); i++ {
+	//	if headers[i].ParentHash != headers[i-1].Hash() {
+	//		return i, errors.New("unknown parent")
+	//	}
+	//}
 	for i, header := range headers {
+
 		if _, ok := t.ownHeaders[header.Hash()]; ok {
 			continue
 		}
@@ -215,7 +228,9 @@ func (t *testChainInfo) InsertHeaderChain(headers []*types.Header, checkFreq int
 		t.ownHashes = append(t.ownHashes, header.Hash())
 		t.ownHeaders[header.Hash()] = header
 		t.ownChainTd[header.Hash()] = new(big.Int).Add(t.ownChainTd[header.ParentHash], header.Difficulty)
+
 	}
+
 	return len(headers), nil
 }
 
@@ -306,7 +321,13 @@ func (t *testChainInfo) FastSyncCommitHead(hash common.Hash) error {
 
 func (t *testChainInfo) InsertChain(blocks types.Blocks) (int, error) {
 	t.lock.Lock()
-	t.lock.Unlock()
+	defer func(n int, isFinalChain bool) {
+		t.lock.Unlock()
+		log.Debug("Coming in InsertChain", "insert blocks", n, "current", t.CurrentBlock().NumberU64(),
+			"currentFast", t.CurrentFastBlock().NumberU64(), "isFinalChain", isFinalChain)
+	}(len(blocks), t.isFinalChain)
+
+
 
 	for i, block := range blocks {
 		if parent, ok := t.ownBlocks[block.ParentHash()]; !ok {
@@ -324,12 +345,15 @@ func (t *testChainInfo) InsertChain(blocks types.Blocks) (int, error) {
 		t.dbHelp.getDB().Put(block.Root().Bytes(), []byte{0x00})
 		t.ownChainTd[block.Hash()] = new(big.Int).Add(t.ownChainTd[block.ParentHash()], block.Difficulty())
 	}
+
 	return len(blocks), nil
 }
 
 func (t *testChainInfo) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (int, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
+	log.Debug("Coming in InsertReceiptChain", "insert blocks", len(blocks),
+		"Receipts", len(receipts), "isFinalChain", t.isFinalChain)
 	for i := 0; i < len(blocks) && i < len(receipts); i++ {
 		if _, ok := t.ownHeaders[blocks[i].Hash()]; !ok {
 			return i, errors.New("unknown owner")
@@ -339,7 +363,7 @@ func (t *testChainInfo) InsertReceiptChain(blocks types.Blocks, receipts []types
 				return i, errors.New("unknown parent")
 			}
 		}
-		if blocks[i].NumberU64() <= ancientLimit {
+		if blocks[i].NumberU64() <= 0 {
 			t.ancientBlocks[blocks[i].Hash()] = blocks[i]
 			t.ancientReceipts[blocks[i].Hash()] = receipts[i]
 
@@ -441,7 +465,8 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 		ftd = dlt.peers[id].fchain.td(fHash)
 	}
 	dlt.lock.RUnlock()
-	//fHash = common.Hash{}
+	// tag start one
+	//hash = common.Hash{}
 
 	err := dlt.downloader.synchroniseTwoChain(id, hash, td, fHash, ftd, mode)
 	select {
@@ -454,10 +479,14 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 
 func testSynchronisation(t *testing.T, protocol int, mode SyncMode) {
 	t.Parallel()
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
+
 	tester := newTwoTester()
 	defer tester.terminate()
 	chain := newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
 	fChain := newTestChain((blockCacheItems+200)/10, tester.fChainInfo.genesis)
+	fmt.Println("chain", chain.genesis.Hash().String())
+	fmt.Println("fChain", fChain.genesis.Hash().String())
 
 	tester.newPeer("peer", protocol, chain, fChain)
 	if err := tester.sync("peer", nil, nil, mode); err != nil {
@@ -492,4 +521,4 @@ func assertMOwnForkedChain(t *testing.T, tester *downloadTwoTester, common int, 
 	funcChack(lengths[1], lengths[1], lengths[1], tester.fChainInfo)
 }
 
-func TestCanonicalSynchronisation65Full(t *testing.T) { testSynchronisation(t, 65, FullSync) }
+func TestCanonicalSynchronisation65Full(t *testing.T) { testSynchronisation(t, 65, FastSync) }

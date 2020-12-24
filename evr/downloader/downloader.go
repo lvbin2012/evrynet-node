@@ -156,6 +156,7 @@ type Downloader struct {
 	stateSyncStart chan *stateSync
 	trackStateReq  chan *stateReq
 	stateCh        chan dataPack // [eth/63] Channel receiving inbound node state data
+	fStateCh       chan dataPack
 
 	// Cancellation and termination
 	cancelPeer string         // Identifier of the peer currently being used as the master (cancel on drop)
@@ -258,6 +259,7 @@ func New(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.SyncBloom, 
 		fHeaderProcCh:  make(chan *headerProcEvent, 1),
 		quitCh:         make(chan struct{}),
 		stateCh:        make(chan dataPack),
+		fStateCh:        make(chan dataPack),
 		stateSyncStart: make(chan *stateSync),
 		syncStatsState: stateSyncStats{
 			processed: rawdb.ReadFastTrieProgress(stateDb, chain.IsFinalChain()),
@@ -1913,6 +1915,9 @@ func (d *Downloader) processFastSyncContent(latest *types.Header, isFinalChain b
 			default:
 			}
 		}
+		if results[0].IsFinalChain != isFinalChain {
+			panic("IsFinalChain flag  not equal")
+		}
 		if d.chainInsertHook != nil {
 			d.chainInsertHook(results)
 		}
@@ -1928,7 +1933,7 @@ func (d *Downloader) processFastSyncContent(latest *types.Header, isFinalChain b
 			}
 		}
 		P, beforeP, afterP := splitAroundPivot(pivot, results)
-		if err := d.commitFastSyncData(beforeP, stateSync); err != nil {
+		if err := d.commitFastSyncData(beforeP, stateSync, isFinalChain); err != nil {
 			return err
 		}
 		if P != nil {
@@ -1951,7 +1956,7 @@ func (d *Downloader) processFastSyncContent(latest *types.Header, isFinalChain b
 				if stateSync.err != nil {
 					return stateSync.err
 				}
-				if err := d.commitPivotBlock(P); err != nil {
+				if err := d.commitPivotBlock(P, isFinalChain); err != nil {
 					return err
 				}
 				oldPivot = nil
@@ -1983,10 +1988,14 @@ func splitAroundPivot(pivot uint64, results []*fetchResult) (p *fetchResult, bef
 	return p, before, after
 }
 
-func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *stateSync) error {
+func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *stateSync, isFinalChain bool) error {
 	// Check for any early termination requests
 	if len(results) == 0 {
 		return nil
+	}
+	blockchain := d.blockchain
+	if isFinalChain {
+		blockchain = d.fblockchain
 	}
 	select {
 	case <-d.quitCh:
@@ -2009,22 +2018,26 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 		receipts[i] = result.Receipts
 	}
-	if index, err := d.blockchain.InsertReceiptChain(blocks, receipts, d.ancientLimit); err != nil {
+	if index, err := blockchain.InsertReceiptChain(blocks, receipts, d.ancientLimit); err != nil {
 		log.Debug("Downloaded item processing failed", "number", results[index].Header.Number, "hash", results[index].Header.Hash(), "err", err)
 		return errInvalidChain
 	}
 	return nil
 }
 
-func (d *Downloader) commitPivotBlock(result *fetchResult) error {
+func (d *Downloader) commitPivotBlock(result *fetchResult, isFinalChain bool) error {
+	blockchain := d.blockchain
+	if isFinalChain {
+		blockchain = d.fblockchain
+	}
 	block := types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 	log.Debug("Committing fast sync pivot as new head", "number", block.Number(), "hash", block.Hash())
 
 	// Commit the pivot block as the new head, will require full sync from here on
-	if _, err := d.blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}, d.ancientLimit); err != nil {
+	if _, err := blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}, d.ancientLimit); err != nil {
 		return err
 	}
-	if err := d.blockchain.FastSyncCommitHead(block.Hash()); err != nil {
+	if err := blockchain.FastSyncCommitHead(block.Hash()); err != nil {
 		return err
 	}
 	atomic.StoreInt32(&d.committed, 1)
@@ -2067,6 +2080,9 @@ func (d *Downloader) DeliverReceipts(id string, isFinalChain bool, receipts [][]
 
 // DeliverNodeData injects a new batch of node state data received from a remote node.
 func (d *Downloader) DeliverNodeData(id string, isFinalChain bool, data [][]byte) (err error) {
+	if isFinalChain{
+		return d.deliver(id, d.fStateCh, &statePack{id, isFinalChain, data}, stateInMeter, stateDropMeter)
+	}
 	return d.deliver(id, d.stateCh, &statePack{id, isFinalChain, data}, stateInMeter, stateDropMeter)
 }
 
