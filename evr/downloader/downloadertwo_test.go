@@ -3,6 +3,11 @@ package downloader
 import (
 	"errors"
 	"fmt"
+	"math/big"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
@@ -11,11 +16,6 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/evrdb"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/trie"
-	"math/big"
-	"os"
-	"sync"
-	"testing"
-	"time"
 )
 
 func init() {
@@ -327,8 +327,6 @@ func (t *testChainInfo) InsertChain(blocks types.Blocks) (int, error) {
 			"currentFast", t.CurrentFastBlock().NumberU64(), "isFinalChain", isFinalChain)
 	}(len(blocks), t.isFinalChain)
 
-
-
 	for i, block := range blocks {
 		if parent, ok := t.ownBlocks[block.ParentHash()]; !ok {
 			return i, errors.New("unknown parent")
@@ -353,7 +351,7 @@ func (t *testChainInfo) InsertReceiptChain(blocks types.Blocks, receipts []types
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	log.Debug("Coming in InsertReceiptChain", "insert blocks", len(blocks),
-		"Receipts", len(receipts), "isFinalChain", t.isFinalChain)
+		"Receipts", len(receipts), "isFinalChain", t.isFinalChain, "ancientLimit", ancientLimit)
 	for i := 0; i < len(blocks) && i < len(receipts); i++ {
 		if _, ok := t.ownHeaders[blocks[i].Hash()]; !ok {
 			return i, errors.New("unknown owner")
@@ -363,7 +361,7 @@ func (t *testChainInfo) InsertReceiptChain(blocks types.Blocks, receipts []types
 				return i, errors.New("unknown parent")
 			}
 		}
-		if blocks[i].NumberU64() <= 0 {
+		if blocks[i].NumberU64() <= ancientLimit {
 			t.ancientBlocks[blocks[i].Hash()] = blocks[i]
 			t.ancientReceipts[blocks[i].Hash()] = receipts[i]
 
@@ -425,11 +423,8 @@ func newTwoTester() *downloadTwoTester {
 		ancientChainTd:  map[common.Hash]*big.Int{fchainGenesis.Hash(): fchainGenesis.Difficulty()},
 	}
 
-	tester.downloader = New(0, tester.stateDb, trie.NewSyncBloom(1, tester.stateDb),
-		new(event.TypeMux), tester.chainInfo, nil, tester.dropPeer)
-
-	tester.downloader.fblockchain = tester.fChainInfo
-	tester.downloader.flightchain = tester.fChainInfo
+	tester.downloader = NewTwoChain(0, tester.stateDb, trie.NewSyncBloom(1, tester.stateDb),
+		new(event.TypeMux), tester.chainInfo, nil, tester.fChainInfo, nil, tester.dropPeer)
 	return tester
 }
 
@@ -466,7 +461,7 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 	}
 	dlt.lock.RUnlock()
 	// tag start one
-	//hash = common.Hash{}
+	//fHash = common.Hash{}
 
 	err := dlt.downloader.synchroniseTwoChain(id, hash, td, fHash, ftd, mode)
 	select {
@@ -479,14 +474,12 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 
 func testSynchronisation(t *testing.T, protocol int, mode SyncMode) {
 	t.Parallel()
-	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
+	//log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
 
 	tester := newTwoTester()
 	defer tester.terminate()
 	chain := newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
 	fChain := newTestChain((blockCacheItems+200)/10, tester.fChainInfo.genesis)
-	fmt.Println("chain", chain.genesis.Hash().String())
-	fmt.Println("fChain", fChain.genesis.Hash().String())
 
 	tester.newPeer("peer", protocol, chain, fChain)
 	if err := tester.sync("peer", nil, nil, mode); err != nil {
@@ -521,4 +514,13 @@ func assertMOwnForkedChain(t *testing.T, tester *downloadTwoTester, common int, 
 	funcChack(lengths[1], lengths[1], lengths[1], tester.fChainInfo)
 }
 
-func TestCanonicalSynchronisation65Full(t *testing.T) { testSynchronisation(t, 65, FastSync) }
+func TestCanonicalSynchronisation65Full(t *testing.T) {
+	testSynchronisation(t, 65, FullSync)
+}
+func TestCanonicalSynchronisation65Light(t *testing.T) {
+	testSynchronisation(t, 65, LightSync)
+}
+
+func TestCanonicalSynchronisation65Fast(t *testing.T) {
+	testSynchronisation(t, 65, FastSync)
+}

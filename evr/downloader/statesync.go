@@ -59,10 +59,14 @@ type stateSyncStats struct {
 
 // syncState starts downloading state with the given root hash.
 func (d *Downloader) syncState(root common.Hash, isFinalChain bool) *stateSync {
+	stateSyncStart := d.stateSyncStart
+	if isFinalChain {
+		stateSyncStart = d.fStateSyncStart
+	}
 	// Create the state sync
 	s := newStateSync(d, root, isFinalChain)
 	select {
-	case d.stateSyncStart <- s:
+	case stateSyncStart <- s:
 	case <-d.quitCh:
 		s.err = errCancelStateFetch
 		close(s.done)
@@ -76,6 +80,10 @@ func (d *Downloader) stateFetcher() {
 	for {
 		select {
 		case s := <-d.stateSyncStart:
+			for next := s; next != nil; {
+				next = d.runStateSync(next)
+			}
+		case s := <-d.fStateSyncStart:
 			for next := s; next != nil; {
 				next = d.runStateSync(next)
 			}
@@ -104,6 +112,10 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 			req.peer.SetNodeDataIdle(len(req.items))
 		}
 	}()
+	stateSyncStart := d.stateSyncStart
+	if s.isFinalChain {
+		stateSyncStart = d.fStateSyncStart
+	}
 	// Run the state sync.
 	go s.run()
 	defer s.Cancel()
@@ -131,7 +143,7 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 
 		select {
 		// The stateSync lifecycle:
-		case next := <-d.stateSyncStart:
+		case next := <-stateSyncStart:
 			return next
 
 		case <-s.done:
@@ -273,7 +285,9 @@ func (s *stateSync) Wait() error {
 
 // Cancel cancels the sync and waits until it has shut down.
 func (s *stateSync) Cancel() error {
-	s.cancelOnce.Do(func() { close(s.cancel) })
+	s.cancelOnce.Do(func() {
+		close(s.cancel)
+	})
 	return s.Wait()
 }
 

@@ -105,7 +105,7 @@ type Downloader struct {
 
 	checkpoint uint64   // Checkpoint block number to enforce head against (e.g. fast sync)
 	genesis    uint64   // Genesis block number to limit sync to (e.g. light client CHT)
-	fgenesis   uint64   // Genesis block number to limit sync to (e.g. light client CHT)
+	fGenesis   uint64   // Genesis block number to limit sync to (e.g. light client CHT)
 	queue      *queue   // Scheduler for selecting the hashes to download
 	fQueue     *queue   // Scheduler for selecting the hashes to download
 	peers      *peerSet // Set of active peers from which download can proceed
@@ -114,6 +114,7 @@ type Downloader struct {
 	stateBloom *trie.SyncBloom // Bloom filter for fast trie node existence checks
 
 	// Statistics
+	// TODO add final chain statistics
 	syncStatsChainOrigin uint64 // Origin block number where syncing started at
 	syncStatsChainHeight uint64 // Highest block number known when syncing started
 	syncStatsState       stateSyncStats
@@ -123,8 +124,8 @@ type Downloader struct {
 	blockchain BlockChain
 
 	// add by lvbin
-	flightchain LightChain
-	fblockchain BlockChain
+	fLightchain LightChain
+	fBlockchain BlockChain
 
 	// Callbacks
 	dropPeer peerDropFn // Drops a peer for misbehaving
@@ -135,6 +136,7 @@ type Downloader struct {
 	notified        int32
 	committed       int32
 	ancientLimit    uint64 // The maximum block number which can be regarded as ancient data.
+	fAncientLimit   uint64 // The maximum block number which can be regarded as ancient data.
 
 	// Channels
 	headerCh      chan dataPack         // [eth/62] Channel receiving inbound block headers
@@ -152,11 +154,11 @@ type Downloader struct {
 	fHeaderProcCh  chan *headerProcEvent // [eth/65] Channel to feed the header processor new tasks
 
 	// for stateFetcher
-	// TODO add stateSyncStart with isFinalChain flag
-	stateSyncStart chan *stateSync
-	trackStateReq  chan *stateReq
-	stateCh        chan dataPack // [eth/63] Channel receiving inbound node state data
-	fStateCh       chan dataPack
+	stateSyncStart  chan *stateSync
+	fStateSyncStart chan *stateSync
+	trackStateReq   chan *stateReq
+	stateCh         chan dataPack // [eth/63] Channel receiving inbound node state data
+	fStateCh        chan dataPack
 
 	// Cancellation and termination
 	cancelPeer string         // Identifier of the peer currently being used as the master (cancel on drop)
@@ -233,34 +235,86 @@ func New(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.SyncBloom, 
 		lightchain = chain
 	}
 	dl := &Downloader{
-		stateDB:        stateDb,
-		stateBloom:     stateBloom,
-		mux:            mux,
-		checkpoint:     checkpoint,
-		queue:          newQueue(),
-		fQueue:         newQueue(),
-		peers:          newPeerSet(),
-		rttEstimate:    uint64(rttMaxEstimate),
-		rttConfidence:  uint64(1000000),
-		blockchain:     chain,
-		lightchain:     lightchain,
-		dropPeer:       dropPeer,
-		headerCh:       make(chan dataPack, 1),
-		bodyCh:         make(chan dataPack, 1),
-		receiptCh:      make(chan dataPack, 1),
-		bodyWakeCh:     make(chan bool, 1),
-		receiptWakeCh:  make(chan bool, 1),
-		headerProcCh:   make(chan *headerProcEvent, 1),
-		fHeaderCh:      make(chan dataPack, 1),
-		fBodyCh:        make(chan dataPack, 1),
-		fReceiptCh:     make(chan dataPack, 1),
-		fBodyWakeCh:    make(chan bool, 1),
-		fReceiptWakeCh: make(chan bool, 1),
-		fHeaderProcCh:  make(chan *headerProcEvent, 1),
-		quitCh:         make(chan struct{}),
-		stateCh:        make(chan dataPack),
+		stateDB:         stateDb,
+		stateBloom:      stateBloom,
+		mux:             mux,
+		checkpoint:      checkpoint,
+		queue:           newQueue(),
+		fQueue:          newQueue(),
+		peers:           newPeerSet(),
+		rttEstimate:     uint64(rttMaxEstimate),
+		rttConfidence:   uint64(1000000),
+		blockchain:      chain,
+		lightchain:      lightchain,
+		dropPeer:        dropPeer,
+		headerCh:        make(chan dataPack, 1),
+		bodyCh:          make(chan dataPack, 1),
+		receiptCh:       make(chan dataPack, 1),
+		bodyWakeCh:      make(chan bool, 1),
+		receiptWakeCh:   make(chan bool, 1),
+		headerProcCh:    make(chan *headerProcEvent, 1),
+		fHeaderCh:       make(chan dataPack, 1),
+		fBodyCh:         make(chan dataPack, 1),
+		fReceiptCh:      make(chan dataPack, 1),
+		fBodyWakeCh:     make(chan bool, 1),
+		fReceiptWakeCh:  make(chan bool, 1),
+		fHeaderProcCh:   make(chan *headerProcEvent, 1),
+		quitCh:          make(chan struct{}),
+		stateCh:         make(chan dataPack),
 		fStateCh:        make(chan dataPack),
-		stateSyncStart: make(chan *stateSync),
+		stateSyncStart:  make(chan *stateSync),
+		fStateSyncStart: make(chan *stateSync),
+		syncStatsState: stateSyncStats{
+			processed: rawdb.ReadFastTrieProgress(stateDb, chain.IsFinalChain()),
+		},
+		trackStateReq: make(chan *stateReq),
+	}
+	go dl.qosTuner()
+	go dl.stateFetcher()
+	return dl
+}
+
+// New creates a new downloader to fetch hashes and blocks from remote peers.
+func NewTwoChain(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.SyncBloom, mux *event.TypeMux,
+	chain BlockChain, lightchain LightChain, fChain BlockChain, fLightchain LightChain, dropPeer peerDropFn) *Downloader {
+	if lightchain == nil {
+		lightchain = chain
+	}
+	if fLightchain == nil {
+		fLightchain = fChain
+	}
+	dl := &Downloader{
+		stateDB:         stateDb,
+		stateBloom:      stateBloom,
+		mux:             mux,
+		checkpoint:      checkpoint,
+		queue:           newQueue(),
+		fQueue:          newQueue(),
+		peers:           newPeerSet(),
+		rttEstimate:     uint64(rttMaxEstimate),
+		rttConfidence:   uint64(1000000),
+		blockchain:      chain,
+		lightchain:      lightchain,
+		fBlockchain:     fChain,
+		fLightchain:     fLightchain,
+		dropPeer:        dropPeer,
+		headerCh:        make(chan dataPack, 1),
+		bodyCh:          make(chan dataPack, 1),
+		receiptCh:       make(chan dataPack, 1),
+		bodyWakeCh:      make(chan bool, 1),
+		receiptWakeCh:   make(chan bool, 1),
+		headerProcCh:    make(chan *headerProcEvent, 1),
+		fHeaderCh:       make(chan dataPack, 1),
+		fBodyCh:         make(chan dataPack, 1),
+		fReceiptCh:      make(chan dataPack, 1),
+		fBodyWakeCh:     make(chan bool, 1),
+		fReceiptWakeCh:  make(chan bool, 1),
+		fHeaderProcCh:   make(chan *headerProcEvent, 1),
+		quitCh:          make(chan struct{}),
+		stateCh:         make(chan dataPack),
+		fStateCh:        make(chan dataPack),
+		stateSyncStart:  make(chan *stateSync),
+		fStateSyncStart: make(chan *stateSync),
 		syncStatsState: stateSyncStats{
 			processed: rawdb.ReadFastTrieProgress(stateDb, chain.IsFinalChain()),
 		},
@@ -588,10 +642,12 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 	queue := d.queue
 	lightchain := d.lightchain
 	blockchain := d.blockchain
+	ancientLimit := &d.ancientLimit
 	if isFinalChain {
 		queue = d.fQueue
-		lightchain = d.flightchain
-		blockchain = d.fblockchain
+		lightchain = d.fLightchain
+		blockchain = d.fBlockchain
+		ancientLimit = &d.fAncientLimit
 	}
 	defer func() {
 		// reset on error
@@ -661,17 +717,17 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 		// the blocks might be written into the ancient store. A following mini-reorg
 		// could cause issues.
 		if d.checkpoint != 0 && d.checkpoint > maxForkAncestry+1 {
-			d.ancientLimit = d.checkpoint
+			*ancientLimit = d.checkpoint
 		} else if height > maxForkAncestry+1 {
-			d.ancientLimit = height - maxForkAncestry - 1
+			*ancientLimit = height - maxForkAncestry - 1
 		}
 		frozen, _ := d.stateDB.Ancients() // Ignore the error here since light client can also hit here.
 		// If a part of blockchain data has already been written into active store,
 		// disable the ancient style insertion explicitly.
 		if origin >= frozen && frozen != 0 {
-			d.ancientLimit = 0
+			*ancientLimit = 0
 			log.Info("Disabling direct-ancient mode", "origin", origin, "ancient", frozen-1)
-		} else if d.ancientLimit > 0 {
+		} else if *ancientLimit > 0 {
 			log.Debug("Enabling direct-ancient mode", "ancient", d.ancientLimit)
 		}
 		// Rewind the ancient store and blockchain if reorg happens.
@@ -757,6 +813,7 @@ func (d *Downloader) Cancel() {
 	d.cancelWg.Wait()
 
 	d.ancientLimit = 0
+	d.fAncientLimit = 0
 	log.Debug("Reset ancient limit to zero")
 }
 
@@ -907,12 +964,12 @@ func (d *Downloader) findAncestor(p *peerConnection, remoteHeader *types.Header,
 	receiptCh := d.receiptCh
 	genesis := &d.genesis
 	if isFinalChain {
-		blockchain = d.fblockchain
-		lightchain = d.flightchain
+		blockchain = d.fBlockchain
+		lightchain = d.fLightchain
 		headerCh = d.fHeaderCh
 		bodyCh = d.fBodyCh
 		receiptCh = d.fReceiptCh
-		genesis = &d.fgenesis
+		genesis = &d.fGenesis
 	}
 	// Figure out the valid ancestor range to prevent rewrite attacks
 	var (
@@ -1140,8 +1197,8 @@ func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64, 
 	headerCh := d.headerCh
 	headerProcCh := d.headerProcCh
 	if isFinalChain {
-		blockchain = d.fblockchain
-		lightchain = d.flightchain
+		blockchain = d.fBlockchain
+		lightchain = d.fLightchain
 		headerCh = d.fHeaderCh
 		headerProcCh = d.fHeaderProcCh
 	}
@@ -1636,8 +1693,8 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int, is
 	receiptWakeCh := d.receiptWakeCh
 	if isFinalChain {
 		queue = d.fQueue
-		lightchain = d.flightchain
-		blockchain = d.fblockchain
+		lightchain = d.fLightchain
+		blockchain = d.fBlockchain
 		headerProcCh = d.fHeaderProcCh
 		bodyWakeCh = d.fBodyWakeCh
 		receiptWakeCh = d.fReceiptWakeCh
@@ -1834,7 +1891,7 @@ func (d *Downloader) importBlockResults(results []*fetchResult, isFinalChain boo
 	// Check for any early termination requests
 	blockchain := d.blockchain
 	if isFinalChain {
-		blockchain = d.fblockchain
+		blockchain = d.fBlockchain
 	}
 	if len(results) == 0 {
 		return nil
@@ -1994,8 +2051,10 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 		return nil
 	}
 	blockchain := d.blockchain
+	ancientLimit := &d.ancientLimit
 	if isFinalChain {
-		blockchain = d.fblockchain
+		blockchain = d.fBlockchain
+		ancientLimit = &d.fAncientLimit
 	}
 	select {
 	case <-d.quitCh:
@@ -2018,7 +2077,7 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 		blocks[i] = types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 		receipts[i] = result.Receipts
 	}
-	if index, err := blockchain.InsertReceiptChain(blocks, receipts, d.ancientLimit); err != nil {
+	if index, err := blockchain.InsertReceiptChain(blocks, receipts, *ancientLimit); err != nil {
 		log.Debug("Downloaded item processing failed", "number", results[index].Header.Number, "hash", results[index].Header.Hash(), "err", err)
 		return errInvalidChain
 	}
@@ -2027,14 +2086,16 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 
 func (d *Downloader) commitPivotBlock(result *fetchResult, isFinalChain bool) error {
 	blockchain := d.blockchain
+	ancientLimit := &d.ancientLimit
 	if isFinalChain {
-		blockchain = d.fblockchain
+		blockchain = d.fBlockchain
+		ancientLimit = &d.fAncientLimit
 	}
 	block := types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles)
 	log.Debug("Committing fast sync pivot as new head", "number", block.Number(), "hash", block.Hash())
 
 	// Commit the pivot block as the new head, will require full sync from here on
-	if _, err := blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}, d.ancientLimit); err != nil {
+	if _, err := blockchain.InsertReceiptChain([]*types.Block{block}, []types.Receipts{result.Receipts}, *ancientLimit); err != nil {
 		return err
 	}
 	if err := blockchain.FastSyncCommitHead(block.Hash()); err != nil {
@@ -2080,7 +2141,7 @@ func (d *Downloader) DeliverReceipts(id string, isFinalChain bool, receipts [][]
 
 // DeliverNodeData injects a new batch of node state data received from a remote node.
 func (d *Downloader) DeliverNodeData(id string, isFinalChain bool, data [][]byte) (err error) {
-	if isFinalChain{
+	if isFinalChain {
 		return d.deliver(id, d.fStateCh, &statePack{id, isFinalChain, data}, stateInMeter, stateDropMeter)
 	}
 	return d.deliver(id, d.stateCh, &statePack{id, isFinalChain, data}, stateInMeter, stateDropMeter)
