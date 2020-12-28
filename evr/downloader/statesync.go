@@ -109,7 +109,7 @@ func (d *Downloader) runStateSync(s *stateSync) *stateSync {
 		// available for the next sync.
 		for _, req := range active {
 			req.timer.Stop()
-			req.peer.SetNodeDataIdle(len(req.items))
+			req.peer.SetNodeDataIdle(len(req.items), s.isFinalChain)
 		}
 	}()
 	stateSyncStart := d.stateSyncStart
@@ -357,7 +357,7 @@ func (s *stateSync) loop() (err error) {
 				log.Warn("Node data write error", "err", err)
 				return err
 			}
-			req.peer.SetNodeDataIdle(delivered)
+			req.peer.SetNodeDataIdle(delivered, s.isFinalChain)
 		}
 	}
 	return nil

@@ -199,35 +199,43 @@ func (t *testChainInfo) InsertHeaderChain(headers []*types.Header, checkFreq int
 	t.lock.Lock()
 	defer func(n int, isFinalChain bool) {
 		t.lock.Unlock()
-		log.Debug("Coming in InsertHeaderChain", "insert headers", n, "currentHeight", t.CurrentHeader().Number.String(), "isFinalChain", isFinalChain)
+		currentHeight := t.CurrentHeader().Number.Uint64()
+		shouldHeight := headers[len(headers)-1].Number.Uint64()
+		n = n - int(shouldHeight-currentHeight)
+		log.Debug("Coming in InsertHeaderChain", "insert headers", n, "currentHeight",
+			t.CurrentHeader().Number.String(), "isFinalChain", isFinalChain)
+		if n == 0 {
+			log.Error("Coming in InsertHeaderChain", "currentHash", t.CurrentHeader().Hash().String(),
+				"Input first parent", headers[0].ParentHash.String(), "isFinalChain", isFinalChain)
+		}
+
 	}(len(headers), t.isFinalChain)
 
-	if _, ok := t.ownHeaders[headers[0].ParentHash]; !ok {
+	_, inOwnHeaders := t.ownHeaders[headers[0].ParentHash]
+	_, inAncientHeaders := t.ancientHeaders[headers[0].ParentHash]
+	if !(inAncientHeaders || inOwnHeaders) {
 		return 0, errors.New("unknown parent")
 	}
-
 	for i, header := range headers[1:] {
 		if headers[i].Hash() != header.ParentHash {
 			return i, errors.New("unknown parent")
 		}
 	}
 
-	//for i := 1; i < len(headers); i++ {
-	//	if headers[i].ParentHash != headers[i-1].Hash() {
-	//		return i, errors.New("unknown parent")
-	//	}
-	//}
 	for i, header := range headers {
-
 		if _, ok := t.ownHeaders[header.Hash()]; ok {
 			continue
 		}
-		if _, ok := t.ownHeaders[header.ParentHash]; !ok {
+		parentTd, ok := t.ownChainTd[header.ParentHash]
+		if !ok {
+			parentTd, ok = t.ancientChainTd[header.ParentHash]
+		}
+		if !ok {
 			return i, errors.New("unknown parent")
 		}
 		t.ownHashes = append(t.ownHashes, header.Hash())
 		t.ownHeaders[header.Hash()] = header
-		t.ownChainTd[header.Hash()] = new(big.Int).Add(t.ownChainTd[header.ParentHash], header.Difficulty)
+		t.ownChainTd[header.Hash()] = new(big.Int).Add(parentTd, header.Difficulty)
 
 	}
 
@@ -352,6 +360,7 @@ func (t *testChainInfo) InsertReceiptChain(blocks types.Blocks, receipts []types
 	defer t.lock.Unlock()
 	log.Debug("Coming in InsertReceiptChain", "insert blocks", len(blocks),
 		"Receipts", len(receipts), "isFinalChain", t.isFinalChain, "ancientLimit", ancientLimit)
+
 	for i := 0; i < len(blocks) && i < len(receipts); i++ {
 		if _, ok := t.ownHeaders[blocks[i].Hash()]; !ok {
 			return i, errors.New("unknown owner")
@@ -461,7 +470,7 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 	}
 	dlt.lock.RUnlock()
 	// tag start one
-	//fHash = common.Hash{}
+	//hash = common.Hash{}
 
 	err := dlt.downloader.synchroniseTwoChain(id, hash, td, fHash, ftd, mode)
 	select {
@@ -479,7 +488,7 @@ func testSynchronisation(t *testing.T, protocol int, mode SyncMode) {
 	tester := newTwoTester()
 	defer tester.terminate()
 	chain := newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
-	fChain := newTestChain((blockCacheItems+200)/10, tester.fChainInfo.genesis)
+	fChain := newTestChain((blockCacheItems+200)*9/9, tester.fChainInfo.genesis)
 
 	tester.newPeer("peer", protocol, chain, fChain)
 	if err := tester.sync("peer", nil, nil, mode); err != nil {

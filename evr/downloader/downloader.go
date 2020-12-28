@@ -628,10 +628,10 @@ func (d *Downloader) synchroniseTwoChain(id string, head common.Hash, td *big.In
 
 	for i := 0; i < 2; i++ {
 		if err := <-errc; err != nil {
+			fmt.Println(err.Error())
 			return err
 		}
 	}
-	d.Cancel()
 	return nil
 }
 
@@ -1407,7 +1407,7 @@ func (d *Downloader) fillHeaderSkeleton(from uint64, skeleton []*types.Header, i
 		}
 		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchHeaders(req.From, MaxHeaderFetch, req.IsFinalChain) }
 		capacity = func(p *peerConnection) int { return p.HeaderCapacity(d.requestRTT()) }
-		setIdle  = func(p *peerConnection, accepted int) { p.SetHeadersIdle(accepted) }
+		setIdle  = func(p *peerConnection, accepted int) { p.SetHeadersIdle(accepted, isFinalChain) }
 	)
 	err := d.fetchParts(headerCh, deliver, queue.headerContCh, expire,
 		queue.PendingHeaders, queue.InFlightHeaders, throttle, reserve,
@@ -1440,7 +1440,7 @@ func (d *Downloader) fetchBodies(from uint64, isFinalChain bool) error {
 		expire   = func() map[string]int { return queue.ExpireBodies(d.requestTTL()) }
 		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchBodies(req) }
 		capacity = func(p *peerConnection) int { return p.BlockCapacity(d.requestRTT()) }
-		setIdle  = func(p *peerConnection, accepted int) { p.SetBodiesIdle(accepted) }
+		setIdle  = func(p *peerConnection, accepted int) { p.SetBodiesIdle(accepted, isFinalChain) }
 	)
 	err := d.fetchParts(bodyCh, deliver, bodyWakeCh, expire,
 		queue.PendingBlocks, queue.InFlightBlocks, queue.ShouldThrottleBlocks, queue.ReserveBodies,
@@ -1472,7 +1472,7 @@ func (d *Downloader) fetchReceipts(from uint64, isFinalChain bool) error {
 		expire   = func() map[string]int { return queue.ExpireReceipts(d.requestTTL()) }
 		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchReceipts(req) }
 		capacity = func(p *peerConnection) int { return p.ReceiptCapacity(d.requestRTT()) }
-		setIdle  = func(p *peerConnection, accepted int) { p.SetReceiptsIdle(accepted) }
+		setIdle  = func(p *peerConnection, accepted int) { p.SetReceiptsIdle(accepted, isFinalChain) }
 	)
 	err := d.fetchParts(receiptCh, deliver, receiptWakeCh, expire,
 		queue.PendingReceipts, queue.InFlightReceipts, queue.ShouldThrottleReceipts, queue.ReserveReceipts,
@@ -1820,7 +1820,8 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int, is
 						if n > 0 {
 							rollback = append(rollback, chunk[:n]...)
 						}
-						log.Debug("Invalid header encountered", "number", chunk[n].Number, "hash", chunk[n].Hash(), "err", err)
+
+						log.Debug("Invalid header encountered", "number", chunk[n].Number, "hash", chunk[n].Hash(), "err", err, "isFinalChain", procEvent.isFinalChain)
 						return errInvalidChain
 					}
 					// All verifications passed, store newly found uncertain headers
@@ -2069,7 +2070,7 @@ func (d *Downloader) commitFastSyncData(results []*fetchResult, stateSync *state
 	first, last := results[0].Header, results[len(results)-1].Header
 	log.Debug("Inserting fast-sync blocks", "items", len(results),
 		"firstnum", first.Number, "firsthash", first.Hash(),
-		"lastnumn", last.Number, "lasthash", last.Hash(),
+		"lastnumn", last.Number, "lasthash", last.Hash(), "isFianlChain", isFinalChain,
 	)
 	blocks := make([]*types.Block, len(results))
 	receipts := make([]types.Receipts, len(results))

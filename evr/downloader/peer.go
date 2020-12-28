@@ -54,6 +54,11 @@ type peerConnection struct {
 	receiptIdle int32 // Current receipt activity state of the peer (idle = 0, active = 1)
 	stateIdle   int32 // Current node data activity state of the peer (idle = 0, active = 1)
 
+	fHeaderIdle  int32 // Current header activity state of the peer (idle = 0, active = 1)
+	fBlockIdle   int32 // Current block activity state of the peer (idle = 0, active = 1)
+	fReceiptIdle int32 // Current receipt activity state of the peer (idle = 0, active = 1)
+	fStateIdle   int32 // Current node data activity state of the peer (idle = 0, active = 1)
+
 	headerThroughput  float64 // Number of headers measured to be retrievable per second
 	blockThroughput   float64 // Number of blocks (bodies) measured to be retrievable per second
 	receiptThroughput float64 // Number of receipts measured to be retrievable per second
@@ -96,7 +101,7 @@ type lightPeerWrapper struct {
 	peer LightPeer
 }
 
-func (w *lightPeerWrapper) Head() (common.Hash, *big.Int) { return w.peer.Head() }
+func (w *lightPeerWrapper) Head() (common.Hash, *big.Int)  { return w.peer.Head() }
 func (w *lightPeerWrapper) FHead() (common.Hash, *big.Int) { return w.peer.Head() }
 func (w *lightPeerWrapper) RequestHeadersByHash(h common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
 	return w.peer.RequestHeadersByHash(h, amount, skip, reverse, isFinalChain)
@@ -136,6 +141,10 @@ func (p *peerConnection) Reset() {
 	atomic.StoreInt32(&p.blockIdle, 0)
 	atomic.StoreInt32(&p.receiptIdle, 0)
 	atomic.StoreInt32(&p.stateIdle, 0)
+	atomic.StoreInt32(&p.fHeaderIdle, 0)
+	atomic.StoreInt32(&p.fBlockIdle, 0)
+	atomic.StoreInt32(&p.fReceiptIdle, 0)
+	atomic.StoreInt32(&p.fStateIdle, 0)
 
 	p.headerThroughput = 0
 	p.blockThroughput = 0
@@ -147,12 +156,16 @@ func (p *peerConnection) Reset() {
 
 // FetchHeaders sends a header retrieval request to the remote peer.
 func (p *peerConnection) FetchHeaders(from uint64, count int, isFinalChain bool) error {
+	headerIdlePtr := &p.headerIdle
+	if isFinalChain {
+		headerIdlePtr = &p.fHeaderIdle
+	}
 	// Sanity check the protocol version
 	if p.version < 62 {
 		panic(fmt.Sprintf("header fetch [eth/62+] requested on eth/%d", p.version))
 	}
 	// Short circuit if the peer is already fetching
-	if !atomic.CompareAndSwapInt32(&p.headerIdle, 0, 1) {
+	if !atomic.CompareAndSwapInt32(headerIdlePtr, 0, 1) {
 		return errAlreadyFetching
 	}
 	p.headerStarted = time.Now()
@@ -165,12 +178,16 @@ func (p *peerConnection) FetchHeaders(from uint64, count int, isFinalChain bool)
 
 // FetchBodies sends a block body retrieval request to the remote peer.
 func (p *peerConnection) FetchBodies(request *fetchRequest) error {
+	blockIdlePtr := &p.blockIdle
+	if request.IsFinalChain {
+		blockIdlePtr = &p.fBlockIdle
+	}
 	// Sanity check the protocol version
 	if p.version < 62 {
 		panic(fmt.Sprintf("body fetch [eth/62+] requested on eth/%d", p.version))
 	}
 	// Short circuit if the peer is already fetching
-	if !atomic.CompareAndSwapInt32(&p.blockIdle, 0, 1) {
+	if !atomic.CompareAndSwapInt32(blockIdlePtr, 0, 1) {
 		return errAlreadyFetching
 	}
 	p.blockStarted = time.Now()
@@ -187,12 +204,16 @@ func (p *peerConnection) FetchBodies(request *fetchRequest) error {
 
 // FetchReceipts sends a receipt retrieval request to the remote peer.
 func (p *peerConnection) FetchReceipts(request *fetchRequest) error {
+	receiptIdlePtr := &p.receiptIdle
+	if request.IsFinalChain {
+		receiptIdlePtr = &p.fReceiptIdle
+	}
 	// Sanity check the protocol version
 	if p.version < 63 {
 		panic(fmt.Sprintf("body fetch [eth/63+] requested on eth/%d", p.version))
 	}
 	// Short circuit if the peer is already fetching
-	if !atomic.CompareAndSwapInt32(&p.receiptIdle, 0, 1) {
+	if !atomic.CompareAndSwapInt32(receiptIdlePtr, 0, 1) {
 		return errAlreadyFetching
 	}
 	p.receiptStarted = time.Now()
@@ -209,12 +230,16 @@ func (p *peerConnection) FetchReceipts(request *fetchRequest) error {
 
 // FetchNodeData sends a node state data retrieval request to the remote peer.
 func (p *peerConnection) FetchNodeData(hashes []common.Hash, isFinalChain bool) error {
+	stateIdlePtr := &p.stateIdle
+	if isFinalChain {
+		stateIdlePtr = &p.fStateIdle
+	}
 	// Sanity check the protocol version
 	if p.version < 63 {
 		panic(fmt.Sprintf("node data fetch [eth/63+] requested on eth/%d", p.version))
 	}
 	// Short circuit if the peer is already fetching
-	if !atomic.CompareAndSwapInt32(&p.stateIdle, 0, 1) {
+	if !atomic.CompareAndSwapInt32(stateIdlePtr, 0, 1) {
 		return errAlreadyFetching
 	}
 	p.stateStarted = time.Now()
@@ -227,29 +252,45 @@ func (p *peerConnection) FetchNodeData(hashes []common.Hash, isFinalChain bool) 
 // SetHeadersIdle sets the peer to idle, allowing it to execute new header retrieval
 // requests. Its estimated header retrieval throughput is updated with that measured
 // just now.
-func (p *peerConnection) SetHeadersIdle(delivered int) {
-	p.setIdle(p.headerStarted, delivered, &p.headerThroughput, &p.headerIdle)
+func (p *peerConnection) SetHeadersIdle(delivered int, isFinalChain bool) {
+	headerIdlePtr := &p.headerIdle
+	if isFinalChain {
+		headerIdlePtr = &p.fHeaderIdle
+	}
+	p.setIdle(p.headerStarted, delivered, &p.headerThroughput, headerIdlePtr)
 }
 
 // SetBodiesIdle sets the peer to idle, allowing it to execute block body retrieval
 // requests. Its estimated body retrieval throughput is updated with that measured
 // just now.
-func (p *peerConnection) SetBodiesIdle(delivered int) {
-	p.setIdle(p.blockStarted, delivered, &p.blockThroughput, &p.blockIdle)
+func (p *peerConnection) SetBodiesIdle(delivered int, isFinalChain bool) {
+	blockIdlePtr := &p.blockIdle
+	if isFinalChain {
+		blockIdlePtr = &p.fBlockIdle
+	}
+	p.setIdle(p.blockStarted, delivered, &p.blockThroughput, blockIdlePtr)
 }
 
 // SetReceiptsIdle sets the peer to idle, allowing it to execute new receipt
 // retrieval requests. Its estimated receipt retrieval throughput is updated
 // with that measured just now.
-func (p *peerConnection) SetReceiptsIdle(delivered int) {
-	p.setIdle(p.receiptStarted, delivered, &p.receiptThroughput, &p.receiptIdle)
+func (p *peerConnection) SetReceiptsIdle(delivered int, isFinalChain bool) {
+	receiptIdlePtr := &p.receiptIdle
+	if isFinalChain {
+		receiptIdlePtr = &p.fReceiptIdle
+	}
+	p.setIdle(p.receiptStarted, delivered, &p.receiptThroughput, receiptIdlePtr)
 }
 
 // SetNodeDataIdle sets the peer to idle, allowing it to execute new state trie
 // data retrieval requests. Its estimated state retrieval throughput is updated
 // with that measured just now.
-func (p *peerConnection) SetNodeDataIdle(delivered int) {
-	p.setIdle(p.stateStarted, delivered, &p.stateThroughput, &p.stateIdle)
+func (p *peerConnection) SetNodeDataIdle(delivered int, isFinalChain bool) {
+	stateIdlePtr := &p.stateIdle
+	if isFinalChain {
+		stateIdlePtr = &p.fStateIdle
+	}
+	p.setIdle(p.stateStarted, delivered, &p.stateThroughput, stateIdlePtr)
 }
 
 // setIdle sets the peer to idle, allowing it to execute new retrieval requests.
