@@ -44,7 +44,7 @@ var (
 )
 
 // blockRetrievalFn is a callback type for retrieving a block from the local chain.
-type blockRetrievalFn func(common.Hash) *types.Block
+type blockRetrievalFn func(common.Hash, bool) *types.Block
 
 // headerRequesterFn is a callback type for sending a header retrieval request.
 type headerRequesterFn func(common.Hash, bool) error
@@ -53,16 +53,16 @@ type headerRequesterFn func(common.Hash, bool) error
 type bodyRequesterFn func([]common.Hash, bool) error
 
 // headerVerifierFn is a callback type to verify a block's header for fast propagation.
-type headerVerifierFn func(header *types.Header) error
+type headerVerifierFn func(*types.Header, bool) error
 
 // blockBroadcasterFn is a callback type for broadcasting a block to connected peers.
 type blockBroadcasterFn func(block *types.Block, propagate bool, isFinalChain bool)
 
 // chainHeightFn is a callback type to retrieve the current chain height.
-type chainHeightFn func() uint64
+type chainHeightFn func(bool) uint64
 
 // chainInsertFn is a callback type to insert a batch of blocks into the local chain.
-type chainInsertFn func(types.Blocks) (int, error)
+type chainInsertFn func(types.Blocks, bool) (int, error)
 
 // peerDropFn is a callback type for dropping a peer detected as malicious.
 type peerDropFn func(id string)
@@ -187,14 +187,15 @@ func (f *Fetcher) Stop() {
 // Notify announces the fetcher of the potential availability of a new block in
 // the network.
 func (f *Fetcher) Notify(peer string, hash common.Hash, number uint64, time time.Time,
-	headerFetcher headerRequesterFn, bodyFetcher bodyRequesterFn) error {
+	headerFetcher headerRequesterFn, bodyFetcher bodyRequesterFn, isFinalChain bool) error {
 	block := &announce{
-		hash:        hash,
-		number:      number,
-		time:        time,
-		origin:      peer,
-		fetchHeader: headerFetcher,
-		fetchBodies: bodyFetcher,
+		hash:         hash,
+		number:       number,
+		time:         time,
+		origin:       peer,
+		fetchHeader:  headerFetcher,
+		fetchBodies:  bodyFetcher,
+		isFinalChain: isFinalChain,
 	}
 	select {
 	case f.notify <- block:
@@ -205,10 +206,11 @@ func (f *Fetcher) Notify(peer string, hash common.Hash, number uint64, time time
 }
 
 // Enqueue tries to fill gaps the fetcher's future import queue.
-func (f *Fetcher) Enqueue(peer string, block *types.Block) error {
+func (f *Fetcher) Enqueue(peer string, block *types.Block, isFinalChain bool) error {
 	op := &inject{
-		origin: peer,
-		block:  block,
+		origin:       peer,
+		block:        block,
+		isFinalChain: isFinalChain,
 	}
 	select {
 	case f.inject <- op:
@@ -289,13 +291,14 @@ func (f *Fetcher) loop() {
 			}
 		}
 		// Import any queued blocks that could potentially fit
-		height := f.chainHeight()
 		for !f.queue.Empty() {
 			op := f.queue.PopItem().(*inject)
 			hash := op.block.Hash()
 			if f.queueChangeHook != nil {
 				f.queueChangeHook(hash, false)
 			}
+
+			height := f.chainHeight(op.isFinalChain)
 			// If too high up the chain or phase, continue later
 			number := op.block.NumberU64()
 			if number > height+1 {
@@ -306,7 +309,7 @@ func (f *Fetcher) loop() {
 				break
 			}
 			// Otherwise if fresh and still unknown, try and import
-			if number+maxUncleDist < height || f.getBlock(hash) != nil {
+			if number+maxUncleDist < height || f.getBlock(hash, op.isFinalChain) != nil {
 				f.forgetBlock(hash)
 				continue
 			}
@@ -330,7 +333,7 @@ func (f *Fetcher) loop() {
 			}
 			// If we have a valid block number, check that it's potentially useful
 			if notification.number > 0 {
-				if dist := int64(notification.number) - int64(f.chainHeight()); dist < -maxUncleDist || dist > maxQueueDist {
+				if dist := int64(notification.number) - int64(f.chainHeight(notification.isFinalChain)); dist < -maxUncleDist || dist > maxQueueDist {
 					log.Debug("Peer discarded announcement", "peer", notification.origin, "number", notification.number, "hash", notification.hash, "distance", dist)
 					propAnnounceDropMeter.Mark(1)
 					break
@@ -355,7 +358,7 @@ func (f *Fetcher) loop() {
 		case op := <-f.inject:
 			// A direct block insertion was requested, try and fill any pending gaps
 			propBroadcastInMeter.Mark(1)
-			f.enqueue(op.origin, op.block)
+			f.enqueue(op.origin, op.block, op.isFinalChain)
 
 		case hash := <-f.done:
 			// A pending import finished, remove all traces of the notification
@@ -373,7 +376,7 @@ func (f *Fetcher) loop() {
 					f.forgetHash(hash)
 
 					// If the block still didn't arrive, queue for fetching
-					if f.getBlock(hash) == nil {
+					if f.getBlock(hash, announce.isFinalChain) == nil {
 						request[announce.origin] = append(request[announce.origin], hash)
 						f.fetching[hash] = announce
 					}
@@ -408,7 +411,7 @@ func (f *Fetcher) loop() {
 				f.forgetHash(hash)
 
 				// If the block still didn't arrive, queue for completion
-				if f.getBlock(hash) == nil {
+				if f.getBlock(hash, announce.isFinalChain) == nil {
 					request[announce.origin] = append(request[announce.origin], hash)
 					f.completing[hash] = announce
 				}
@@ -456,7 +459,7 @@ func (f *Fetcher) loop() {
 						continue
 					}
 					// Only keep if not imported by other means
-					if f.getBlock(hash) == nil {
+					if f.getBlock(hash, announce.isFinalChain) == nil {
 						announce.header = header
 						announce.time = task.time
 
@@ -502,7 +505,7 @@ func (f *Fetcher) loop() {
 			// Schedule the header-only blocks for import
 			for _, block := range complete {
 				if announce := f.completing[block.Hash()]; announce != nil {
-					f.enqueue(announce.origin, block)
+					f.enqueue(announce.origin, block, announce.isFinalChain)
 				}
 			}
 
@@ -530,7 +533,7 @@ func (f *Fetcher) loop() {
 							// Mark the body matched, reassemble if still unknown
 							matched = true
 
-							if f.getBlock(hash) == nil {
+							if f.getBlock(hash, announce.isFinalChain) == nil {
 								block := types.NewBlockWithHeader(announce.header).WithBody(task.transactions[i], task.uncles[i])
 								block.ReceivedAt = task.time
 
@@ -558,7 +561,7 @@ func (f *Fetcher) loop() {
 			// Schedule the retrieved blocks for ordered import
 			for _, block := range blocks {
 				if announce := f.completing[block.Hash()]; announce != nil {
-					f.enqueue(announce.origin, block)
+					f.enqueue(announce.origin, block, announce.isFinalChain)
 				}
 			}
 		}
@@ -599,7 +602,7 @@ func (f *Fetcher) rescheduleComplete(complete *time.Timer) {
 
 // enqueue schedules a new future import operation, if the block to be imported
 // has not yet been seen.
-func (f *Fetcher) enqueue(peer string, block *types.Block) {
+func (f *Fetcher) enqueue(peer string, block *types.Block, isFinalChain bool) {
 	hash := block.Hash()
 
 	// Ensure the peer isn't DOSing us
@@ -611,7 +614,7 @@ func (f *Fetcher) enqueue(peer string, block *types.Block) {
 		return
 	}
 	// Discard any past or too distant blocks
-	if dist := int64(block.NumberU64()) - int64(f.chainHeight()); dist < -maxUncleDist || dist > maxQueueDist {
+	if dist := int64(block.NumberU64()) - int64(f.chainHeight(isFinalChain)); dist < -maxUncleDist || dist > maxQueueDist {
 		log.Debug("Discarded propagated block, too far away", "peer", peer, "number", block.Number(), "hash", hash, "distance", dist)
 		propBroadcastDropMeter.Mark(1)
 		f.forgetHash(hash)
@@ -620,8 +623,9 @@ func (f *Fetcher) enqueue(peer string, block *types.Block) {
 	// Schedule the block for future importing
 	if _, ok := f.queued[hash]; !ok {
 		op := &inject{
-			origin: peer,
-			block:  block,
+			origin:       peer,
+			block:        block,
+			isFinalChain: isFinalChain,
 		}
 		f.queues[peer] = count
 		f.queued[hash] = op
@@ -645,13 +649,13 @@ func (f *Fetcher) insert(peer string, block *types.Block, isFinalChain bool) {
 		defer func() { f.done <- hash }()
 
 		// If the parent's unknown, abort insertion
-		parent := f.getBlock(block.ParentHash())
+		parent := f.getBlock(block.ParentHash(), isFinalChain)
 		if parent == nil {
 			log.Debug("Unknown parent of propagated block", "peer", peer, "number", block.Number(), "hash", hash, "parent", block.ParentHash())
 			return
 		}
 		// Quickly validate the header and propagate the block if it passes
-		switch err := f.verifyHeader(block.Header()); err {
+		switch err := f.verifyHeader(block.Header(), isFinalChain); err {
 		case nil:
 			// All ok, quickly propagate to our peers
 			propBroadcastOutTimer.UpdateSince(block.ReceivedAt)
@@ -667,7 +671,7 @@ func (f *Fetcher) insert(peer string, block *types.Block, isFinalChain bool) {
 			return
 		}
 		// Run the actual import and log any issues
-		if _, err := f.insertChain(types.Blocks{block}); err != nil {
+		if _, err := f.insertChain(types.Blocks{block}, isFinalChain); err != nil {
 			log.Debug("Propagated block import failed", "peer", peer, "number", block.Number(), "hash", hash, "err", err)
 			return
 		}

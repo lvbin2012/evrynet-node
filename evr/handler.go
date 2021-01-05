@@ -192,21 +192,38 @@ func NewProtocolManager(config *params.ChainConfig, fConfig *params.ChainConfig,
 	}
 	manager.downloader = downloader.New(manager.checkpointNumber, chaindb, stateBloom, manager.eventMux, blockchain, nil, manager.removePeer)
 
+	getBlock := func(hash common.Hash, isFinalChain bool) *types.Block {
+		if isFinalChain {
+			return fBlockchain.GetBlockByHash(hash)
+		}
+		return blockchain.GetBlockByHash(hash)
+	}
 	// Construct the fetcher (short sync)
-	validator := func(header *types.Header) error {
+	validator := func(header *types.Header, isFinalChain bool) error {
+		if isFinalChain {
+			return fEngine.VerifyHeader(fBlockchain, header, true)
+		}
 		return engine.VerifyHeader(blockchain, header, true)
 	}
-	heighter := func() uint64 {
+	heighter := func(isFinalChain bool) uint64 {
+		if isFinalChain {
+			return fBlockchain.CurrentBlock().NumberU64()
+		}
 		return blockchain.CurrentBlock().NumberU64()
 	}
-	inserter := func(blocks types.Blocks) (int, error) {
+	inserter := func(blocks types.Blocks, isFinalChain bool) (int, error) {
+		blockchain := manager.blockchain
+		if isFinalChain {
+			blockchain = manager.fblockchain
+		}
+
 		// If sync hasn't reached the checkpoint yet, deny importing weird blocks.
 		//
 		// Ideally we would also compare the head block's timestamp and similarly reject
 		// the propagated block if the head is too old. Unfortunately there is a corner
 		// case when starting new networks, where the genesis might be ancient (0 unix)
 		// which would prevent full nodes from accepting it.
-		if manager.blockchain.CurrentBlock().NumberU64() < manager.checkpointNumber {
+		if blockchain.CurrentBlock().NumberU64() < manager.checkpointNumber {
 			log.Warn("Unsynced yet, discarded propagated block", "number", blocks[0].Number(), "hash", blocks[0].Hash())
 			return 0, nil
 		}
@@ -219,13 +236,13 @@ func NewProtocolManager(config *params.ChainConfig, fConfig *params.ChainConfig,
 			log.Warn("Fast syncing, discarded propagated block", "number", blocks[0].Number(), "hash", blocks[0].Hash())
 			return 0, nil
 		}
-		n, err := manager.blockchain.InsertChain(blocks)
+		n, err := blockchain.InsertChain(blocks)
 		if err == nil {
 			atomic.StoreUint32(&manager.acceptTxs, 1) // Mark initial sync done on any fetcher import
 		}
 		return n, err
 	}
-	manager.fetcher = fetcher.New(blockchain.GetBlockByHash, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
+	manager.fetcher = fetcher.New(getBlock, validator, manager.BroadcastBlock, heighter, inserter, manager.removePeer)
 
 	return manager, nil
 }
@@ -723,7 +740,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			}
 		}
 		for _, block := range unknown {
-			pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies)
+			pm.fetcher.Notify(p.id, block.Hash, block.Number, time.Now(), p.RequestOneHeader, p.RequestBodies, msg.Code == NewFBlockHashesMsg)
 		}
 
 	case msg.Code == NewBlockMsg || msg.Code == NewFBlockMsg:
@@ -737,7 +754,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 
 		// Mark the Peer as owning the block and schedule it for import
 		p.MarkBlock(request.Block.Hash())
-		pm.fetcher.Enqueue(p.id, request.Block)
+		pm.fetcher.Enqueue(p.id, request.Block, msg.Code == NewFBlockMsg)
 
 		// Assuming the block is importable by the Peer, but possibly not yet done so,
 		// calculate the head hash and TD that the Peer truly must have.
@@ -916,5 +933,5 @@ func (pm *ProtocolManager) FindPeers(targets map[common.Address]bool) map[common
 
 // Enqueue adds a block into fetcher queue
 func (pm *ProtocolManager) Enqueue(id string, block *types.Block) {
-	pm.fetcher.Enqueue(id, block)
+	pm.fetcher.Enqueue(id, block, false)
 }
