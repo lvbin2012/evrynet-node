@@ -437,6 +437,22 @@ func (p *Peer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
 	return p2p.Send(p.rw, GetNodeDataMsg, hashes)
 }
 
+func (p *Peer) RequestEvilBodies(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (p *Peer) RequestEvilReceipts(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (p *Peer) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (p *Peer) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
+}
+
 // RequestReceipts fetches a batch of transaction receipts from a remote node.
 func (p *Peer) RequestReceipts(hashes []common.Hash, isFinalChain bool) error {
 	p.Log().Debug("Fetching batch of receipts", "isFinalChain", isFinalChain, "count", len(hashes))

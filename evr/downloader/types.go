@@ -50,6 +50,27 @@ type headerProcEvent struct {
 	isFinalChain bool
 }
 
+// evilBlockPack is batch of evil block returned by a peer
+type evilBlockPack struct {
+	peerID       string
+	isFinalChain bool
+	transactions [][]*types.Transaction
+	uncles       [][]*types.Header
+	receipts     [][]*types.Receipt
+}
+
+func (p *evilBlockPack) PeerId() string     { return p.peerID }
+func (p *evilBlockPack) IsFinalChain() bool { return p.isFinalChain }
+func (p *evilBlockPack) Items() int {
+	if len(p.transactions) <= len(p.uncles) {
+		return len(p.transactions)
+	}
+	return len(p.uncles)
+}
+func (p *evilBlockPack) Stats() string {
+	return fmt.Sprintf("%d:%d:%d", len(p.transactions), len(p.uncles), len(p.receipts))
+}
+
 // bodyPack is a batch of block bodies returned by a peer.
 type bodyPack struct {
 	peerID       string

@@ -20,11 +20,6 @@ package downloader
 import (
 	"errors"
 	"fmt"
-	"math/big"
-	"sync"
-	"sync/atomic"
-	"time"
-
 	evrynetNode "github.com/Evrynetlabs/evrynet-node"
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
@@ -35,6 +30,10 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/metrics"
 	"github.com/Evrynetlabs/evrynet-node/params"
 	"github.com/Evrynetlabs/evrynet-node/trie"
+	"math/big"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 var (
@@ -91,6 +90,11 @@ var (
 	errNoSyncActive            = errors.New("no sync active")
 	errTooOld                  = errors.New("peer doesn't speak recent enough protocol version (need version >= 62)")
 )
+
+type EvilInfo struct {
+	header     *types.Header
+	evilHeader *types.Header
+}
 
 type Downloader struct {
 	// WARNING: The `rttEstimate` and `rttConfidence` fields are accessed atomically.
@@ -152,6 +156,9 @@ type Downloader struct {
 	fBodyWakeCh    chan bool             // [eth/65] Channel to signal the block body fetcher of new tasks
 	fReceiptWakeCh chan bool             // [eth/65] Channel to signal the receipt fetcher of new tasks
 	fHeaderProcCh  chan *headerProcEvent // [eth/65] Channel to feed the header processor new tasks
+
+	evilBodyCh     chan dataPack
+	evilBodyWakeCh chan bool
 
 	// for stateFetcher
 	stateSyncStart  chan *stateSync
@@ -227,6 +234,9 @@ type BlockChain interface {
 
 	// IsFinalChain return bool
 	IsFinalChain() bool
+
+	// SaveEvilBlock inserts a batch of evil block infos
+	SaveEvilBlock(types.Blocks, []types.Receipts, uint64) (int, error)
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
@@ -239,8 +249,8 @@ func New(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.SyncBloom, 
 		stateBloom:      stateBloom,
 		mux:             mux,
 		checkpoint:      checkpoint,
-		queue:           newQueue(),
-		fQueue:          newQueue(),
+		queue:           newQueue(false),
+		fQueue:          newQueue(true),
 		peers:           newPeerSet(),
 		rttEstimate:     uint64(rttMaxEstimate),
 		rttConfidence:   uint64(1000000),
@@ -257,6 +267,7 @@ func New(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.SyncBloom, 
 		fBodyCh:         make(chan dataPack, 1),
 		fReceiptCh:      make(chan dataPack, 1),
 		fBodyWakeCh:     make(chan bool, 1),
+		evilBodyWakeCh:  make(chan bool, 1),
 		fReceiptWakeCh:  make(chan bool, 1),
 		fHeaderProcCh:   make(chan *headerProcEvent, 1),
 		quitCh:          make(chan struct{}),
@@ -288,8 +299,8 @@ func NewTwoChain(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.Syn
 		stateBloom:      stateBloom,
 		mux:             mux,
 		checkpoint:      checkpoint,
-		queue:           newQueue(),
-		fQueue:          newQueue(),
+		queue:           newQueue(false),
+		fQueue:          newQueue(true),
 		peers:           newPeerSet(),
 		rttEstimate:     uint64(rttMaxEstimate),
 		rttConfidence:   uint64(1000000),
@@ -307,7 +318,9 @@ func NewTwoChain(checkpoint uint64, stateDb evrdb.Database, stateBloom *trie.Syn
 		fHeaderCh:       make(chan dataPack, 1),
 		fBodyCh:         make(chan dataPack, 1),
 		fReceiptCh:      make(chan dataPack, 1),
+		evilBodyCh:      make(chan dataPack, 1),
 		fBodyWakeCh:     make(chan bool, 1),
+		evilBodyWakeCh:  make(chan bool, 1),
 		fReceiptWakeCh:  make(chan bool, 1),
 		fHeaderProcCh:   make(chan *headerProcEvent, 1),
 		quitCh:          make(chan struct{}),
@@ -563,9 +576,11 @@ func (d *Downloader) synchroniseTwoChain(id string, head common.Hash, td *big.In
 		d.fQueue.Reset()
 		boolChs = append(boolChs, d.fBodyWakeCh)
 		boolChs = append(boolChs, d.fReceiptWakeCh)
+		boolChs = append(boolChs, d.evilBodyWakeCh)
 		dataPackChs = append(dataPackChs, d.fHeaderCh)
 		dataPackChs = append(dataPackChs, d.fBodyCh)
 		dataPackChs = append(dataPackChs, d.fReceiptCh)
+		dataPackChs = append(dataPackChs, d.evilBodyCh)
 		headerProcChs = append(headerProcChs, d.fHeaderProcCh)
 	}
 
@@ -664,7 +679,7 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 
 	log.Debug("Synchronising with the network", "peer", p.id, "evr", p.version, "head", hash, "td", td, "mode", d.mode)
 	defer func(start time.Time) {
-		log.Debug("Synchronisation terminated", "elapsed", common.PrettyDuration(time.Since(start)))
+		log.Debug("Synchronisation terminated", "elapsed", common.PrettyDuration(time.Since(start)), "isFinalChain", isFinalChain)
 	}(time.Now())
 
 	// Look up the sync boundaries: the common ancestor and the target block
@@ -750,6 +765,9 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 		func() error { return d.fetchReceipts(origin+1, isFinalChain) },          // Receipts are retrieved during fast sync
 		func() error { return d.processHeaders(origin+1, pivot, td, isFinalChain) },
 	}
+	if isFinalChain {
+		fetchers = append(fetchers, func() error { return d.fetchEvilBodies(origin + 1) })
+	}
 	if d.mode == FastSync {
 		fetchers = append(fetchers, func() error { return d.processFastSyncContent(latest, isFinalChain) })
 	} else if d.mode == FullSync {
@@ -767,9 +785,9 @@ func (d *Downloader) spawnSync(fetchers []func() error, isFinalChain bool) error
 	}
 	errc := make(chan error, len(fetchers))
 	d.cancelWg.Add(len(fetchers))
-	for _, fn := range fetchers {
+	for index, fn := range fetchers {
 		fn := fn
-		go func() { defer d.cancelWg.Done(); errc <- fn() }()
+		go func(index int) { defer d.cancelWg.Done(); errc <- fn() }(index)
 	}
 	// Wait for the first error, then terminate the others.
 	var err error
@@ -1190,7 +1208,7 @@ func (d *Downloader) findAncestor(p *peerConnection, remoteHeader *types.Header,
 // the origin is dropped.
 func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64, isFinalChain bool) error {
 	p.log.Debug("Directing header downloads", "origin", from)
-	defer p.log.Debug("Header download terminated")
+	defer p.log.Debug("Header download terminated", "isFinalChain", isFinalChain)
 
 	blockchain := d.blockchain
 	lightchain := d.lightchain
@@ -1355,9 +1373,9 @@ func (d *Downloader) fetchHeaders(p *peerConnection, from uint64, pivot uint64, 
 			// Finish the sync gracefully instead of dumping the gathered data though
 			var boolChs []chan bool
 			if isFinalChain {
-				boolChs = []chan bool{d.bodyWakeCh, d.receiptWakeCh}
+				boolChs = []chan bool{d.fBodyWakeCh, d.fReceiptWakeCh, d.evilBodyWakeCh}
 			} else {
-				boolChs = []chan bool{d.fBodyWakeCh, d.fReceiptWakeCh}
+				boolChs = []chan bool{d.bodyWakeCh, d.receiptWakeCh}
 			}
 			for _, ch := range boolChs {
 				select {
@@ -1446,8 +1464,37 @@ func (d *Downloader) fetchBodies(from uint64, isFinalChain bool) error {
 		queue.PendingBlocks, queue.InFlightBlocks, queue.ShouldThrottleBlocks, queue.ReserveBodies,
 		d.bodyFetchHook, fetch, queue.CancelBodies, capacity, d.peers.BodyIdlePeers, setIdle, "bodies", isFinalChain)
 
-	log.Debug("Block body download terminated", "err", err)
+	log.Debug("Block body download terminated", "err", err, "isFinalChain", isFinalChain)
 	return err
+}
+
+func (d *Downloader) fetchEvilBodies(from uint64) error {
+	log.Debug("Download evil block bodies", "origin", from)
+	bodyCh := d.evilBodyCh
+	bodyWakeCh := d.evilBodyWakeCh
+	queue := d.fQueue
+	var (
+		saveFunc = func(header *types.Header, txs []*types.Transaction, uncles []*types.Header,
+			receipts []*types.Receipt) {
+			block := types.NewBlockWithHeader(header).WithBody(txs, uncles)
+			d.fBlockchain.SaveEvilBlock([]*types.Block{block}, []types.Receipts{receipts}, d.fAncientLimit)
+		}
+		deliver = func(packet dataPack) (int, error) {
+			pack := packet.(*evilBlockPack)
+			return queue.DeliverEvilBodies(pack.peerID, pack.transactions, pack.uncles, pack.receipts, saveFunc)
+		}
+		expire   = func() map[string]int { return queue.ExpireEvilBodies(d.requestRTT()) }
+		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchEvilBodies(req) }
+		capacity = func(p *peerConnection) int { return p.EvilBlockCapacity(d.requestRTT()) }
+		setIdle  = func(p *peerConnection, accepted int) { p.SetEvilBodiesIdle(accepted, true) }
+	)
+	err := d.fetchParts(bodyCh, deliver, bodyWakeCh, expire,
+		queue.PendingEvilBlocks, queue.InFlightEvilBlocks, queue.ShouldThrottleEvilBlocks, queue.ReserveEvilBodies,
+		d.bodyFetchHook, fetch, queue.CancelEvilBodies, capacity, d.peers.EvilBodyIdlePeers, setIdle, "evilBodies", true)
+
+	log.Debug("Evil Block body download terminated", "err", err)
+
+	return nil
 }
 
 // fetchReceipts iteratively downloads the scheduled block receipts, taking any
@@ -1478,7 +1525,7 @@ func (d *Downloader) fetchReceipts(from uint64, isFinalChain bool) error {
 		queue.PendingReceipts, queue.InFlightReceipts, queue.ShouldThrottleReceipts, queue.ReserveReceipts,
 		d.receiptFetchHook, fetch, queue.CancelReceipts, capacity, d.peers.ReceiptIdlePeers, setIdle, "receipts", isFinalChain)
 
-	log.Debug("Transaction receipt download terminated", "err", err)
+	log.Debug("Transaction receipt download terminated", "err", err, "isFinalChain", isFinalChain)
 	return err
 }
 
@@ -1523,6 +1570,7 @@ func (d *Downloader) fetchParts(deliveryCh chan dataPack, deliver func(dataPack)
 	for {
 		select {
 		case <-d.cancelCh:
+			fmt.Println("=======> d.cancelCh ", kind)
 			return errCanceled
 
 		case packet := <-deliveryCh:
@@ -1689,15 +1737,21 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int, is
 	lightchain := d.lightchain
 	blockchain := d.blockchain
 	headerProcCh := d.headerProcCh
-	bodyWakeCh := d.bodyWakeCh
-	receiptWakeCh := d.receiptWakeCh
+	//bodyWakeCh := d.bodyWakeCh
+	//receiptWakeCh := d.receiptWakeCh
+	var boolChs []chan bool
+	if isFinalChain {
+		boolChs = []chan bool{d.fBodyWakeCh, d.fReceiptWakeCh, d.evilBodyWakeCh}
+	} else {
+		boolChs = []chan bool{d.bodyWakeCh, d.receiptWakeCh}
+	}
 	if isFinalChain {
 		queue = d.fQueue
 		lightchain = d.fLightchain
 		blockchain = d.fBlockchain
 		headerProcCh = d.fHeaderProcCh
-		bodyWakeCh = d.fBodyWakeCh
-		receiptWakeCh = d.fReceiptWakeCh
+		//bodyWakeCh = d.fBodyWakeCh
+		//receiptWakeCh = d.fReceiptWakeCh
 	}
 	// Keep a count of uncertain headers to roll back
 	var rollback []*types.Header
@@ -1739,7 +1793,7 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int, is
 			// Terminate header processing if we synced up
 			if procEvent == nil || len(procEvent.headers) == 0 {
 				// Notify everyone that headers are fully processed
-				for _, ch := range []chan bool{bodyWakeCh, receiptWakeCh} {
+				for _, ch := range boolChs {
 					select {
 					case ch <- false:
 					case <-d.cancelCh:
@@ -1858,7 +1912,7 @@ func (d *Downloader) processHeaders(origin uint64, pivot uint64, td *big.Int, is
 			d.syncStatsLock.Unlock()
 
 			// Signal the content downloaders of the availablility of new tasks
-			for _, ch := range []chan bool{bodyWakeCh, receiptWakeCh} {
+			for _, ch := range boolChs {
 				select {
 				case ch <- true:
 				default:
@@ -2138,6 +2192,13 @@ func (d *Downloader) DeliverReceipts(id string, isFinalChain bool, receipts [][]
 		return d.deliver(id, d.fReceiptCh, &receiptPack{id, isFinalChain, receipts}, receiptInMeter, receiptDropMeter)
 	}
 	return d.deliver(id, d.receiptCh, &receiptPack{id, isFinalChain, receipts}, receiptInMeter, receiptDropMeter)
+}
+
+// DeliverEvilBlocks inject a new batch of received from a remote node
+func (d *Downloader) DeliverEvilBlocks(id string, isFinalChain bool, transactions [][]*types.Transaction,
+	uncles [][]*types.Header, receipts [][]*types.Receipt) (err error) {
+	return d.deliver(id, d.evilBodyCh, &evilBlockPack{id, isFinalChain, transactions,
+		uncles, receipts}, evilBodyInMeter, evilBodyDropMeter)
 }
 
 // DeliverNodeData injects a new batch of node state data received from a remote node.

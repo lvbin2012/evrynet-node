@@ -17,8 +17,13 @@
 package core
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
+	"github.com/Evrynetlabs/evrynet-node/rlp"
 	"math/big"
+	"math/rand"
+	"runtime"
 
 	"github.com/pkg/errors"
 
@@ -206,7 +211,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	}
 	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
 		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
-		b.header = makeHeader(chainreader, parent, statedb, b.engine)
+		b.header = makeHeader(chainreader, parent, statedb, b.engine, 0)
 
 		// Execute any user modifications to the block
 		if gen != nil {
@@ -246,12 +251,186 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	return blocks, receipts
 }
 
-func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.StateDB, engine consensus.Engine) *types.Header {
+func GenerateTwoChain(config, fConfig *params.ChainConfig, parent, fParent *types.Block, engine, fEngine consensus.Engine,
+	db evrdb.Database, n, k int, seed byte, gen func(int, *BlockGen)) ([]*types.Block, []types.Receipts, []*types.Block, []types.Receipts, []*types.Block, []types.Receipts) {
+	if n < k {
+		panic("n shoud big than k")
+	}
+
+	if config == nil {
+		config = params.TestChainConfig
+	}
+	if fConfig == nil {
+		fConfig = params.TestChainConfig
+	}
+	fn := n / k
+	blocks, fBlocks, receipts, fReceipts := make(types.Blocks, n), make(types.Blocks, fn), make([]types.Receipts, n), make([]types.Receipts, fn)
+	evilBlocks, evilReceipts := make(types.Blocks, 0), make([]types.Receipts, 0)
+	stateDB, err := state.New(parent.Root(), state.NewDatabase(db))
+	if err != nil {
+		panic(err)
+	}
+	fStateDB, err := state.New(fParent.Root(), state.NewDatabase(db))
+	if err != nil {
+		panic(err)
+	}
+
+	chainreader := &fakeChainReader{
+		config: config,
+		blocksByNumber: map[uint64]*types.Block{
+			parent.NumberU64(): parent,
+		},
+		stateByHash: map[common.Hash]*state.StateDB{
+			parent.Root(): stateDB,
+		},
+	}
+
+	fChainreader := &fakeChainReader{
+		config: fConfig,
+		blocksByNumber: map[uint64]*types.Block{
+			fParent.NumberU64(): parent,
+		},
+		stateByHash: map[common.Hash]*state.StateDB{
+			fParent.Root(): fStateDB,
+		},
+	}
+
+	sealBlock := func(engine consensus.Engine, header *types.Header, state *state.StateDB, txs []*types.Transaction,
+		uncles []*types.Header, receipts []*types.Receipt, chainreader *fakeChainReader, fixed func()) *types.Block {
+		block, err := engine.FinalizeAndAssemble(chainreader, header, state, txs, uncles, receipts)
+		if err != nil {
+			panic(fmt.Sprintf("FinalizeAndAssemble error: %v", err))
+		}
+		if fixed != nil {
+			fixed()
+			header.Root = state.IntermediateRoot(true)
+			block = types.NewBlock(header, txs, uncles, receipts)
+		}
+		// Write state changes to db
+		root, err := state.Commit(true)
+		if err != nil {
+			panic(fmt.Sprintf("state write error: %v", err))
+		}
+		if err := state.Database().TrieDB().Commit(root, false); err != nil {
+			panic(fmt.Sprintf("trie write error: %v", err))
+		}
+		chainreader.blocksByNumber[block.NumberU64()] = block
+		chainreader.stateByHash[state.IntermediateRoot(true)] = state
+		return block
+	}
+
+	genblock := func(i int, parent *types.Block, statedb *state.StateDB) (*types.Block, types.Receipts) {
+		b := &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
+		b.header = makeHeader(chainreader, parent, statedb, b.engine, 0)
+		var evilHeader *types.Header
+		// Execute any user modifications to the block
+		if gen != nil {
+			gen(i, b)
+		}
+		if b.engine != nil {
+			block := sealBlock(b.engine, b.header, statedb, b.txs, b.uncles, b.receipts, chainreader, nil)
+			if (i+1)%k != 0 {
+				return block, b.receipts
+			}
+			// random make evil block
+			if isEvilBlock() {
+				evilHeader = block.Header()
+				evilBlocks = append(evilBlocks, block)
+				evilReceipts = append(evilReceipts, b.receipts)
+				statedb, err = state.New(parent.Root(), state.NewDatabase(db))
+				if err != nil {
+					panic(err)
+				}
+				b = &BlockGen{i: i, chain: blocks, parent: parent, statedb: statedb, config: config, engine: engine}
+				b.header = makeHeader(chainreader, parent, statedb, b.engine, 1)
+				if gen != nil {
+					gen(i, b)
+				}
+				block = sealBlock(b.engine, b.header, statedb, b.txs, b.uncles, b.receipts, chainreader, nil)
+			}
+
+			fParentNumber := (i+1)/k - 1
+			fParent := fChainreader.blocksByNumber[uint64(fParentNumber)]
+			fStateDB, err := state.New(fParent.Root(), state.NewDatabase(db))
+			if err != nil {
+				panic(err)
+			}
+
+			fb := &BlockGen{i: fParentNumber, chain: fBlocks, parent: fParent, statedb: fStateDB, config: fConfig, engine: fEngine}
+			fb.header = makeHeader(fChainreader, fParent, fStateDB, fEngine, 0)
+			// Create Extra
+			extra := makeHeaderExtra(block.Hash(), evilHeader)
+			fb.header.Extra = extra
+			// Add Txs
+			fb.SetCoinbase(common.Address{0x00})
+
+			for j := i + 2 - k; j < i+1; j++ {
+				txs := chainreader.blocksByNumber[uint64(j)].Transactions()
+				for _, tx := range txs {
+					fb.AddTx(tx)
+				}
+			}
+			for _, tx := range block.Transactions() {
+				fb.AddTx(tx)
+			}
+			fBlock := sealBlock(fb.engine, fb.header, fStateDB, fb.txs, fb.uncles, fb.receipts, fChainreader, func() {
+				balance := statedb.GetBalance(common.Address{seed})
+				fBalance := fStateDB.GetBalance(common.Address{seed})
+				fStateDB.AddBalance(common.Address{0x00}, balance.Sub(balance, fBalance))
+			})
+			fBlocks[fBlock.NumberU64()-1] = fBlock
+			fReceipts[fBlock.NumberU64()-1] = fb.receipts
+			//fmt.Println("========>", (i + 2 - k), i+1, fBlock.Number().String(), block.Number().String(), fBlock.Root().String(), block.Root().String())
+			return block, b.receipts
+		}
+		return nil, nil
+	}
+	for i := 0; i < n; i++ {
+		statedb, err := state.New(parent.Root(), state.NewDatabase(db))
+		if err != nil {
+			panic(err)
+		}
+		block, receipt := genblock(i, parent, statedb)
+		blocks[i] = block
+		receipts[i] = receipt
+		parent = block
+	}
+
+	return blocks, receipts, fBlocks, fReceipts, evilBlocks, evilReceipts
+}
+
+func makeHeaderExtra(hash common.Hash, evilHeader *types.Header) []byte {
+	extra, _ := rlp.EncodeToBytes([]interface{}{
+		uint(params.VersionMajor<<16 | params.VersionMinor<<8 | params.VersionPatch),
+		"gev",
+		runtime.Version(),
+		runtime.GOOS,
+	})
+	if len(extra) < 32 {
+		extra = append(extra, bytes.Repeat([]byte{0x00}, 32-len(extra))...)
+	}
+	fce := fconsensus.FConExtra{}
+	fce.CurrentBlock = hash
+	fce.EvilHeader = evilHeader
+	byteBuffer := new(bytes.Buffer)
+	err := rlp.Encode(byteBuffer, &fce)
+	if err != nil {
+		panic(err)
+	}
+	extra = append(extra[:32], byteBuffer.Bytes()...)
+	return extra
+}
+
+func isEvilBlock() bool {
+	return rand.Intn(100)%2 == 1
+}
+
+func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.StateDB, engine consensus.Engine, index uint64) *types.Header {
 	var time uint64
 	if parent.Time() == 0 {
-		time = 10
+		time = 10 + index
 	} else {
-		time = parent.Time() + 10 // block time is fixed at 10 seconds
+		time = parent.Time() + 10 + index // block time is fixed at 10 seconds
 	}
 
 	return &types.Header{
@@ -260,7 +439,7 @@ func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.S
 		Coinbase:   parent.Coinbase(),
 		Difficulty: engine.CalcDifficulty(chain, time, &types.Header{
 			Number:     parent.Number(),
-			Time:       time - 10,
+			Time:       time - 10 - index,
 			Difficulty: parent.Difficulty(),
 			UncleHash:  parent.UncleHash(),
 		}),

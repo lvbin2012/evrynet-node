@@ -18,8 +18,10 @@ package downloader
 
 import (
 	"fmt"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"math/big"
 	"sync"
+	"testing"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus/ethash"
@@ -62,6 +64,10 @@ type testChain struct {
 	blockm   map[common.Hash]*types.Block
 	receiptm map[common.Hash][]*types.Receipt
 	tdm      map[common.Hash]*big.Int
+	// Evil info
+	evilHeaderm  map[common.Hash]*types.Header
+	evilBlockm   map[common.Hash]*types.Block
+	evilReceiptm map[common.Hash][]*types.Receipt
 }
 
 // newTestChain creates a blockchain of the given length.
@@ -74,6 +80,26 @@ func newTestChain(length int, genesis *types.Block) *testChain {
 	tc.blockm[tc.genesis.Hash()] = tc.genesis
 	tc.generate(length-1, 0, genesis, false)
 	return tc
+}
+
+func newTwoTestChain(length, k int, genesis, fGenesis *types.Block) (*testChain, *testChain) {
+	tc := new(testChain).copy(length)
+	tc.genesis = genesis
+	tc.chain = append(tc.chain, genesis.Hash())
+	tc.headerm[tc.genesis.Hash()] = tc.genesis.Header()
+	tc.tdm[tc.genesis.Hash()] = tc.genesis.Difficulty()
+	tc.blockm[tc.genesis.Hash()] = tc.genesis
+	tfc := new(testChain).copy(length / k)
+	tfc.evilHeaderm = make(map[common.Hash]*types.Header, 0)
+	tfc.evilBlockm = make(map[common.Hash]*types.Block, 0)
+	tfc.evilReceiptm = make(map[common.Hash][]*types.Receipt, 0)
+	tfc.genesis = fGenesis
+	tfc.chain = append(tfc.chain, fGenesis.Hash())
+	tfc.headerm[tfc.genesis.Hash()] = tfc.genesis.Header()
+	tfc.tdm[tfc.genesis.Hash()] = tfc.genesis.Difficulty()
+	tfc.blockm[tfc.genesis.Hash()] = tfc.genesis
+	generateTwoChain(length-1, k, 0, genesis, fGenesis, tc, tfc)
+	return tc, tfc
 }
 
 // makeFork creates a fork on top of the test chain.
@@ -109,6 +135,56 @@ func (tc *testChain) copy(newlen int) *testChain {
 		cpy.receiptm[hash] = tc.receiptm[hash]
 	}
 	return cpy
+}
+
+func TestCreateTwoChain(t *testing.T) {
+	n := 26
+	k := 4
+	b1, r1, b2, r2, eb, er := core.GenerateTwoChain(params.TestChainConfig, params.TestChainConfig, testGenesis, testGenesis,
+		ethash.NewFaker(), ethash.NewFaker(), testDB, n, k, 0, func(i int, block *core.BlockGen) {
+			block.SetCoinbase(common.Address{})
+			// Include transactions to the miner to make blocks more interesting.
+			if true {
+				signer := types.MakeSigner(params.TestChainConfig, block.Number())
+				tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testAddress), common.Address{}, big.NewInt(1000), params.TxGas, nil, nil), signer, testKey)
+				if err != nil {
+					panic(err)
+				}
+				block.AddTx(tx)
+			}
+		})
+
+	fmt.Println(len(b1), len(r1), len(b2), len(r2), len(eb), len(er))
+
+	for i, b := range b2 {
+		fex, err := fconsensus.ExtractFConExtra(b.Header())
+		if err != nil {
+			fmt.Println(i, err.Error())
+			continue
+		}
+		fmt.Println(i, "current block", fex.CurrentBlock.String(), b1[(i+1)*k-1].Hash().String(), b1[(i+1)*k-1].Number().String())
+		if fex.EvilHeader != nil {
+			fmt.Println("      evil ", fex.EvilHeader.Hash().String(), fex.EvilHeader.Number.Int64())
+		}
+		if i == 3 {
+			fBlock := b2[i]
+
+			begin := i * k
+			end := (i + 1) * k
+			fmt.Println(begin, end)
+			fmt.Println(fBlock.Root().String(), b1[end-1].Root().String())
+			for i, tx := range fBlock.Transactions() {
+				fmt.Println("=====> f ", i, tx.Hash().String())
+			}
+			for ; begin < end; begin++ {
+				b := b1[begin]
+				for _, tx := range b.Transactions() {
+					fmt.Println("=====> b ", begin, tx.Hash().String())
+				}
+			}
+		}
+
+	}
 }
 
 // generate creates a chain of n blocks starting at and including parent.
@@ -153,6 +229,50 @@ func (tc *testChain) generate(n int, seed byte, parent *types.Block, heavy bool)
 		tc.headerm[hash] = b.Header()
 		tc.receiptm[hash] = receipts[i]
 		tc.tdm[hash] = new(big.Int).Set(td)
+	}
+}
+
+func generateTwoChain(n, k int, seed byte, parent, fParent *types.Block, tc, tfc *testChain) {
+	blocks, receipts, fBlocks, fReceipts, evilBlocks, evilReceipts := core.GenerateTwoChain(params.TestChainConfig, params.TestChainConfig, parent, fParent,
+		ethash.NewFaker(), ethash.NewFaker(), testDB, n, k, seed, func(i int, block *core.BlockGen) {
+			block.SetCoinbase(common.Address{seed})
+			// Include transactions to the miner to make blocks more interesting.
+			if true {
+				signer := types.MakeSigner(params.TestChainConfig, block.Number())
+				tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testAddress), common.Address{}, big.NewInt(1000), params.TxGas, nil, nil), signer, testKey)
+				if err != nil {
+					panic(err)
+				}
+				block.AddTx(tx)
+			}
+		})
+
+	td := new(big.Int).Set(tc.td(parent.Hash()))
+	for i, b := range blocks {
+		td := td.Add(td, b.Difficulty())
+		hash := b.Hash()
+		tc.chain = append(tc.chain, hash)
+		tc.blockm[hash] = b
+		tc.headerm[hash] = b.Header()
+		tc.receiptm[hash] = receipts[i]
+		tc.tdm[hash] = new(big.Int).Set(td)
+	}
+	td = new(big.Int).Set(tfc.td(fParent.Hash()))
+	for i, b := range fBlocks {
+		td := td.Add(td, b.Difficulty())
+		hash := b.Hash()
+		tfc.chain = append(tfc.chain, hash)
+		tfc.blockm[hash] = b
+		tfc.headerm[hash] = b.Header()
+		tfc.receiptm[hash] = fReceipts[i]
+		tfc.tdm[hash] = new(big.Int).Set(td)
+	}
+
+	for i, b := range evilBlocks {
+		hash := b.Hash()
+		tfc.evilBlockm[hash] = b
+		tfc.evilHeaderm[hash] = b.Header()
+		tfc.evilReceiptm[hash] = evilReceipts[i]
 	}
 }
 
@@ -210,6 +330,23 @@ func (tc *testChain) bodies(hashes []common.Hash) ([][]*types.Transaction, [][]*
 		}
 	}
 	return transactions, uncles
+}
+
+// evilBlocks return the evilBlock of the given block hashes
+func (tc *testChain) evilBlocks(hashes []common.Hash) ([][]*types.Transaction, [][]*types.Header, [][]*types.Receipt) {
+	transactions := make([][]*types.Transaction, 0, len(hashes))
+	uncles := make([][]*types.Header, 0, len(hashes))
+	receipts := make([][]*types.Receipt, 0, len(hashes))
+	for _, hash := range hashes{
+		if block, ok := tc.evilBlockm[hash]; ok{
+			transactions = append(transactions, block.Transactions())
+			uncles = append(uncles, block.Uncles())
+			if receipt, ok := tc.evilReceiptm[hash]; ok{
+				receipts = append(receipts, receipt)
+			}
+		}
+	}
+	return transactions, uncles, receipts
 }
 
 func (tc *testChain) hashToNumber(target common.Hash) (uint64, bool) {

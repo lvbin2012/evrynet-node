@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -42,7 +43,12 @@ type testChainInfo struct {
 	ancientBlocks   map[common.Hash]*types.Block
 	ancientReceipts map[common.Hash]types.Receipts
 	ancientChainTd  map[common.Hash]*big.Int
-	lock            sync.RWMutex
+
+	evilHeaders  map[common.Hash]*types.Header
+	evilBlocks   map[common.Hash]*types.Block
+	evilReceipts map[common.Hash]types.Receipts
+
+	lock sync.RWMutex
 }
 
 type downloadTwoTester struct {
@@ -149,6 +155,25 @@ func (d *downloadTwoTesterPeer) RequestNodeData(hashes []common.Hash, isFinalCha
 	log.Debug("RequestNodeData", "Hashes", len(hashes), "isFinalChain", isFinalChain, "results", len(results))
 	go d.dlt.downloader.DeliverNodeData(d.id, isFinalChain, results)
 	return nil
+}
+
+func (d *downloadTwoTesterPeer) RequestEvilBodies(hashes []common.Hash) error {
+	txs, uncles, receipts := d.fchain.evilBlocks(hashes)
+	log.Debug("RequestEvilBodies", "Hashes", len(hashes), "txs", len(txs), "uncles", len(uncles), "receipts", len(receipts))
+	go d.dlt.downloader.DeliverEvilBlocks(d.id, true, txs, uncles, receipts)
+	return nil
+}
+
+func (d *downloadTwoTesterPeer) RequestEvilReceipts(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (pc *downloadTwoTesterPeer) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (pc *downloadTwoTesterPeer) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
 }
 
 func (dlt *downloadTwoTester) getDB() evrdb.Database {
@@ -390,6 +415,22 @@ func (t *testChainInfo) IsFinalChain() bool {
 	return t.isFinalChain
 }
 
+func (t *testChainInfo) SaveEvilBlock(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (int, error) {
+	t.lock.Lock()
+	defer func(n int, isFinalChain bool) {
+		t.lock.Unlock()
+		log.Debug("Coming SaveEvilBlock", "insert evil blocks", n, "isFinalChain", isFinalChain)
+	}(len(blocks), t.isFinalChain)
+
+	for i, block := range blocks {
+		hash := block.Hash()
+		t.evilBlocks[hash] = block
+		t.evilHeaders[hash] = block.Header()
+		t.evilReceipts[hash] = receipts[i]
+	}
+	return len(blocks), nil
+}
+
 func newTwoTester() *downloadTwoTester {
 	tester := &downloadTwoTester{
 		peerDb: testDB,
@@ -430,6 +471,10 @@ func newTwoTester() *downloadTwoTester {
 		ancientBlocks:   map[common.Hash]*types.Block{fchainGenesis.Hash(): fchainGenesis},
 		ancientReceipts: map[common.Hash]types.Receipts{fchainGenesis.Hash(): nil},
 		ancientChainTd:  map[common.Hash]*big.Int{fchainGenesis.Hash(): fchainGenesis.Difficulty()},
+
+		evilHeaders:  map[common.Hash]*types.Header{},
+		evilBlocks:   map[common.Hash]*types.Block{},
+		evilReceipts: map[common.Hash]types.Receipts{},
 	}
 
 	tester.downloader = NewTwoChain(0, tester.stateDb, trie.NewSyncBloom(1, tester.stateDb),
@@ -483,12 +528,14 @@ func (dlt *downloadTwoTester) sync(id string, td *big.Int, ftd *big.Int, mode Sy
 
 func testSynchronisation(t *testing.T, protocol int, mode SyncMode) {
 	t.Parallel()
-	//log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
+	log.Root().SetHandler(log.LvlFilterHandler(log.LvlDebug, log.StreamHandler(os.Stderr, log.TerminalFormat(true))))
 
 	tester := newTwoTester()
 	defer tester.terminate()
-	chain := newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
-	fChain := newTestChain((blockCacheItems+200)*9/9, tester.fChainInfo.genesis)
+	//chain := newTestChain(blockCacheItems+200, tester.chainInfo.genesis)
+	//fChain := newTestChain((blockCacheItems+200)*9/9, tester.fChainInfo.genesis)
+	chain, fChain := newTwoTestChain(blockCacheItems+200, 2, tester.chainInfo.genesis, tester.fChainInfo.genesis)
+	fmt.Println("two chain info", chain.headBlock().Number().String(), fChain.headBlock().Number().String())
 
 	tester.newPeer("peer", protocol, chain, fChain)
 	if err := tester.sync("peer", nil, nil, mode); err != nil {

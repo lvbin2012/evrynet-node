@@ -164,3 +164,19 @@ func (p *FakePeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) erro
 	p.dl.DeliverNodeData(p.id, isFinalChain, data)
 	return nil
 }
+
+func (p *FakePeer) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (p *FakePeer) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
+}
+
+func (p *FakePeer) RequestEvilBodies(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (p *FakePeer) RequestEvilReceipts(hashes []common.Hash) error {
+	panic("implement me later")
+}

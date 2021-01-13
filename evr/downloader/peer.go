@@ -54,6 +54,8 @@ type peerConnection struct {
 	receiptIdle int32 // Current receipt activity state of the peer (idle = 0, active = 1)
 	stateIdle   int32 // Current node data activity state of the peer (idle = 0, active = 1)
 
+	evilBlockIdle int32
+
 	fHeaderIdle  int32 // Current header activity state of the peer (idle = 0, active = 1)
 	fBlockIdle   int32 // Current block activity state of the peer (idle = 0, active = 1)
 	fReceiptIdle int32 // Current receipt activity state of the peer (idle = 0, active = 1)
@@ -86,6 +88,8 @@ type LightPeer interface {
 	FHead() (common.Hash, *big.Int)
 	RequestHeadersByHash(common.Hash, int, int, bool, bool) error
 	RequestHeadersByNumber(uint64, int, int, bool, bool) error
+	RequestEvilHeadersByHash(common.Hash) error
+	RequestEvilHeadersByNumber(uint64) error
 }
 
 // Peer encapsulates the methods required to synchronise with a remote full peer.
@@ -94,6 +98,8 @@ type Peer interface {
 	RequestBodies([]common.Hash, bool) error
 	RequestReceipts([]common.Hash, bool) error
 	RequestNodeData([]common.Hash, bool) error
+	RequestEvilBodies([]common.Hash) error
+	RequestEvilReceipts([]common.Hash) error
 }
 
 // lightPeerWrapper wraps a LightPeer struct, stubbing out the Peer-only methods.
@@ -106,9 +112,19 @@ func (w *lightPeerWrapper) FHead() (common.Hash, *big.Int) { return w.peer.Head(
 func (w *lightPeerWrapper) RequestHeadersByHash(h common.Hash, amount int, skip int, reverse bool, isFinalChain bool) error {
 	return w.peer.RequestHeadersByHash(h, amount, skip, reverse, isFinalChain)
 }
+
 func (w *lightPeerWrapper) RequestHeadersByNumber(i uint64, amount int, skip int, reverse bool, isFinalChain bool) error {
 	return w.peer.RequestHeadersByNumber(i, amount, skip, reverse, isFinalChain)
 }
+
+func (w *lightPeerWrapper) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (w *lightPeerWrapper) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
+}
+
 func (w *lightPeerWrapper) RequestBodies([]common.Hash, bool) error {
 	panic("RequestBodies not supported in light client mode sync")
 }
@@ -117,6 +133,14 @@ func (w *lightPeerWrapper) RequestReceipts([]common.Hash, bool) error {
 }
 func (w *lightPeerWrapper) RequestNodeData([]common.Hash, bool) error {
 	panic("RequestNodeData not supported in light client mode sync")
+}
+
+func (w *lightPeerWrapper) RequestEvilBodies([]common.Hash) error {
+	panic("RequestEvilBodies not supported in light client mode sync")
+}
+
+func (w *lightPeerWrapper) RequestEvilReceipts([]common.Hash) error {
+	panic("RequestEvilReceipts not supported in light client mode sync")
 }
 
 // newPeerConnection creates a new downloader peer.
@@ -202,6 +226,18 @@ func (p *peerConnection) FetchBodies(request *fetchRequest) error {
 	return nil
 }
 
+func (p *peerConnection) FetchEvilBodies(request *fetchRequest) error {
+	if !atomic.CompareAndSwapInt32(&p.evilBlockIdle, 0, 1){
+		return errAlreadyFetching
+	}
+	hashes := make([]common.Hash, 0, len(request.Headers))
+	for _, header := range request.Headers {
+		hashes = append(hashes, header.Hash())
+	}
+	go p.peer.RequestEvilBodies(hashes)
+	return nil
+}
+
 // FetchReceipts sends a receipt retrieval request to the remote peer.
 func (p *peerConnection) FetchReceipts(request *fetchRequest) error {
 	receiptIdlePtr := &p.receiptIdle
@@ -271,6 +307,11 @@ func (p *peerConnection) SetBodiesIdle(delivered int, isFinalChain bool) {
 	p.setIdle(p.blockStarted, delivered, &p.blockThroughput, blockIdlePtr)
 }
 
+func (p *peerConnection) SetEvilBodiesIdle(delivered int, isFinalChain bool) {
+	p.setIdle(p.blockStarted, delivered, &p.blockThroughput, &p.evilBlockIdle)
+}
+
+
 // SetReceiptsIdle sets the peer to idle, allowing it to execute new receipt
 // retrieval requests. Its estimated receipt retrieval throughput is updated
 // with that measured just now.
@@ -335,6 +376,12 @@ func (p *peerConnection) BlockCapacity(targetRTT time.Duration) int {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 
+	return int(math.Min(1+math.Max(1, p.blockThroughput*float64(targetRTT)/float64(time.Second)), float64(MaxBlockFetch)))
+}
+
+func (p *peerConnection) EvilBlockCapacity(targetRTT time.Duration) int {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
 	return int(math.Min(1+math.Max(1, p.blockThroughput*float64(targetRTT)/float64(time.Second)), float64(MaxBlockFetch)))
 }
 
@@ -528,6 +575,18 @@ func (ps *peerSet) BodyIdlePeers() ([]*peerConnection, int) {
 		return p.blockThroughput
 	}
 	return ps.idlePeers(62, 65, idle, throughput)
+}
+
+func (ps *peerSet) EvilBodyIdlePeers() ([]*peerConnection, int) {
+	idle := func(p *peerConnection) bool {
+		return atomic.LoadInt32(&p.evilBlockIdle) == 0
+	}
+	throughput := func(p *peerConnection) float64 {
+		p.lock.RLock()
+		defer p.lock.RUnlock()
+		return p.blockThroughput
+	}
+	return ps.idlePeers(65, 65, idle, throughput)
 }
 
 // ReceiptIdlePeers retrieves a flat list of all the currently receipt-idle peers

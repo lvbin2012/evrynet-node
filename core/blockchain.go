@@ -475,6 +475,10 @@ func (bc *BlockChain) IsFinalChain() bool {
 	return bc.chainConfig.IsFinalChain
 }
 
+func (bc *BlockChain) SaveEvilBlock(types.Blocks, []types.Receipts, uint64) (int, error) {
+	panic("implement me later")
+}
+
 // CurrentBlock retrieves the current head block of the canonical chain. The
 // block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentBlock() *types.Block {

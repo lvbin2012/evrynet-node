@@ -22,6 +22,7 @@ package downloader
 import (
 	"errors"
 	"fmt"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"sync"
 	"time"
 
@@ -58,11 +59,19 @@ type fetchResult struct {
 	Pending int         // Number of data fetches still pending
 	Hash    common.Hash // Hash of the header to prevent recalculating
 
-	Header       *types.Header
-	Uncles       []*types.Header
-	Transactions types.Transactions
-	Receipts     types.Receipts
-	IsFinalChain bool
+	Header           *types.Header
+	Uncles           []*types.Header
+	Transactions     types.Transactions
+	Receipts         types.Receipts
+	EvilHeader       *types.Header
+	EvilUncles       []*types.Header
+	EvilTransactions types.Transactions
+	EvilReceipts     types.Receipts
+	IsFinalChain     bool
+}
+
+type evilInfo struct {
+	finalHeader *types.Header
 }
 
 // queue represents hashes that are either need fetching or are being fetched
@@ -86,6 +95,14 @@ type queue struct {
 	blockPendPool  map[string]*fetchRequest      // [eth/62] Currently pending block (body) retrieval operations
 	blockDonePool  map[common.Hash]struct{}      // [eth/62] Set of the completed block (body) fetches
 
+	evilBlockTaskPool  map[common.Hash]*types.Header
+	evilBlockTaskQueue *prque.Prque
+	evilBlockPendPool  map[string]*fetchRequest
+	evilBlockDonePool  map[common.Hash]struct{}
+
+	evilMountMap map[common.Hash]*evilInfo
+	//blockEvilMap map[common.Hash]bool
+
 	receiptTaskPool  map[common.Hash]*types.Header // [eth/63] Pending receipt retrieval tasks, mapping hashes to headers
 	receiptTaskQueue *prque.Prque                  // [eth/63] Priority queue of the headers to fetch the receipts for
 	receiptPendPool  map[string]*fetchRequest      // [eth/63] Currently pending receipt retrieval operations
@@ -95,15 +112,17 @@ type queue struct {
 	resultOffset uint64             // Offset of the first cached fetch result in the block chain
 	resultSize   common.StorageSize // Approximate size of a block (exponential moving average)
 
-	lock   *sync.Mutex
-	active *sync.Cond
-	closed bool
+	lock         *sync.Mutex
+	active       *sync.Cond
+	closed       bool
+	isFinalChain bool
 }
 
 // newQueue creates a new download queue for scheduling block retrieval.
-func newQueue() *queue {
+func newQueue(isFinalChain bool) *queue {
 	lock := new(sync.Mutex)
-	return &queue{
+	queue := &queue{
+		isFinalChain:     isFinalChain,
 		headerPendPool:   make(map[string]*fetchRequest),
 		headerContCh:     make(chan bool),
 		blockTaskPool:    make(map[common.Hash]*types.Header),
@@ -118,6 +137,16 @@ func newQueue() *queue {
 		active:           sync.NewCond(lock),
 		lock:             lock,
 	}
+	if queue.isFinalChain {
+		queue.evilBlockTaskPool = make(map[common.Hash]*types.Header)
+		queue.evilBlockTaskQueue = prque.New(nil)
+		queue.evilBlockPendPool = make(map[string]*fetchRequest)
+		queue.evilBlockDonePool = make(map[common.Hash]struct{})
+		queue.evilMountMap = make(map[common.Hash]*evilInfo)
+		//queue.blockEvilMap = make(map[common.Hash]bool)
+	}
+
+	return queue
 }
 
 // Reset clears out the queue contents.
@@ -143,6 +172,15 @@ func (q *queue) Reset() {
 
 	q.resultCache = make([]*fetchResult, blockCacheItems)
 	q.resultOffset = 0
+
+	if q.isFinalChain {
+		q.evilBlockTaskPool = make(map[common.Hash]*types.Header)
+		q.evilBlockTaskQueue.Reset()
+		q.evilBlockPendPool = make(map[string]*fetchRequest)
+		q.evilBlockDonePool = make(map[common.Hash]struct{})
+		q.evilMountMap = make(map[common.Hash]*evilInfo)
+		//q.blockEvilMap = make(map[common.Hash]bool)
+	}
 }
 
 // Close marks the end of the sync, unblocking Results.
@@ -178,6 +216,15 @@ func (q *queue) PendingReceipts() int {
 	return q.receiptTaskQueue.Size()
 }
 
+func (q *queue) PendingEvilBlocks() int {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	if q.isFinalChain {
+		return q.evilBlockTaskQueue.Size()
+	}
+	return 0
+}
+
 // InFlightHeaders retrieves whether there are header fetch requests currently
 // in flight.
 func (q *queue) InFlightHeaders() bool {
@@ -205,6 +252,15 @@ func (q *queue) InFlightReceipts() bool {
 	return len(q.receiptPendPool) > 0
 }
 
+func (q *queue) InFlightEvilBlocks() bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	if q.isFinalChain {
+		return len(q.evilBlockPendPool) > 0
+	}
+	return false
+}
+
 // Idle returns if the queue is fully idle or has some data still inside.
 func (q *queue) Idle() bool {
 	q.lock.Lock()
@@ -213,6 +269,11 @@ func (q *queue) Idle() bool {
 	queued := q.blockTaskQueue.Size() + q.receiptTaskQueue.Size()
 	pending := len(q.blockPendPool) + len(q.receiptPendPool)
 	cached := len(q.blockDonePool) + len(q.receiptDonePool)
+	if q.isFinalChain {
+		queued += q.evilBlockTaskQueue.Size()
+		pending += len(q.evilBlockPendPool)
+		cached += len(q.evilBlockDonePool)
+	}
 
 	return (queued + pending + cached) == 0
 }
@@ -233,6 +294,13 @@ func (q *queue) ShouldThrottleReceipts() bool {
 	defer q.lock.Unlock()
 
 	return q.resultSlots(q.receiptPendPool, q.receiptDonePool) <= 0
+}
+
+func (q *queue) ShouldThrottleEvilBlocks() bool {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	return q.resultSlots(q.evilBlockPendPool, q.evilBlockDonePool) <= 0
 }
 
 // resultSlots calculates the number of results slots available for requests
@@ -342,11 +410,36 @@ func (q *queue) Schedule(headers []*types.Header, from uint64) []*types.Header {
 			q.receiptTaskPool[hash] = header
 			q.receiptTaskQueue.Push(header, -int64(header.Number.Uint64()))
 		}
+
+		if q.isFinalChain {
+			//if false {
+			extra, err := fconsensus.ExtractFConExtra(header)
+			if err != nil {
+				log.Warn("Header.Extra parse fail", "number", header.Number, "hash", hash, "err", err.Error())
+				continue
+			}
+			if extra.EvilHeader != nil {
+				evilHash := extra.EvilHeader.Hash()
+				q.evilMountMap[evilHash] = &evilInfo{finalHeader: header}
+				q.evilBlockTaskPool[evilHash] = extra.EvilHeader
+				//q.evilBlockTaskQueue.Push(extra.EvilHeader, -int64(extra.EvilHeader.Number.Uint64()))
+				q.evilBlockTaskQueue.Push(extra.EvilHeader, -int64(header.Number.Uint64()))
+			}
+		}
+
 		inserts = append(inserts, header)
 		q.headerHead = hash
 		from++
 	}
 	return inserts
+}
+
+func (q *queue) hasEvilInfo(header *types.Header) bool {
+	fex, err := fconsensus.ExtractFConExtra(header)
+	if err != nil {
+		return false
+	}
+	return fex.EvilHeader != nil
 }
 
 // Results retrieves and permanently removes a batch of fetch results from
@@ -376,6 +469,7 @@ func (q *queue) Results(block bool) []*fetchResult {
 			hash := result.Header.Hash()
 			delete(q.blockDonePool, hash)
 			delete(q.receiptDonePool, hash)
+			//delete(q.blockEvilMap, hash)
 		}
 		// Delete the results from the cache and clear the tail.
 		copy(q.resultCache, q.resultCache[nproc:])
@@ -464,7 +558,16 @@ func (q *queue) ReserveBodies(p *peerConnection, count int, isFinalChain bool) (
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	return q.reserveHeaders(p, count, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool, q.blockDonePool, isNoop, isFinalChain)
+	return q.reserveHeaders(p, count, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool, q.blockDonePool, isNoop, isFinalChain, false)
+}
+
+func (q *queue) ReserveEvilBodies(p *peerConnection, count int, isFinalChain bool) (*fetchRequest, bool, error) {
+	isNoop := func(header *types.Header) bool {
+		return header.TxHash == types.EmptyRootHash && header.UncleHash == types.EmptyRootHash
+	}
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	return q.reserveHeaders(p, count, q.evilBlockTaskPool, q.evilBlockTaskQueue, q.evilBlockPendPool, q.evilBlockDonePool, isNoop, isFinalChain, true)
 }
 
 // ReserveReceipts reserves a set of receipt fetches for the given peer, skipping
@@ -477,7 +580,7 @@ func (q *queue) ReserveReceipts(p *peerConnection, count int, isFinalChain bool)
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
-	return q.reserveHeaders(p, count, q.receiptTaskPool, q.receiptTaskQueue, q.receiptPendPool, q.receiptDonePool, isNoop, isFinalChain)
+	return q.reserveHeaders(p, count, q.receiptTaskPool, q.receiptTaskQueue, q.receiptPendPool, q.receiptDonePool, isNoop, isFinalChain, false)
 }
 
 // reserveHeaders reserves a set of data download operations for a given peer,
@@ -488,7 +591,7 @@ func (q *queue) ReserveReceipts(p *peerConnection, count int, isFinalChain bool)
 // reason the lock is not obtained in here is because the parameters already need
 // to access the queue, so they already need a lock anyway.
 func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common.Hash]*types.Header, taskQueue *prque.Prque,
-	pendPool map[string]*fetchRequest, donePool map[common.Hash]struct{}, isNoop func(*types.Header) bool, isFinalChain bool) (*fetchRequest, bool, error) {
+	pendPool map[string]*fetchRequest, donePool map[common.Hash]struct{}, isNoop func(*types.Header) bool, isFinalChain bool, isEvilInfo bool) (*fetchRequest, bool, error) {
 	// Short circuit if the pool has been depleted, or if the peer's already
 	// downloading something (sanity check not to corrupt state)
 	if taskQueue.Empty() {
@@ -505,25 +608,41 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 	skip := make([]*types.Header, 0)
 
 	progress := false
+	//isNoTriggle := false
 	for proc := 0; proc < space && len(send) < count && !taskQueue.Empty(); proc++ {
-		header := taskQueue.PopItem().(*types.Header)
+		item, priority := taskQueue.Pop()
+		header := item.(*types.Header)
 		hash := header.Hash()
 
 		// If we're the first to request this task, initialise the result container
 		index := int(header.Number.Int64() - int64(q.resultOffset))
+		if isEvilInfo {
+			index = int(-1*priority - int64(q.resultOffset))
+		}
 		if index >= len(q.resultCache) || index < 0 {
 			common.Report("index allocation went beyond available resultCache space")
 			return nil, false, errInvalidChain
 		}
 		if q.resultCache[index] == nil {
+			requestHeader := header
+			if isEvilInfo {
+				if mountInfo, ok := q.evilMountMap[hash]; ok {
+					requestHeader = mountInfo.finalHeader
+				} else {
+					panic("Evil block not mount")
+				}
+			}
 			components := 1
 			if q.mode == FastSync {
 				components = 2
 			}
+			if q.hasEvilInfo(requestHeader) {
+				components++
+			}
 			q.resultCache[index] = &fetchResult{
 				Pending:      components,
-				Hash:         hash,
-				Header:       header,
+				Hash:         requestHeader.Hash(),
+				Header:       requestHeader,
 				IsFinalChain: isFinalChain,
 			}
 		}
@@ -533,10 +652,13 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 			delete(taskPool, hash)
 
 			space, proc = space-1, proc-1
-			q.resultCache[index].Pending--
+			if !isEvilInfo {
+				q.resultCache[index].Pending--
+			}
 			progress = true
 			continue
 		}
+
 		// Otherwise unless the peer is known not to have the data, add to the retrieve list
 		if p.Lacks(hash) {
 			skip = append(skip, header)
@@ -544,6 +666,7 @@ func (q *queue) reserveHeaders(p *peerConnection, count int, taskPool map[common
 			send = append(send, header)
 		}
 	}
+
 	// Merge all the skipped headers back
 	for _, header := range skip {
 		taskQueue.Push(header, -int64(header.Number.Uint64()))
@@ -576,6 +699,10 @@ func (q *queue) CancelHeaders(request *fetchRequest) {
 // task queue.
 func (q *queue) CancelBodies(request *fetchRequest) {
 	q.cancel(request, q.blockTaskQueue, q.blockPendPool)
+}
+
+func (q *queue) CancelEvilBodies(request *fetchRequest) {
+	q.cancel(request, q.evilBlockTaskQueue, q.evilBlockPendPool)
 }
 
 // CancelReceipts aborts a body fetch request, returning all pending headers to
@@ -635,6 +762,12 @@ func (q *queue) ExpireBodies(timeout time.Duration) map[string]int {
 	defer q.lock.Unlock()
 
 	return q.expire(timeout, q.blockPendPool, q.blockTaskQueue, bodyTimeoutMeter)
+}
+
+func (q *queue) ExpireEvilBodies(timeout time.Duration) map[string]int {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	return q.expire(timeout, q.evilBlockPendPool, q.evilBlockTaskQueue, evilBodyTimeoutMeter)
 }
 
 // ExpireReceipts checks for in flight receipt requests that exceeded a timeout
@@ -783,7 +916,22 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, uncleLi
 		result.Uncles = uncleLists[index]
 		return nil
 	}
-	return q.deliver(id, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool, q.blockDonePool, bodyReqTimer, len(txLists), reconstruct)
+	return q.deliver(id, q.blockTaskPool, q.blockTaskQueue, q.blockPendPool, q.blockDonePool, bodyReqTimer, len(txLists), reconstruct, false)
+}
+
+func (q *queue) DeliverEvilBodies(id string, txLists [][]*types.Transaction, uncleList [][]*types.Header,
+	receiptList [][]*types.Receipt, saveFunc func(header *types.Header, txs []*types.Transaction, uncles []*types.Header,
+	receipts []*types.Receipt)) (int, error) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+	reconstruct := func(header *types.Header, index int, result *fetchResult) error {
+		if types.DeriveSha(types.Transactions(txLists[index])) != header.TxHash || types.CalcUncleHash(uncleList[index]) != header.UncleHash {
+			return errInvalidBody
+		}
+		saveFunc(header, txLists[index], uncleList[index], receiptList[index])
+		return nil
+	}
+	return q.deliver(id, q.evilBlockTaskPool, q.evilBlockTaskQueue, q.evilBlockPendPool, q.evilBlockDonePool, evilBodyReqTimer, len(txLists), reconstruct, true)
 }
 
 // DeliverReceipts injects a receipt retrieval response into the results queue.
@@ -800,7 +948,7 @@ func (q *queue) DeliverReceipts(id string, receiptList [][]*types.Receipt) (int,
 		result.Receipts = receiptList[index]
 		return nil
 	}
-	return q.deliver(id, q.receiptTaskPool, q.receiptTaskQueue, q.receiptPendPool, q.receiptDonePool, receiptReqTimer, len(receiptList), reconstruct)
+	return q.deliver(id, q.receiptTaskPool, q.receiptTaskQueue, q.receiptPendPool, q.receiptDonePool, receiptReqTimer, len(receiptList), reconstruct, false)
 }
 
 // deliver injects a data retrieval response into the results queue.
@@ -810,7 +958,7 @@ func (q *queue) DeliverReceipts(id string, receiptList [][]*types.Receipt) (int,
 // to access the queue, so they already need a lock anyway.
 func (q *queue) deliver(id string, taskPool map[common.Hash]*types.Header, taskQueue *prque.Prque,
 	pendPool map[string]*fetchRequest, donePool map[common.Hash]struct{}, reqTimer metrics.Timer,
-	results int, reconstruct func(header *types.Header, index int, result *fetchResult) error) (int, error) {
+	results int, reconstruct func(header *types.Header, index int, result *fetchResult) error, isEvilInfo bool) (int, error) {
 
 	// Short circuit if the data was never requested
 	request := pendPool[id]
@@ -837,8 +985,19 @@ func (q *queue) deliver(id string, taskPool map[common.Hash]*types.Header, taskQ
 		if i >= results {
 			break
 		}
+		hash := header.Hash()
 		// Reconstruct the next result if contents match up
 		index := int(header.Number.Int64() - int64(q.resultOffset))
+		if isEvilInfo {
+			mountHeader, ok := q.evilMountMap[hash]
+			if ok {
+				index = int(mountHeader.finalHeader.Number.Int64() - int64(q.resultOffset))
+				delete(q.evilMountMap, hash)
+				log.Debug("queue evil Deliver save", "number", header.Number.Int64(), "hash", header.Hash())
+			} else {
+				continue
+			}
+		}
 		if index >= len(q.resultCache) || index < 0 || q.resultCache[index] == nil {
 			failure = errInvalidChain
 			break
@@ -847,10 +1006,10 @@ func (q *queue) deliver(id string, taskPool map[common.Hash]*types.Header, taskQ
 			failure = err
 			break
 		}
-		hash := header.Hash()
+
+		q.resultCache[index].Pending--
 
 		donePool[hash] = struct{}{}
-		q.resultCache[index].Pending--
 		useful = true
 		accepted++
 

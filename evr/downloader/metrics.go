@@ -28,10 +28,10 @@ var (
 	headerDropMeter    = metrics.NewRegisteredMeter("evr/downloader/headers/drop", nil)
 	headerTimeoutMeter = metrics.NewRegisteredMeter("evr/downloader/headers/timeout", nil)
 
-	bodyInMeter      = metrics.NewRegisteredMeter("evr/downloader/bodies/in", nil)
-	bodyReqTimer     = metrics.NewRegisteredTimer("evr/downloader/bodies/req", nil)
-	bodyDropMeter    = metrics.NewRegisteredMeter("evr/downloader/bodies/drop", nil)
-	bodyTimeoutMeter = metrics.NewRegisteredMeter("evr/downloader/bodies/timeout", nil)
+	bodyInMeter          = metrics.NewRegisteredMeter("evr/downloader/bodies/in", nil)
+	bodyReqTimer         = metrics.NewRegisteredTimer("evr/downloader/bodies/req", nil)
+	bodyDropMeter        = metrics.NewRegisteredMeter("evr/downloader/bodies/drop", nil)
+	bodyTimeoutMeter     = metrics.NewRegisteredMeter("evr/downloader/bodies/timeout", nil)
 
 	receiptInMeter      = metrics.NewRegisteredMeter("evr/downloader/receipts/in", nil)
 	receiptReqTimer     = metrics.NewRegisteredTimer("evr/downloader/receipts/req", nil)
@@ -40,4 +40,9 @@ var (
 
 	stateInMeter   = metrics.NewRegisteredMeter("evr/downloader/states/in", nil)
 	stateDropMeter = metrics.NewRegisteredMeter("evr/downloader/states/drop", nil)
+
+	evilBodyInMeter          = metrics.NewRegisteredMeter("evr/downloader/evilBodies/in", nil)
+	evilBodyReqTimer         = metrics.NewRegisteredTimer("evr/downloader/evilBodies/req", nil)
+	evilBodyDropMeter        = metrics.NewRegisteredMeter("evr/downloader/evilBodies/drop", nil)
+	evilBodyTimeoutMeter     = metrics.NewRegisteredMeter("evr/downloader/evilBodies/timeout", nil)
 )

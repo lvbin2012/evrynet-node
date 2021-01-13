@@ -1292,6 +1292,14 @@ func (pc *peerConnection) RequestHeadersByNumber(origin uint64, amount int, skip
 	return nil
 }
 
+func (pc *peerConnection) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (pc *peerConnection) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
+}
+
 func (d *downloaderPeerNotify) registerPeer(p *peer) {
 	pm := (*ProtocolManager)(d)
 	pc := &peerConnection{

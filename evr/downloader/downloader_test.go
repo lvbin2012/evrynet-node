@@ -294,6 +294,10 @@ func (dl *downloadTester) IsFinalChain() bool {
 	return false
 }
 
+func (dl *downloadTester) SaveEvilBlock(types.Blocks, []types.Receipts, uint64) (int, error) {
+	panic("implement me later")
+}
+
 // InsertReceiptChain injects a new batch of receipts into the simulated chain.
 func (dl *downloadTester) InsertReceiptChain(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (i int, err error) {
 	dl.lock.Lock()
@@ -447,6 +451,22 @@ func (dlp *downloadTesterPeer) RequestNodeData(hashes []common.Hash, isFinalChai
 	}
 	go dlp.dl.downloader.DeliverNodeData(dlp.id, isFinalChain, results)
 	return nil
+}
+
+func (d *downloadTesterPeer) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (d *downloadTesterPeer) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
+}
+
+func (d *downloadTesterPeer) RequestEvilBodies(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (d *downloadTesterPeer) RequestEvilReceipts(hashes []common.Hash) error {
+	panic("implement me later")
 }
 
 // assertOwnChain checks if the local chain contains the correct number of items
@@ -1509,7 +1529,7 @@ type floodingTestPeer struct {
 	tester *downloadTester
 }
 
-func (ftp *floodingTestPeer) Head() (common.Hash, *big.Int) { return ftp.peer.Head() }
+func (ftp *floodingTestPeer) Head() (common.Hash, *big.Int)  { return ftp.peer.Head() }
 func (ftp *floodingTestPeer) FHead() (common.Hash, *big.Int) { return ftp.peer.Head() }
 func (ftp *floodingTestPeer) RequestHeadersByHash(hash common.Hash, count int, skip int, reverse bool, isFinalChain bool) error {
 	return ftp.peer.RequestHeadersByHash(hash, count, skip, reverse, isFinalChain)
@@ -1522,6 +1542,22 @@ func (ftp *floodingTestPeer) RequestReceipts(hashes []common.Hash, isFinalChain 
 }
 func (ftp *floodingTestPeer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
 	return ftp.peer.RequestNodeData(hashes, isFinalChain)
+}
+
+func (ftp *floodingTestPeer) RequestEvilBodies(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (ftp *floodingTestPeer) RequestEvilReceipts(hashes []common.Hash) error {
+	panic("implement me later")
+}
+
+func (ftp *floodingTestPeer) RequestEvilHeadersByHash(h common.Hash) error {
+	panic("implement me later")
+}
+
+func (ftp *floodingTestPeer) RequestEvilHeadersByNumber(i uint64) error {
+	panic("implement me later")
 }
 
 func (ftp *floodingTestPeer) RequestHeadersByNumber(from uint64, count, skip int, reverse bool, isFinalChain bool) error {
