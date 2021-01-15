@@ -53,7 +53,7 @@ var (
 	txLookupPrefix  = []byte("l") // txLookupPrefix + hash -> transaction/receipt lookup metadata
 	bloomBitsPrefix = []byte("B") // bloomBitsPrefix + bit (uint16 big endian) + section (uint64 big endian) + hash -> bloom bits
 
-	preimagePrefix = []byte("secure-key-")      // preimagePrefix + hash -> preimage
+	preimagePrefix = []byte("secure-key-")     // preimagePrefix + hash -> preimage
 	configPrefix   = []byte("evrynet-config-") // config prefix for the db
 
 	tendermintPrefix = []byte("tendermint-snapshot-")
@@ -81,7 +81,6 @@ const (
 	// freezerDifficultyTable indicates the name of the freezer total difficulty table.
 	freezerDifficultyTable = "diffs"
 
-
 	// freezerFHeaderTable indicates the name of the freezer header table.
 	freezerFHeaderTable = "fheaders"
 
@@ -101,11 +100,11 @@ const (
 // freezerNoSnappy configures whether compression is disabled for the ancient-tables.
 // Hashes and difficulties don't compress well.
 var freezerNoSnappy = map[string]bool{
-	freezerHeaderTable:     false,
-	freezerHashTable:       true,
-	freezerBodiesTable:     false,
-	freezerReceiptTable:    false,
-	freezerDifficultyTable: true,
+	freezerHeaderTable:      false,
+	freezerHashTable:        true,
+	freezerBodiesTable:      false,
+	freezerReceiptTable:     false,
+	freezerDifficultyTable:  true,
 	freezerFHeaderTable:     false,
 	freezerFHashTable:       true,
 	freezerFBodiesTable:     false,
@@ -133,9 +132,19 @@ func headerKeyPrefix(number uint64) []byte {
 	return append(headerPrefix, encodeBlockNumber(number)...)
 }
 
+// evilHeaderKeyPrefix = "evil" + headerPrefix + num (uint64 big endian)
+func evilHeaderKeyPrefix(number uint64) []byte {
+	return getEvilInfoKey(headerKeyPrefix(number))
+}
+
 // headerKey = headerPrefix + num (uint64 big endian) + hash
 func headerKey(number uint64, hash common.Hash) []byte {
 	return append(append(headerPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+}
+
+// evilHeaderKey = "evil" + headerPerfix + num (uint64 big endian) + hash
+func evilHeaderKey(number uint64, hash common.Hash) []byte {
+	return getEvilInfoKey(headerKey(number, hash))
 }
 
 // headerTDKey = headerPrefix + num (uint64 big endian) + hash + headerTDSuffix
@@ -143,9 +152,19 @@ func headerTDKey(number uint64, hash common.Hash) []byte {
 	return append(headerKey(number, hash), headerTDSuffix...)
 }
 
+// evilHeaderTDKey = "evil" + headerPrefix + num (uint64 big endian) + hash + headerTDSuffix
+func evilHeaderTDKey(number uint64, hash common.Hash) []byte {
+	return getEvilInfoKey(headerTDKey(number, hash))
+}
+
 // headerHashKey = headerPrefix + num (uint64 big endian) + headerHashSuffix
 func headerHashKey(number uint64) []byte {
 	return append(append(headerPrefix, encodeBlockNumber(number)...), headerHashSuffix...)
+}
+
+// evilHeaderHashKey = "evil" + headerPrefix + num (uint64 big endian) + headerHashSuffix
+func evilHeaderHashKey(number uint64) []byte {
+	return getEvilInfoKey(headerHashKey(number))
 }
 
 // headerNumberKey = headerNumberPrefix + hash
@@ -153,14 +172,29 @@ func headerNumberKey(hash common.Hash) []byte {
 	return append(headerNumberPrefix, hash.Bytes()...)
 }
 
+// evilHeaderNumberKey = "evil" + headerNumberPrefix + hash
+func evilHeaderNumberKey(hash common.Hash) []byte {
+	return getEvilInfoKey(headerNumberKey(hash))
+}
+
 // blockBodyKey = blockBodyPrefix + num (uint64 big endian) + hash
 func blockBodyKey(number uint64, hash common.Hash) []byte {
 	return append(append(blockBodyPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
 }
 
+// evilBlockBodyKey = "evil" + blockBodyPrefix + num (uint64 big endian) + hash
+func evilBlockBodyKey(number uint64, hash common.Hash) []byte {
+	return getEvilInfoKey(blockBodyKey(number, hash))
+}
+
 // blockReceiptsKey = blockReceiptsPrefix + num (uint64 big endian) + hash
 func blockReceiptsKey(number uint64, hash common.Hash) []byte {
 	return append(append(blockReceiptsPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+}
+
+// evilBlockReceiptsKey = "evil" + blockReceiptsPrefix + num (uint64 big endian) + hash
+func evilBlockReceiptsKey(number uint64, hash common.Hash) []byte {
+	return getEvilInfoKey(blockReceiptsKey(number, hash))
 }
 
 // txLookupKey = txLookupPrefix + hash
@@ -188,10 +222,13 @@ func configKey(hash common.Hash) []byte {
 	return append(configPrefix, hash.Bytes()...)
 }
 
-func getFinalKey(key []byte, isFinalChain bool) []byte{
-	if isFinalChain{
+func getFinalKey(key []byte, isFinalChain bool) []byte {
+	if isFinalChain {
 		return append([]byte{'F'}, key...)
 	}
 	return key
 }
 
+func getEvilInfoKey(key []byte) []byte {
+	return append([]byte("evil"), key...)
+}
