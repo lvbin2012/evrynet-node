@@ -600,6 +600,30 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 		}
 		return p.SendBlockBodiesRLP(bodies, msg.Code == GetFBlockBodiesMsg)
 
+	case msg.Code == GetFEvilBlockMsg:
+		msgStream := rlp.NewStream(msg.Payload, uint64(msg.Size))
+		if _, err := msgStream.List(); err != nil {
+			return err
+		}
+		var (
+			hash      common.Hash
+			bytes     int
+			evilBlock []rlp.RawValue
+		)
+		for bytes < softResponseLimit && len(evilBlock) < downloader.MaxBlockFetch {
+			if err := msgStream.Decode(&hash); err == rlp.EOL {
+				break
+			} else if err != nil {
+				return errResp(ErrDecode, "msg %v: %v", msg, err)
+			}
+			if data := pm.fblockchain.GetEvilBlockRLP(hash); len(data) != 0 {
+				evilBlock = append(evilBlock, data)
+				bytes += len(data)
+			}
+
+		}
+		return p.SendEvilBlockRLP(evilBlock)
+
 	case msg.Code == BlockBodiesMsg || msg.Code == FBlockBodiesMsg:
 		// A batch of block bodies arrived to one of our previous requests
 		var request blockBodiesData
@@ -624,6 +648,22 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			if err != nil {
 				log.Debug("Failed to deliver bodies", "err", err)
 			}
+		}
+	case msg.Code == FEvilBlockMsg:
+		var request evilBlockData
+		if err := msg.Decode(&request); err != nil {
+			return errResp(ErrDecode, "msg %v: %v", msg, err)
+		}
+		transactions := make([][]*types.Transaction, len(request))
+		uncles := make([][]*types.Header, len(request))
+
+		for i, block := range request {
+			transactions[i] = block.Transactions
+			uncles[i] = block.Uncles
+		}
+		err := pm.downloader.DeliverEvilBlocks(p.id, true, transactions, uncles)
+		if err != nil {
+			log.Debug("Failed to deliver evil  bodies", "err", err)
 		}
 
 	case p.version >= eth63 && (msg.Code == GetNodeDataMsg || msg.Code == GetFNodeDataMsg):

@@ -85,9 +85,23 @@ func ReadAllHashes(db evrdb.Iteratee, number uint64, isFinalChain bool) []common
 	return hashes
 }
 
-// ReadHeaderNumber returns the header number assigned to a hash.
 func ReadHeaderNumber(db evrdb.KeyValueReader, hash common.Hash, isFinalChain bool) *uint64 {
-	key := getFinalKey(headerNumberKey(hash), isFinalChain)
+	return ReadHeaderNumberBase(db, hash, isFinalChain, false)
+}
+
+func ReadEvilHeaderNumber(db evrdb.KeyValueReader, hash common.Hash, isFinalChain bool) *uint64 {
+	return ReadHeaderNumberBase(db, hash, isFinalChain, true)
+}
+
+// ReadHeaderNumber returns the header number assigned to a hash.
+func ReadHeaderNumberBase(db evrdb.KeyValueReader, hash common.Hash, isFinalChain bool, isEvil bool) *uint64 {
+	var keyOri []byte
+	if isEvil {
+		keyOri = evilHeaderNumberKey(hash)
+	} else {
+		keyOri = headerNumberKey(hash)
+	}
+	key := getFinalKey(keyOri, isFinalChain)
 	data, _ := db.Get(key)
 	if len(data) != 8 {
 		return nil

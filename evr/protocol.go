@@ -46,7 +46,7 @@ var ProtocolName = "evr"
 var ProtocolVersions = []uint{eth65, eth64, eth63, eth62}
 
 // ProtocolLengths are the number of implemented message corresponding to different protocol versions.
-var ProtocolLengths = []uint64{49, 18, 17, 8}
+var ProtocolLengths = []uint64{51, 18, 17, 8}
 
 const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 
@@ -81,10 +81,12 @@ const (
 	FBlockBodiesMsg     = 0x26
 	NewFBlockMsg        = 0x27
 	// Protocol messages belonging to evr/63
-	GetFNodeDataMsg = 0x2d
-	FNodeDataMsg    = 0x2e
-	GetFReceiptsMsg = 0x2f
-	FReceiptsMsg    = 0x30
+	GetFNodeDataMsg  = 0x2d
+	FNodeDataMsg     = 0x2e
+	GetFReceiptsMsg  = 0x2f
+	FReceiptsMsg     = 0x30
+	FEvilBlockMsg    = 0x31
+	GetFEvilBlockMsg = 0x32
 )
 
 type errCode int
@@ -207,3 +209,11 @@ type blockBody struct {
 
 // blockBodiesData is the network packet for block content distribution.
 type blockBodiesData []*blockBody
+
+
+type evilBlock struct {
+	Transactions []*types.Transaction
+	Uncles []*types.Header
+}
+
+type evilBlockData []*evilBlock

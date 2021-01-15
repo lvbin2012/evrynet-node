@@ -370,6 +370,10 @@ func (p *Peer) SendBlockBodiesRLP(bodies []rlp.RawValue, isFinalChain bool) erro
 	return p2p.Send(p.rw, BlockBodiesMsg, bodies)
 }
 
+func (p *Peer) SendEvilBlockRLP(evilBlocks []rlp.RawValue) error{
+	return p2p.Send(p.rw, FEvilBlockMsg, evilBlocks)
+}
+
 // SendNodeDataRLP sends a batch of arbitrary internal data, corresponding to the
 // hashes requested.
 func (p *Peer) SendNodeData(data [][]byte, isFinalChain bool) error {
@@ -438,7 +442,8 @@ func (p *Peer) RequestNodeData(hashes []common.Hash, isFinalChain bool) error {
 }
 
 func (p *Peer) RequestEvilBodies(hashes []common.Hash) error {
-	panic("implement me later")
+	p.Log().Debug("Fetching batch of block bodies", "count", len(hashes))
+	return p2p.Send(p.rw, GetFEvilBlockMsg, hashes)
 }
 
 func (p *Peer) RequestEvilReceipts(hashes []common.Hash) error {

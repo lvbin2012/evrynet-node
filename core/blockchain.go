@@ -673,6 +673,12 @@ func (bc *BlockChain) GetBodyRLP(hash common.Hash) rlp.RawValue {
 	return body
 }
 
+func (bc *BlockChain) GetEvilBlockRLP(hash common.Hash) rlp.RawValue {
+	number := rawdb.ReadEvilHeaderNumber(bc.db, hash, false)
+	block := rawdb.ReadEvilBodyRLP(bc.db, hash, *number, false)
+	return block
+}
+
 // HasBlock checks if a block is fully present in the database or not.
 func (bc *BlockChain) HasBlock(hash common.Hash, number uint64) bool {
 	if bc.blockCache.Contains(hash) {
@@ -1412,7 +1418,7 @@ func (bc *BlockChain) SaveEvilBlock(blocks types.Blocks) (int, error) {
 
 	// TODO Verify evil block???? is need? or just simple check txHash ReceiptHash
 
-	if len(blocks) == 0  {
+	if len(blocks) == 0 {
 		return 0, nil
 	}
 	bc.wg.Add(1)
@@ -1427,11 +1433,11 @@ func (bc *BlockChain) SaveEvilBlock(blocks types.Blocks) (int, error) {
 		hash := block.Hash()
 		// save Header
 		rawdb.WriteEvilHeaderNumber(bc.db, hash, number, false)
-		if rawdb.HasHeader(bc.db, hash, number, false){
+		if rawdb.HasHeader(bc.db, hash, number, false) {
 			rawdb.WriteEvilHeader(bc.db, block.Header(), false)
 		}
 		// save Body
-		if rawdb.HasBody(bc.db, hash, number, false){
+		if rawdb.HasBody(bc.db, hash, number, false) {
 			rawdb.WriteEvilBlock(bc.db, block, false)
 		}
 	}
