@@ -294,7 +294,7 @@ func (dl *downloadTester) IsFinalChain() bool {
 	return false
 }
 
-func (dl *downloadTester) SaveEvilBlock(types.Blocks, []types.Receipts, uint64) (int, error) {
+func (dl *downloadTester) SaveEvilBlock(types.Blocks) (int, error) {
 	panic("implement me later")
 }
 

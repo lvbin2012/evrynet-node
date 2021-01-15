@@ -475,10 +475,6 @@ func (bc *BlockChain) IsFinalChain() bool {
 	return bc.chainConfig.IsFinalChain
 }
 
-func (bc *BlockChain) SaveEvilBlock(types.Blocks, []types.Receipts, uint64) (int, error) {
-	panic("implement me later")
-}
-
 // CurrentBlock retrieves the current head block of the canonical chain. The
 // block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) CurrentBlock() *types.Block {
@@ -1411,6 +1407,36 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 
 	bc.PostChainEvents(events, logs)
 	return n, err
+}
+func (bc *BlockChain) SaveEvilBlock(blocks types.Blocks) (int, error) {
+
+	// TODO Verify evil block???? is need? or just simple check txHash ReceiptHash
+
+	if len(blocks) == 0  {
+		return 0, nil
+	}
+	bc.wg.Add(1)
+	bc.chainmu.Lock()
+	defer func() {
+		bc.chainmu.Unlock()
+		bc.wg.Done()
+	}()
+
+	for _, block := range blocks {
+		number := block.NumberU64()
+		hash := block.Hash()
+		// save Header
+		rawdb.WriteEvilHeaderNumber(bc.db, hash, number, false)
+		if rawdb.HasHeader(bc.db, hash, number, false){
+			rawdb.WriteEvilHeader(bc.db, block.Header(), false)
+		}
+		// save Body
+		if rawdb.HasBody(bc.db, hash, number, false){
+			rawdb.WriteEvilBlock(bc.db, block, false)
+		}
+	}
+
+	panic("implement me later")
 }
 
 // insertChain is the internal implementation of InsertChain, which assumes that

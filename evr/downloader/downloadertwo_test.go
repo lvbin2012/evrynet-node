@@ -158,9 +158,9 @@ func (d *downloadTwoTesterPeer) RequestNodeData(hashes []common.Hash, isFinalCha
 }
 
 func (d *downloadTwoTesterPeer) RequestEvilBodies(hashes []common.Hash) error {
-	txs, uncles, receipts := d.fchain.evilBlocks(hashes)
-	log.Debug("RequestEvilBodies", "Hashes", len(hashes), "txs", len(txs), "uncles", len(uncles), "receipts", len(receipts))
-	go d.dlt.downloader.DeliverEvilBlocks(d.id, true, txs, uncles, receipts)
+	txs, uncles := d.fchain.evilBlocks(hashes)
+	log.Debug("RequestEvilBodies", "Hashes", len(hashes), "txs", len(txs), "uncles", len(uncles))
+	go d.dlt.downloader.DeliverEvilBlocks(d.id, true, txs, uncles)
 	return nil
 }
 
@@ -415,18 +415,17 @@ func (t *testChainInfo) IsFinalChain() bool {
 	return t.isFinalChain
 }
 
-func (t *testChainInfo) SaveEvilBlock(blocks types.Blocks, receipts []types.Receipts, ancientLimit uint64) (int, error) {
+func (t *testChainInfo) SaveEvilBlock(blocks types.Blocks) (int, error) {
 	t.lock.Lock()
 	defer func(n int, isFinalChain bool) {
 		t.lock.Unlock()
 		log.Debug("Coming SaveEvilBlock", "insert evil blocks", n, "isFinalChain", isFinalChain)
 	}(len(blocks), t.isFinalChain)
 
-	for i, block := range blocks {
+	for _, block := range blocks {
 		hash := block.Hash()
 		t.evilBlocks[hash] = block
 		t.evilHeaders[hash] = block.Header()
-		t.evilReceipts[hash] = receipts[i]
 	}
 	return len(blocks), nil
 }

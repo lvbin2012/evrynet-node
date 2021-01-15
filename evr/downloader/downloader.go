@@ -236,7 +236,7 @@ type BlockChain interface {
 	IsFinalChain() bool
 
 	// SaveEvilBlock inserts a batch of evil block infos
-	SaveEvilBlock(types.Blocks, []types.Receipts, uint64) (int, error)
+	SaveEvilBlock(types.Blocks) (int, error)
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
@@ -1474,14 +1474,13 @@ func (d *Downloader) fetchEvilBodies(from uint64) error {
 	bodyWakeCh := d.evilBodyWakeCh
 	queue := d.fQueue
 	var (
-		saveFunc = func(header *types.Header, txs []*types.Transaction, uncles []*types.Header,
-			receipts []*types.Receipt) {
+		saveFunc = func(header *types.Header, txs []*types.Transaction, uncles []*types.Header) {
 			block := types.NewBlockWithHeader(header).WithBody(txs, uncles)
-			d.fBlockchain.SaveEvilBlock([]*types.Block{block}, []types.Receipts{receipts}, d.fAncientLimit)
+			d.fBlockchain.SaveEvilBlock([]*types.Block{block})
 		}
 		deliver = func(packet dataPack) (int, error) {
 			pack := packet.(*evilBlockPack)
-			return queue.DeliverEvilBodies(pack.peerID, pack.transactions, pack.uncles, pack.receipts, saveFunc)
+			return queue.DeliverEvilBodies(pack.peerID, pack.transactions, pack.uncles, saveFunc)
 		}
 		expire   = func() map[string]int { return queue.ExpireEvilBodies(d.requestRTT()) }
 		fetch    = func(p *peerConnection, req *fetchRequest) error { return p.FetchEvilBodies(req) }
@@ -2196,9 +2195,9 @@ func (d *Downloader) DeliverReceipts(id string, isFinalChain bool, receipts [][]
 
 // DeliverEvilBlocks inject a new batch of received from a remote node
 func (d *Downloader) DeliverEvilBlocks(id string, isFinalChain bool, transactions [][]*types.Transaction,
-	uncles [][]*types.Header, receipts [][]*types.Receipt) (err error) {
+	uncles [][]*types.Header) (err error) {
 	return d.deliver(id, d.evilBodyCh, &evilBlockPack{id, isFinalChain, transactions,
-		uncles, receipts}, evilBodyInMeter, evilBodyDropMeter)
+		uncles}, evilBodyInMeter, evilBodyDropMeter)
 }
 
 // DeliverNodeData injects a new batch of node state data received from a remote node.

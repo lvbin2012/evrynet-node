@@ -56,7 +56,6 @@ type evilBlockPack struct {
 	isFinalChain bool
 	transactions [][]*types.Transaction
 	uncles       [][]*types.Header
-	receipts     [][]*types.Receipt
 }
 
 func (p *evilBlockPack) PeerId() string     { return p.peerID }
@@ -68,7 +67,7 @@ func (p *evilBlockPack) Items() int {
 	return len(p.uncles)
 }
 func (p *evilBlockPack) Stats() string {
-	return fmt.Sprintf("%d:%d:%d", len(p.transactions), len(p.uncles), len(p.receipts))
+	return fmt.Sprintf("%d:%d", len(p.transactions), len(p.uncles))
 }
 
 // bodyPack is a batch of block bodies returned by a peer.

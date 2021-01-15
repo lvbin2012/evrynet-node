@@ -920,15 +920,14 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, uncleLi
 }
 
 func (q *queue) DeliverEvilBodies(id string, txLists [][]*types.Transaction, uncleList [][]*types.Header,
-	receiptList [][]*types.Receipt, saveFunc func(header *types.Header, txs []*types.Transaction, uncles []*types.Header,
-	receipts []*types.Receipt)) (int, error) {
+	 saveFunc func(header *types.Header, txs []*types.Transaction, uncles []*types.Header)) (int, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	reconstruct := func(header *types.Header, index int, result *fetchResult) error {
 		if types.DeriveSha(types.Transactions(txLists[index])) != header.TxHash || types.CalcUncleHash(uncleList[index]) != header.UncleHash {
 			return errInvalidBody
 		}
-		saveFunc(header, txLists[index], uncleList[index], receiptList[index])
+		saveFunc(header, txLists[index], uncleList[index])
 		return nil
 	}
 	return q.deliver(id, q.evilBlockTaskPool, q.evilBlockTaskQueue, q.evilBlockPendPool, q.evilBlockDonePool, evilBodyReqTimer, len(txLists), reconstruct, true)

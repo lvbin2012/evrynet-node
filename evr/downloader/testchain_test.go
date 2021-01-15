@@ -333,20 +333,16 @@ func (tc *testChain) bodies(hashes []common.Hash) ([][]*types.Transaction, [][]*
 }
 
 // evilBlocks return the evilBlock of the given block hashes
-func (tc *testChain) evilBlocks(hashes []common.Hash) ([][]*types.Transaction, [][]*types.Header, [][]*types.Receipt) {
+func (tc *testChain) evilBlocks(hashes []common.Hash) ([][]*types.Transaction, [][]*types.Header) {
 	transactions := make([][]*types.Transaction, 0, len(hashes))
 	uncles := make([][]*types.Header, 0, len(hashes))
-	receipts := make([][]*types.Receipt, 0, len(hashes))
 	for _, hash := range hashes{
 		if block, ok := tc.evilBlockm[hash]; ok{
 			transactions = append(transactions, block.Transactions())
 			uncles = append(uncles, block.Uncles())
-			if receipt, ok := tc.evilReceiptm[hash]; ok{
-				receipts = append(receipts, receipt)
-			}
 		}
 	}
-	return transactions, uncles, receipts
+	return transactions, uncles
 }
 
 func (tc *testChain) hashToNumber(target common.Hash) (uint64, bool) {
