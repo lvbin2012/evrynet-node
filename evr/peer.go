@@ -370,7 +370,7 @@ func (p *Peer) SendBlockBodiesRLP(bodies []rlp.RawValue, isFinalChain bool) erro
 	return p2p.Send(p.rw, BlockBodiesMsg, bodies)
 }
 
-func (p *Peer) SendEvilBlockRLP(evilBlocks []rlp.RawValue) error{
+func (p *Peer) SendEvilBlockRLP(evilBlocks []rlp.RawValue) error {
 	return p2p.Send(p.rw, FEvilBlockMsg, evilBlocks)
 }
 

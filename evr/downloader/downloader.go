@@ -1065,7 +1065,7 @@ func (d *Downloader) findAncestor(p *peerConnection, remoteHeader *types.Header,
 			for i, header := range headers {
 				expectNumber := from + int64(i)*int64(skip+1)
 				if number := header.Number.Int64(); number != expectNumber {
-					p.log.Warn("Head headers broke chain ordering", "index", i, "requested", expectNumber, "received", number)
+					p.log.Warn("Head headers broke chain ordering", "index", i, "requested", expectNumber, "received", number, "isFinalChain", isFinalChain)
 					return 0, errInvalidChain
 				}
 			}
@@ -1569,7 +1569,6 @@ func (d *Downloader) fetchParts(deliveryCh chan dataPack, deliver func(dataPack)
 	for {
 		select {
 		case <-d.cancelCh:
-			fmt.Println("=======> d.cancelCh ", kind)
 			return errCanceled
 
 		case packet := <-deliveryCh:

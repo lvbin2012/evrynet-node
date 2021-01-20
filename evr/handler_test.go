@@ -19,6 +19,7 @@ package evr
 import (
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"math/big"
 	"math/rand"
@@ -28,6 +29,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/ethash"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
@@ -39,6 +41,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/p2p"
 	"github.com/Evrynetlabs/evrynet-node/p2p/enode"
 	"github.com/Evrynetlabs/evrynet-node/params"
+	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
 
 // Tests that protocol versions and modes of operations are matched up properly.
@@ -521,10 +524,10 @@ func testCheckpointChallenge(t *testing.T, syncmode downloader.SyncMode, checkpo
 
 	// Initialize a chain and generate a fake CHT if checkpointing is enabled
 	var (
-		db       = rawdb.NewMemoryDatabase()
-		config   = new(params.ChainConfig)
-		genesis  = (&core.Genesis{Config: config}).MustCommit(db)
-		fConfig  = new(params.ChainConfig)
+		db      = rawdb.NewMemoryDatabase()
+		config  = new(params.ChainConfig)
+		genesis = (&core.Genesis{Config: config}).MustCommit(db)
+		fConfig = new(params.ChainConfig)
 	)
 
 	// If checkpointing is enabled, create and inject a fake CHT and the corresponding
@@ -739,4 +742,57 @@ func TestSendMessageBetweenPeer(t *testing.T) {
 	go peer.Send(uint64(VoteMsg), []interface{}{vote})
 
 	//TODO: Add handler to check receiving messages
+}
+
+func TestSendEvilInfoBetweenPeers(t *testing.T) {
+
+	pm, db, err := newTestProtocolManagerForTwoChain(downloader.FullSync, 10, 2, byte(0x00), nil, nil)
+	if pm != nil {
+		defer pm.Stop()
+	}
+	if err != nil {
+		t.Fatalf("can't create protocol manager: %v", err)
+	}
+
+	peer, _ := newTestPeerForTwoChain("Peer", eth65, pm, true)
+	fmt.Println(peer)
+	fHeader := pm.fblockchain.CurrentHeader()
+	fext, err := fconsensus.ExtractFConExtra(fHeader)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(fext.EvilHeader.Hash().String(), fext.CurrentBlock.String())
+	go func() {
+		if err := p2p.Send(peer.app, GetFEvilBlockMsg, []common.Hash{fext.EvilHeader.Hash()}); err != nil {
+			t.Fatalf("failed to answer challenge: %v", err)
+		}
+	}()
+
+	msg, err := peer.app.ReadMsg()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(msg.Code, msg.Size)
+
+	content, err := ioutil.ReadAll(msg.Payload)
+	fmt.Println("content", hex.EncodeToString(content), err)
+	var bodys []*types.Body
+
+	err = rlp.DecodeBytes(content, &bodys)
+	fmt.Println(err)
+	for _, body := range bodys {
+		for _, tx := range body.Transactions {
+			fmt.Println("p2p get ", tx.Hash().String())
+		}
+	}
+
+	res := rawdb.ReadEvilBodyRLP(db, fext.EvilHeader.Hash(), fext.EvilHeader.Number.Uint64(), false)
+	var body types.Body
+	err = rlp.DecodeBytes(res, &body)
+	fmt.Println(err)
+
+	for _, tx := range body.Transactions {
+		fmt.Println("level db find ", tx.Hash().String())
+	}
+
 }

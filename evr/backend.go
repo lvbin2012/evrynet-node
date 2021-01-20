@@ -80,8 +80,10 @@ type Evrynet struct {
 	// DB interfaces
 	chainDb evrdb.Database // Block chain database
 
-	eventMux       *event.TypeMux
-	engine         consensus.Engine
+	eventMux *event.TypeMux
+	engine   consensus.Engine
+	fEngine  consensus.Engine
+
 	accountManager *accounts.Manager
 
 	bloomRequests chan chan *bloombits.Retrieval // Channel receiving bloom data retrieval requests
@@ -190,19 +192,20 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 		conf.Period = fchainConfig.Clique.Period
 	}
 	fEngin := fconsensus.New(conf, chainDb)
-	coinbase, _ := evr.Etherbase()
-	wallet, err := evr.accountManager.Find(accounts.Account{Address: coinbase})
-	if wallet == nil || err != nil {
-		log.Error("Etherbase account unavailable locally", "err", err)
-		return nil, fmt.Errorf("signer missing: %v", err)
-	}
-	fEngin.Authorize(coinbase, wallet.SignData)
+	evr.fEngine = fEngin
+	//coinbase, _ := evr.Etherbase()
+	//wallet, err := evr.accountManager.Find(accounts.Account{Address: coinbase})
+	//if wallet == nil || err != nil {
+	//	log.Error("Etherbase account unavailable locally", "err", err)
+	//	return nil, fmt.Errorf("signer missing: %v", err)
+	//}
+	//fEngin.Authorize(coinbase, wallet.SignData)
 
 	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, fEngin, vmConfig, evr.shouldPreserve)
 	if err != nil {
 		return nil, err
 	}
-	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fEngin)
+	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fEngin, evr.EventMux())
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -501,6 +504,7 @@ func (s *Evrynet) StartMining(threads int) error {
 
 			// Test by lvbin
 			s.fb.Authorize(eb, wallet.SignData)
+
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.

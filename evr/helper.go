@@ -22,14 +22,19 @@ package evr
 import (
 	"crypto/ecdsa"
 	"crypto/rand"
+	"errors"
+	"fmt"
 	"math/big"
 	"sort"
 	"sync"
 	"testing"
 
+	"github.com/Evrynetlabs/evrynet-node/accounts"
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	"github.com/Evrynetlabs/evrynet-node/consensus/clique"
 	"github.com/Evrynetlabs/evrynet-node/consensus/ethash"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -72,12 +77,98 @@ func newTestProtocolManager(mode downloader.SyncMode, blocks int, generator func
 	if _, err := blockchain.InsertChain(chain); err != nil {
 		panic(err)
 	}
-	pm, err := NewProtocolManager(gspec.Config,nil, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine,nil,  blockchain, nil,  db, 1, nil)
+	pm, err := NewProtocolManager(gspec.Config, nil, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newtx}, engine, nil, blockchain, nil, db, 1, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 	pm.Start(1000)
 	return pm, db, nil
+}
+
+func newTestProtocolManagerForTwoChain(mode downloader.SyncMode, n int, k int, seed byte, generator func(int, *core.BlockGen),
+	newTx chan<- []*types.Transaction) (*ProtocolManager, evrdb.Database, error) {
+	evmux := new(event.TypeMux)
+	db := rawdb.NewMemoryDatabase()
+	extraData := make([]byte, 32+common.AddressLength+65)
+	copy(extraData[32:], testBank[:])
+
+	signFun := func(a accounts.Account, mineType string, data []byte) ([]byte, error) {
+		if a.Address != testBank {
+			return nil, errors.New("unkown signer")
+		}
+		return crypto.Sign(crypto.Keccak256(data), testBankKey)
+	}
+
+	gspec := &core.Genesis{
+		Difficulty: big.NewInt(1),
+		ExtraData:  extraData,
+		Config:     params.AllCliqueProtocolChanges,
+		Alloc: core.GenesisAlloc{
+			testBank: {
+				Balance: new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+			},
+		},
+	}
+	fGspec := &core.Genesis{
+		Difficulty: big.NewInt(1),
+		ExtraData:  extraData,
+		Config:     params.FConsensusChainConfig,
+		Alloc: core.GenesisAlloc{
+			testBank: {
+				Balance: new(big.Int).Exp(big.NewInt(10), big.NewInt(18), nil),
+			},
+		},
+	}
+	if generator == nil {
+		generator = func(i int, block *core.BlockGen) {
+			block.SetCoinbase(common.Address{seed})
+			// Include transactions to the miner to make blocks more interesting.
+			if true {
+				signer := types.MakeSigner(params.AllCliqueProtocolChanges, block.Number())
+				tx, err := types.SignTx(types.NewTransaction(block.TxNonce(testBank), common.Address{}, big.NewInt(1000), params.TxGas, params.AllCliqueProtocolChanges.GasPrice, nil), signer, testBankKey)
+				if err != nil {
+					panic(err)
+				}
+				block.AddTx(tx)
+			}
+		}
+	}
+
+	engine := clique.New(params.AllCliqueProtocolChanges.Clique, db)
+	engine.Authorize(testBank, signFun)
+	conf := &params.FConConfig{params.FConsensusChainConfig.Clique.Period, params.FConsensusChainConfig.Clique.Epoch}
+	fEngine := fconsensus.New(conf, db)
+	fEngine.Authorize(testBank, signFun)
+
+	genesis := gspec.MustCommit(db)
+	fGenesis := fGspec.MustCommit(db)
+
+	blockChain, _ := core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{}, nil)
+	fBlockChain, _ := core.NewBlockChain(db, nil, fGspec.Config, fEngine, vm.Config{}, nil)
+
+	chain, _, fChain, _, eBlocks, _ := core.GenerateTwoChain(gspec.Config, gspec.Config,
+		genesis, fGenesis, engine, fEngine, db, n, k, seed, generator)
+	fmt.Println("Insert Block ", len(chain))
+	if _, err := blockChain.InsertChain(chain); err != nil {
+		panic(err)
+	}
+	fmt.Println("Insert Final Block ", len(fChain))
+	if _, err := fBlockChain.InsertChain(fChain); err != nil {
+		panic(err)
+	}
+	fmt.Println("Insert Evil  eBlocks ", len(eBlocks))
+	if _, err := fBlockChain.SaveEvilBlock(eBlocks); err != nil {
+		panic(err)
+	}
+
+	pm, err := NewProtocolManager(gspec.Config, fGspec.Config, mode, DefaultConfig.NetworkId, evmux, &testTxPool{added: newTx},
+		engine, fEngine, blockChain, fBlockChain, db, 1, nil)
+	if err != nil {
+		return nil, nil, err
+	}
+	pm.Start(1000)
+	return pm, db, nil
+
 }
 
 //NewTestProtocolManagerWithConsensus return an evr.ProtocolManager with specific consensusEngine
@@ -98,7 +189,7 @@ func NewTestProtocolManagerWithConsensus(engine consensus.Engine) (*ProtocolMana
 	if _, err := blockchain.InsertChain(chain); err != nil {
 		panic(err)
 	}
-	pm, err := NewProtocolManager(gspec.Config,nil, mode, DefaultConfig.NetworkId, evmux, &testTxPool{}, engine,nil,  blockchain,nil, db, 1, nil)
+	pm, err := NewProtocolManager(gspec.Config, nil, mode, DefaultConfig.NetworkId, evmux, &testTxPool{}, engine, nil, blockchain, nil, db, 1, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -208,6 +299,38 @@ func newTestPeer(name string, version int, pm *ProtocolManager, shake bool) (*te
 	return tp, errc
 }
 
+func newTestPeerForTwoChain(name string, version int, pm *ProtocolManager, shake bool) (*testPeer, <-chan error) {
+	app, net := p2p.MsgPipe()
+
+	var id enode.ID
+	rand.Read(id[:])
+
+	peer := pm.NewPeer(version, p2p.NewPeer(id, name, nil), net)
+	errc := make(chan error, 1)
+	go func() {
+		select {
+		case pm.newPeerCh <- peer:
+			errc <- pm.handle(peer)
+		case <-pm.quitSync:
+			errc <- p2p.DiscQuitting
+		}
+	}()
+
+	tp := &testPeer{app: app, net: net, Peer: peer}
+	if shake {
+		var (
+			genesis  = pm.blockchain.Genesis()
+			head     = pm.blockchain.CurrentHeader()
+			td       = pm.blockchain.GetTd(head.Hash(), head.Number.Uint64())
+			fGenesis = pm.fblockchain.Genesis()
+			fHead    = pm.fblockchain.CurrentHeader()
+			fTd      = pm.fblockchain.GetTd(fHead.Hash(), fHead.Number.Uint64())
+		)
+		tp.handshakeForTwoChain(nil, td, fTd, head.Hash(), fHead.Hash(), genesis.Hash(), fGenesis.Hash())
+	}
+	return tp, errc
+}
+
 // newTestPeerFromNode creates a new Peer from a node registered at the given protocol manager.
 // Its used in TestFindPeers
 func newTestPeerFromNode(name string, version int, pm *ProtocolManager, shake bool, node *enode.Node) (*testPeer, <-chan error) {
@@ -248,6 +371,25 @@ func (p *testPeer) handshake(t *testing.T, td *big.Int, head common.Hash, genesi
 		TD:              td,
 		CurrentBlock:    head,
 		GenesisBlock:    genesis,
+	}
+	if err := p2p.ExpectMsg(p.app, StatusMsg, msg); err != nil {
+		t.Fatalf("status recv: %v", err)
+	}
+	if err := p2p.Send(p.app, StatusMsg, msg); err != nil {
+		t.Fatalf("status send: %v", err)
+	}
+}
+
+func (p *testPeer) handshakeForTwoChain(t *testing.T, td, ftd *big.Int, head, fHead, genesis, fGenesis common.Hash) {
+	msg := &statusData{
+		ProtocolVersion: uint32(p.version),
+		NetworkId:       1,
+		TD:              td,
+		CurrentBlock:    head,
+		GenesisBlock:    genesis,
+		FTD:             ftd,
+		FCurrentBlock:   fHead,
+		FGenesisBlock:   fGenesis,
 	}
 	if err := p2p.ExpectMsg(p.app, StatusMsg, msg); err != nil {
 		t.Fatalf("status recv: %v", err)

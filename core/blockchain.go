@@ -1431,18 +1431,13 @@ func (bc *BlockChain) SaveEvilBlock(blocks types.Blocks) (int, error) {
 	for _, block := range blocks {
 		number := block.NumberU64()
 		hash := block.Hash()
-		// save Header
-		rawdb.WriteEvilHeaderNumber(bc.db, hash, number, false)
-		if rawdb.HasHeader(bc.db, hash, number, false) {
-			rawdb.WriteEvilHeader(bc.db, block.Header(), false)
-		}
 		// save Body
-		if rawdb.HasBody(bc.db, hash, number, false) {
+		if !rawdb.HasBody(bc.db, hash, number, false) {
 			rawdb.WriteEvilBlock(bc.db, block, false)
 		}
-	}
 
-	panic("implement me later")
+	}
+	return len(blocks), nil
 }
 
 // insertChain is the internal implementation of InsertChain, which assumes that
@@ -1704,7 +1699,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		stats.usedGas += usedGas
 
 		dirty, _ := bc.stateCache.TrieDB().Size()
-		stats.report(chain, it.index, dirty)
+		stats.report(chain, it.index, dirty, bc.chainConfig.IsFinalChain)
 	}
 	// Any blocks remaining here? The only ones we care about are the future ones
 	if block != nil && err == consensus.ErrFutureBlock {
@@ -1724,7 +1719,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 
 	// Append a single chain head event if we've progressed the chain
 	if lastCanon != nil && bc.CurrentBlock().Hash() == lastCanon.Hash() {
-		events = append(events, ChainHeadEvent{lastCanon})
+		events = append(events, ChainHeadEvent{Block: lastCanon})
 	}
 	return it.index, events, coalescedLogs, err
 }

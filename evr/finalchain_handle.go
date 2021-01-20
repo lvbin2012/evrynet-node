@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/Evrynetlabs/evrynet-node/accounts"
+	"math/big"
+	"time"
+
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
@@ -12,10 +14,9 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/core/vm"
+	"github.com/Evrynetlabs/evrynet-node/event"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
-	"math/big"
-	"time"
 )
 
 const (
@@ -24,32 +25,40 @@ const (
 )
 
 type FBManager struct {
+	mux                *event.TypeMux
 	engine             consensus.Engine
 	blockchain         *core.BlockChain
 	finaliseBlockchain *core.BlockChain
 	chainHeadCh        chan core.ChainHeadEvent
 	abort              chan struct{}
-	signer             common.Address // Evrynet address of the signing key
-	signFn             SignerFn       // Signer function to authorize hashes with
+	signer             common.Address      // Evrynet address of the signing key
+	signFn             fconsensus.SignerFn // Signer function to authorize hashes with
 }
 
-type SignerFn func(accounts.Account, string, []byte) ([]byte, error)
+var AuthorSinger common.Address
 
-func NewFBManager(bc, fbc *core.BlockChain, engine consensus.Engine) *FBManager {
+//type SignerFn func(accounts.Account, string, []byte) ([]byte, error)
+
+func NewFBManager(bc, fbc *core.BlockChain, engine consensus.Engine, mux *event.TypeMux) *FBManager {
 	fb := &FBManager{
 		engine:             engine,
 		blockchain:         bc,
 		finaliseBlockchain: fbc,
 		chainHeadCh:        make(chan core.ChainHeadEvent, 10),
-		abort:              make(chan struct{})}
+		abort:              make(chan struct{}),
+		mux:                mux,
+	}
 
 	fb.blockchain.SubscribeChainHeadEvent(fb.chainHeadCh)
 	return fb
 }
 
-func (fb *FBManager) Authorize(signer common.Address, signFn SignerFn) {
+func (fb *FBManager) Authorize(signer common.Address, signFn fconsensus.SignerFn) {
 	fb.signer = signer
 	fb.signFn = signFn
+	if fcon, ok := fb.engine.(*fconsensus.FConsensus); ok {
+		fcon.Authorize(signer, signFn)
+	}
 }
 
 func (fb *FBManager) GetBlockSections(newBlock *types.Block) (uint64, uint64, bool) {
@@ -154,7 +163,27 @@ func (fb *FBManager) VerifyBlock(block *types.Block, statedb *state.StateDB, fhe
 
 }
 
+// Just for Test, fix later
+func (fb *FBManager) IsAuthorizedSinger() bool {
+	if (AuthorSinger != common.Address{}) {
+		return bytes.Equal(AuthorSinger[:], fb.signer[:])
+	}
+
+	header := fb.finaliseBlockchain.GetHeaderByNumber(0)
+	if len(header.Extra) < 97 {
+		return false
+	}
+
+	AuthorSinger.SetBytes(header.Extra[32:52])
+	return bytes.Equal(AuthorSinger[:], fb.signer[:])
+}
+
 func (fb *FBManager) CreateFinaliseBlock(newBlock *types.Block) *types.Block {
+	// fix later
+	if !fb.IsAuthorizedSinger() {
+		return nil
+	}
+
 	start, end, trigger := fb.GetBlockSections(newBlock)
 	if !trigger {
 		log.Info("FBManager: not trigger to create block")
@@ -254,6 +283,7 @@ func (fb *FBManager) Start() {
 				block := fb.CreateFinaliseBlock(ev.Block)
 				if block != nil {
 					fb.finaliseBlockchain.InsertChain(types.Blocks{block})
+					fb.mux.Post(core.NewMinedBlockEvent{Block: block, IsFinalChain: true})
 				}
 			}
 		}

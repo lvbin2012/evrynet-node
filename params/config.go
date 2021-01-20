@@ -126,6 +126,7 @@ var (
 	// This configuration is intentionally not using keyed fields to force anyone
 	// adding flags to the config to also have to set these fields.
 	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil, false}
+	FConsensusChainConfig = &ChainConfig{big.NewInt(1337), big.NewInt(GasPriceConfig), nil, nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}, nil, false}
 
 	TestChainConfig           = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), nil, nil, new(EthashConfig), nil, nil, false}
 	TendermintTestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(GasPriceConfig), nil, nil, nil, nil, new(TendermintConfig), false}

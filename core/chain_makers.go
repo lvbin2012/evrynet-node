@@ -19,21 +19,21 @@ package core
 import (
 	"bytes"
 	"fmt"
-	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
-	"github.com/Evrynetlabs/evrynet-node/rlp"
 	"math/big"
 	"math/rand"
 	"runtime"
 
-	"github.com/pkg/errors"
-
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	"github.com/Evrynetlabs/evrynet-node/consensus/clique"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/core/vm"
 	"github.com/Evrynetlabs/evrynet-node/evrdb"
 	"github.com/Evrynetlabs/evrynet-node/params"
+	"github.com/Evrynetlabs/evrynet-node/rlp"
+	"github.com/pkg/errors"
 )
 
 // BlockGen creates blocks for testing.
@@ -314,6 +314,20 @@ func GenerateTwoChain(config, fConfig *params.ChainConfig, parent, fParent *type
 		if err := state.Database().TrieDB().Commit(root, false); err != nil {
 			panic(fmt.Sprintf("trie write error: %v", err))
 		}
+
+		if clique, ok := engine.(*clique.Clique); ok {
+			block, err = clique.SealForTest(block)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		if fcons, ok := engine.(*fconsensus.FConsensus); ok {
+			block, err = fcons.SealForTest(block)
+			if err != nil {
+				panic(err)
+			}
+		}
 		chainreader.blocksByNumber[block.NumberU64()] = block
 		chainreader.stateByHash[state.IntermediateRoot(true)] = state
 		return block
@@ -437,15 +451,10 @@ func makeHeader(chain consensus.ChainReader, parent *types.Block, state *state.S
 		Root:       state.IntermediateRoot(true),
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
-		Difficulty: engine.CalcDifficulty(chain, time, &types.Header{
-			Number:     parent.Number(),
-			Time:       time - 10 - index,
-			Difficulty: parent.Difficulty(),
-			UncleHash:  parent.UncleHash(),
-		}),
-		GasLimit: CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit()),
-		Number:   new(big.Int).Add(parent.Number(), common.Big1),
-		Time:     time,
+		Difficulty: big.NewInt(2),
+		GasLimit:   CalcGasLimit(parent, parent.GasLimit(), parent.GasLimit()),
+		Number:     new(big.Int).Add(parent.Number(), common.Big1),
+		Time:       time,
 	}
 }
 

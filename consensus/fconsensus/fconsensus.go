@@ -462,6 +462,31 @@ func (fc *FConsensus) FinalizeAndAssemble(chain consensus.FullChainReader, heade
 	return types.NewBlock(header, txs, nil, receipts), nil
 }
 
+func (fc *FConsensus) SealForTest(block *types.Block) (*types.Block, error) {
+	header := block.Header()
+	if len(header.Extra) < ExtraVanity {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, ExtraVanity-len(header.Extra))...)
+	}
+	signHash, err := fc.signFn(accounts.Account{Address: fc.signer}, accounts.MimetypeClique, FConRLP(header))
+	if err != nil {
+		return nil, err
+	}
+	fce, err := ExtractFConExtra(header)
+	if err != nil {
+		return nil, err
+	}
+
+	fce.Seal = append(fce.Seal[:0], signHash[:]...)
+	byteBuffer := new(bytes.Buffer)
+	err = rlp.Encode(byteBuffer, &fce)
+	if err != nil {
+		return nil,  err
+	}
+	header.Extra = append(header.Extra[:ExtraVanity], byteBuffer.Bytes()...)
+	return block.WithSeal(header), nil
+
+}
+
 func (fc *FConsensus) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	header := block.Header()
 

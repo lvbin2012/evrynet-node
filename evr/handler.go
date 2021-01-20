@@ -190,7 +190,7 @@ func NewProtocolManager(config *params.ChainConfig, fConfig *params.ChainConfig,
 	if atomic.LoadUint32(&manager.fastSync) == 1 {
 		stateBloom = trie.NewSyncBloom(uint64(cacheLimit), chaindb)
 	}
-	manager.downloader = downloader.New(manager.checkpointNumber, chaindb, stateBloom, manager.eventMux, blockchain, nil, manager.removePeer)
+	manager.downloader = downloader.NewTwoChain(manager.checkpointNumber, chaindb, stateBloom, manager.eventMux, blockchain, nil, fBlockchain, nil, manager.removePeer)
 
 	getBlock := func(hash common.Hash, isFinalChain bool) *types.Block {
 		if isFinalChain {
@@ -336,6 +336,7 @@ func (pm *ProtocolManager) handle(p *Peer) error {
 		td      = pm.blockchain.GetTd(hash, number)
 		fTD     = pm.fblockchain.GetTd(fHash, fNumber)
 	)
+
 	if err := p.Handshake(pm.networkID, td, hash, genesis.Hash(), fTD, fHash, fGeneis.Hash()); err != nil {
 		p.Log().Debug("Evrynet handshake failed", "err", err)
 		return err
@@ -563,7 +564,7 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 			headers = pm.fetcher.FilterHeaders(p.id, headers, time.Now())
 		}
 		if len(headers) > 0 || !filter {
-			err := pm.downloader.DeliverHeaders(p.id, msg.Code == FBlockBodiesMsg, headers)
+			err := pm.downloader.DeliverHeaders(p.id, msg.Code == FBlockHeadersMsg, headers)
 			if err != nil {
 				log.Debug("Failed to deliver headers", "err", err)
 			}
@@ -845,13 +846,16 @@ func (pm *ProtocolManager) HandleMsg(p *Peer) error {
 func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool, isFinalChain bool) {
 	hash := block.Hash()
 	peers := pm.peers.PeersWithoutBlock(hash)
-
+	blockchain := pm.blockchain
+	if isFinalChain {
+		blockchain = pm.fblockchain
+	}
 	// If propagation is requested, send to a subset of the Peer
 	if propagate {
 		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
 		var td *big.Int
-		if parent := pm.blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1); parent != nil {
-			td = new(big.Int).Add(block.Difficulty(), pm.blockchain.GetTd(block.ParentHash(), block.NumberU64()-1))
+		if parent := blockchain.GetBlock(block.ParentHash(), block.NumberU64()-1); parent != nil {
+			td = new(big.Int).Add(block.Difficulty(), blockchain.GetTd(block.ParentHash(), block.NumberU64()-1))
 		} else {
 			log.Error("Propagating dangling block", "number", block.Number(), "hash", hash)
 			return
@@ -872,7 +876,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool, is
 		return
 	}
 	// Otherwise if the block is indeed in out own chain, announce it
-	if pm.blockchain.HasBlock(hash, block.NumberU64()) {
+	if blockchain.HasBlock(hash, block.NumberU64()) {
 		for _, peer := range peers {
 			peer.AsyncSendNewBlockHash(block, isFinalChain)
 		}

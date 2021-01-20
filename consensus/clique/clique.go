@@ -575,6 +575,21 @@ func (c *Clique) Authorize(signer common.Address, signFn SignerFn) {
 	c.signFn = signFn
 }
 
+// Ddd by lvbin for test
+func (c *Clique) SealForTest(block *types.Block) (*types.Block, error) {
+	header := block.Header()
+	if len(header.Extra) < (extraVanity + extraSeal) {
+		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, (extraVanity+extraSeal)-len(header.Extra))...)
+	}
+	sighash, err := c.signFn(accounts.Account{Address: c.signer}, accounts.MimetypeClique, CliqueRLP(header))
+	if err != nil {
+		return nil, err
+	}
+	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
+	return block.WithSeal(header), nil
+
+}
+
 // Seal implements consensus.Engine, attempting to create a sealed block using
 // the local signing credentials.
 func (c *Clique) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
