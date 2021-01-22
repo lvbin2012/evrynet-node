@@ -54,19 +54,21 @@ type Config struct {
 
 // Miner creates blocks and searches for proof-of-work values.
 type Miner struct {
-	mux      *event.TypeMux
-	worker   *worker
-	fWorker  *worker
-	coinbase common.Address
-	evr      Backend
-	engine   consensus.Engine
-	exitCh   chan struct{}
+	mux       *event.TypeMux
+	worker    *worker
+	fWorker   *worker
+	coinbase  common.Address
+	fCoinBase common.Address
+	evr       Backend
+	engine    consensus.Engine
+	exitCh    chan struct{}
 
-	canStart    int32 // can start indicates whether we can start the mining operation
-	shouldStart int32 // should start indicates whether we should start after sync
+	canStart     int32 // can start indicates whether we can start the mining operation
+	shouldStart  int32 // should start indicates whether we should start after sync
+	fShouldStart int32 // should start indicates whether we should start after sync for finalChain
 }
 
-func New(evr Backend, config *Config, chainConfig *params.ChainConfig, fChainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, fEngine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(evr Backend, config *Config, chainConfig *params.ChainConfig, fChainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, fEngine consensus.Engine, isLocalBlock func(block *types.Block, isFinalChain bool) bool) *Miner {
 	miner := &Miner{
 		evr:      evr,
 		mux:      mux,
@@ -103,13 +105,23 @@ func (self *Miner) update() {
 					atomic.StoreInt32(&self.shouldStart, 1)
 					log.Info("Mining aborted due to sync")
 				}
+				if self.FMining() {
+					self.FStop()
+					atomic.StoreInt32(&self.fShouldStart, 1)
+					log.Info("Mining aborted due to sync")
+				}
 			case downloader.DoneEvent, downloader.FailedEvent:
 				shouldStart := atomic.LoadInt32(&self.shouldStart) == 1
+				fShouldStart := atomic.LoadInt32(&self.fShouldStart) == 1
 
 				atomic.StoreInt32(&self.canStart, 1)
 				atomic.StoreInt32(&self.shouldStart, 0)
+				atomic.StoreInt32(&self.fShouldStart, 0)
 				if shouldStart {
 					self.Start(self.coinbase)
+				}
+				if fShouldStart{
+					self.FStart(self.fCoinBase)
 				}
 				// stop immediately and ignore all further pending events
 				return
@@ -129,28 +141,41 @@ func (self *Miner) Start(coinbase common.Address) {
 		return
 	}
 	self.worker.start()
+}
 
-	// TODO  split two worker
+func (self *Miner) FStart(coinBase common.Address) {
+	atomic.StoreInt32(&self.fShouldStart, 1)
+	self.SetFEtherBase(coinBase)
+
+	if atomic.LoadInt32(&self.canStart) == 0 {
+		log.Info("Network syncing, final chain will start miner afterwards")
+		return
+	}
 	self.fWorker.start()
-
 }
 
 func (self *Miner) Stop() {
 	self.worker.stop()
-	// TODO  split two worker
-	self.fWorker.stop()
 	atomic.StoreInt32(&self.shouldStart, 0)
+}
+
+func (self *Miner) FStop() {
+	self.fWorker.stop()
+	atomic.StoreInt32(&self.fShouldStart, 0)
 }
 
 func (self *Miner) Close() {
 	self.worker.close()
-	// TODO  split two worker
 	self.fWorker.close()
 	close(self.exitCh)
 }
 
 func (self *Miner) Mining() bool {
 	return self.worker.isRunning()
+}
+
+func (self *Miner) FMining() bool {
+	return self.fWorker.isRunning()
 }
 
 func (self *Miner) HashRate() uint64 {
@@ -191,6 +216,9 @@ func (self *Miner) PendingBlock() *types.Block {
 func (self *Miner) SetEtherbase(addr common.Address) {
 	self.coinbase = addr
 	self.worker.setEtherbase(addr)
-	// TODO  split two worker
+}
+
+func (self *Miner) SetFEtherBase(addr common.Address) {
+	self.fCoinBase = addr
 	self.fWorker.setEtherbase(addr)
 }

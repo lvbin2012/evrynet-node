@@ -552,6 +552,16 @@ web3._extend({
 			name: 'stop',
 			call: 'miner_stop'
 		}),
+
+		new web3._extend.Method({
+			name: 'fstart',
+			call: 'miner_fStart'
+		}),
+
+		new web3._extend.Method({
+			name: 'fstop',
+			call: 'miner_fStop'
+		}),
 		new web3._extend.Method({
 			name: 'setEtherbase',
 			call: 'miner_setEtherbase',

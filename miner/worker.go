@@ -181,7 +181,7 @@ type worker struct {
 	newTxs  int32 // New arrival transaction count since last sealing work submitting.
 
 	// External functions
-	isLocalBlock func(block *types.Block) bool // Function used to determine whether the specified block is mined by local miner.
+	isLocalBlock func(block *types.Block, isFinalChain bool) bool // Function used to determine whether the specified block is mined by local miner.
 
 	// Test hooks
 	newTaskHook  func(*task)                        // Method to call upon receiving a new sealing task.
@@ -190,7 +190,7 @@ type worker struct {
 	resubmitHook func(time.Duration, time.Duration) // Method to call upon updating resubmitting interval.
 }
 
-func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, evr Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *worker {
+func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, evr Backend, mux *event.TypeMux, isLocalBlock func(*types.Block, bool) bool) *worker {
 	worker := &worker{
 		config:      config,
 		chainConfig: chainConfig,
@@ -474,7 +474,7 @@ func (w *worker) mainLoop() {
 				continue
 			}
 			// Add side block to possible uncle block set depending on the author.
-			if w.isLocalBlock != nil && w.isLocalBlock(ev.Block) {
+			if w.isLocalBlock != nil && w.isLocalBlock(ev.Block, w.chainConfig.IsFinalChain) {
 				w.localUncles[ev.Block.Hash()] = ev.Block
 			} else {
 				w.remoteUncles[ev.Block.Hash()] = ev.Block
@@ -1063,7 +1063,7 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	commitUncles(w.localUncles)
 	commitUncles(w.remoteUncles)
 
-	if w.chainConfig.IsFinalChain {
+	if w.chainConfig.IsFinalChain && w.isRunning(){
 		if !w.commitTransactionsForFinalChain(begin, end, w.coinbase, interrupt) {
 			w.commit(uncles, w.fullTaskHook, true, tstart)
 		}

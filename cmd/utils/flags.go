@@ -370,6 +370,11 @@ var (
 		Usage: "Number of CPU threads to use for mining",
 		Value: 0,
 	}
+	// FMiner setting
+	FMiningEnabledFlag = cli.BoolFlag{
+		Name:  "fmine",
+		Usage: "Enable final chain mining",
+	}
 	MinerLegacyThreadsFlag = cli.IntFlag{
 		Name:  "minerthreads",
 		Usage: "Number of CPU threads to use for mining (deprecated, use --miner.threads)",

@@ -208,6 +208,12 @@ var AppHelpFlagGroups = []flagGroup{
 		},
 	},
 	{
+		Name: "FMINER",
+		Flags: []cli.Flag{
+			utils.FMiningEnabledFlag,
+		},
+	},
+	{
 		Name: "GAS PRICE ORACLE",
 		Flags: []cli.Flag{
 			utils.GpoBlocksFlag,

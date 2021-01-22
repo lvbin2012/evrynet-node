@@ -70,9 +70,9 @@ type Evrynet struct {
 	shutdownChan chan bool // Channel for shutting down the Evrynet
 
 	// Handlers
-	txPool          *core.TxPool
-	blockchain      *core.BlockChain
-	fBlockchain     *core.BlockChain
+	txPool      *core.TxPool
+	blockchain  *core.BlockChain
+	fBlockchain *core.BlockChain
 	//fb              *FBManager
 	protocolManager *ProtocolManager
 	lesServer       LesServer
@@ -407,8 +407,12 @@ func (s *Evrynet) Etherbase() (eb common.Address, err error) {
 //
 // We regard two types of accounts as local miner account: etherbase
 // and accounts specified via `txpool.locals` flag.
-func (s *Evrynet) isLocalBlock(block *types.Block) bool {
-	author, err := s.engine.Author(block.Header())
+func (s *Evrynet) isLocalBlock(block *types.Block, isFinalChain bool) bool {
+	engine := s.engine
+	if isFinalChain {
+		engine = s.fEngine
+	}
+	author, err := engine.Author(block.Header())
 	if err != nil {
 		log.Warn("Failed to retrieve block author", "number", block.NumberU64(), "hash", block.Hash(), "err", err)
 		return false
@@ -433,7 +437,7 @@ func (s *Evrynet) isLocalBlock(block *types.Block) bool {
 // shouldPreserve checks whether we should preserve the given block
 // during the chain reorg depending on whether the author of block
 // is a local account.
-func (s *Evrynet) shouldPreserve(block *types.Block) bool {
+func (s *Evrynet) shouldPreserve(block *types.Block, isFinalChain bool) bool {
 	// The reason we need to disable the self-reorg preserving for clique
 	// is it can be probable to introduce a deadlock.
 	//
@@ -453,7 +457,10 @@ func (s *Evrynet) shouldPreserve(block *types.Block) bool {
 	if _, ok := s.engine.(*clique.Clique); ok {
 		return false
 	}
-	return s.isLocalBlock(block)
+	if _, ok := s.engine.(*fconsensus.FConsensus); ok {
+		return false
+	}
+	return s.isLocalBlock(block, isFinalChain)
 }
 
 // SetEtherbase sets the mining reward address.
@@ -502,6 +509,26 @@ func (s *Evrynet) StartMining(threads int) error {
 			}
 			clique.Authorize(eb, wallet.SignData)
 		}
+
+		// If mining is started, we can disable the transaction rejection mechanism
+		// introduced to speed sync times.
+		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
+
+		go s.miner.Start(eb)
+	}
+	return nil
+}
+
+func (s *Evrynet) StartFMining() error {
+	// If the miner was not running, initialize it
+	if !s.IsFMining() {
+		// Configure the local mining address
+		eb, err := s.Etherbase()
+		if err != nil {
+			log.Error("Cannot start mining without etherbase", "err", err)
+			return fmt.Errorf("etherbase missing: %v", err)
+		}
+
 		if fconse, ok := s.fEngine.(*fconsensus.FConsensus); ok {
 			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
 			if wallet == nil || err != nil {
@@ -510,11 +537,7 @@ func (s *Evrynet) StartMining(threads int) error {
 			}
 			fconse.Authorize(eb, wallet.SignData)
 		}
-		// If mining is started, we can disable the transaction rejection mechanism
-		// introduced to speed sync times.
-		atomic.StoreUint32(&s.protocolManager.acceptTxs, 1)
-
-		go s.miner.Start(eb)
+		go s.miner.FStart(eb)
 	}
 	return nil
 }
@@ -533,7 +556,13 @@ func (s *Evrynet) StopMining() {
 	s.miner.Stop()
 }
 
+func (s *Evrynet) StopFMining() {
+	// Stop the block creating itself
+	s.miner.FStop()
+}
+
 func (s *Evrynet) IsMining() bool      { return s.miner.Mining() }
+func (s *Evrynet) IsFMining() bool     { return s.miner.FMining() }
 func (s *Evrynet) Miner() *miner.Miner { return s.miner }
 
 func (s *Evrynet) AccountManager() *accounts.Manager  { return s.accountManager }

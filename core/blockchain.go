@@ -170,14 +170,14 @@ type BlockChain struct {
 	vmConfig   vm.Config
 
 	badBlocks       *lru.Cache                     // Bad block cache
-	shouldPreserve  func(*types.Block) bool        // Function used to determine whether should preserve the given block.
+	shouldPreserve  func(*types.Block, bool) bool        // Function used to determine whether should preserve the given block.
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
 }
 
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Evrynet Validator and
 // Processor.
-func NewBlockChain(db evrdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block) bool) (*BlockChain, error) {
+func NewBlockChain(db evrdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, engine consensus.Engine, vmConfig vm.Config, shouldPreserve func(block *types.Block, isFinalChain bool) bool) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = &CacheConfig{
 			TrieCleanLimit: 256,
@@ -1328,7 +1328,7 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 		} else if block.NumberU64() == currentBlock.NumberU64() {
 			var currentPreserve, blockPreserve bool
 			if bc.shouldPreserve != nil {
-				currentPreserve, blockPreserve = bc.shouldPreserve(currentBlock), bc.shouldPreserve(block)
+				currentPreserve, blockPreserve = bc.shouldPreserve(currentBlock, bc.IsFinalChain()), bc.shouldPreserve(block, bc.IsFinalChain())
 			}
 			reorg = !currentPreserve && (blockPreserve || mrand.Float64() < 0.5)
 		}

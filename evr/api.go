@@ -88,6 +88,11 @@ func (api *PublicMinerAPI) Mining() bool {
 	return api.e.IsMining()
 }
 
+// FMining returns an indication if this node is currently mining.
+func (api *PublicMinerAPI) FMining() bool {
+	return api.e.IsFMining()
+}
+
 // PrivateMinerAPI provides private RPC methods to control the miner.
 // These methods can be abused by external users and must be considered insecure for use by untrusted users.
 type PrivateMinerAPI struct {
@@ -115,6 +120,14 @@ func (api *PrivateMinerAPI) Start(threads *int) error {
 // the block creation level.
 func (api *PrivateMinerAPI) Stop() {
 	api.e.StopMining()
+}
+
+func (api *PrivateMinerAPI) FStart() error {
+	return api.e.StartFMining()
+}
+
+func (api *PrivateMinerAPI) FStop() {
+	api.e.StopFMining()
 }
 
 // SetExtra sets the extra data string that is included when this miner mines a block.

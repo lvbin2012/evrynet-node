@@ -126,6 +126,7 @@ var (
 		utils.MinerLegacyExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
 		utils.MinerNoVerfiyFlag,
+		utils.FMiningEnabledFlag,
 		utils.NATFlag,
 		utils.NoDiscoverFlag,
 		utils.DiscoveryV5Flag,
@@ -433,6 +434,16 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 		}
 		if err := evrynet.StartMining(threads); err != nil {
 			utils.Fatalf("Failed to start mining: %v", err)
+		}
+	}
+
+	if ctx.GlobalBool(utils.FMiningEnabledFlag.Name) {
+		var evrynet *evr.Evrynet
+		if err := stack.Service(&evrynet); err != nil {
+			utils.Fatalf("Evrynet service not running: %v", err)
+		}
+		if err := evrynet.StartFMining(); err != nil {
+			utils.Fatalf("Failed to start final chain mining: %v", err)
 		}
 	}
 }
