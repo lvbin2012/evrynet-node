@@ -139,8 +139,9 @@ func newTestWorkerBackend(t *testing.T, chainConfig *params.ChainConfig, engine 
 	}
 }
 
-func (b *testWorkerBackend) BlockChain() *core.BlockChain { return b.chain }
-func (b *testWorkerBackend) TxPool() *core.TxPool         { return b.txPool }
+func (b *testWorkerBackend) BlockChain() *core.BlockChain  { return b.chain }
+func (b *testWorkerBackend) FBlockChain() *core.BlockChain { panic("implement me later") }
+func (b *testWorkerBackend) TxPool() *core.TxPool          { return b.txPool }
 func (b *testWorkerBackend) PostChainEvents(events []interface{}) {
 	b.chain.PostChainEvents(events, nil)
 }

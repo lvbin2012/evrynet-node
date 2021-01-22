@@ -18,13 +18,13 @@ package downloader
 
 import (
 	"fmt"
-	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"math/big"
 	"sync"
 	"testing"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus/ethash"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -157,7 +157,7 @@ func TestCreateTwoChain(t *testing.T) {
 	fmt.Println(len(b1), len(r1), len(b2), len(r2), len(eb), len(er))
 
 	for i, b := range b2 {
-		fex, err := fconsensus.ExtractFConExtra(b.Header())
+		fex, err := fconTypes.ExtractFConExtra(b.Header())
 		if err != nil {
 			fmt.Println(i, err.Error())
 			continue
@@ -336,8 +336,8 @@ func (tc *testChain) bodies(hashes []common.Hash) ([][]*types.Transaction, [][]*
 func (tc *testChain) evilBlocks(hashes []common.Hash) ([][]*types.Transaction, [][]*types.Header) {
 	transactions := make([][]*types.Transaction, 0, len(hashes))
 	uncles := make([][]*types.Header, 0, len(hashes))
-	for _, hash := range hashes{
-		if block, ok := tc.evilBlockm[hash]; ok{
+	for _, hash := range hashes {
+		if block, ok := tc.evilBlockm[hash]; ok {
 			transactions = append(transactions, block.Transactions())
 			uncles = append(uncles, block.Uncles())
 		}

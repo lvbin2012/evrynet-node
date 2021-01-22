@@ -29,7 +29,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/ethash"
-	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
@@ -757,7 +757,7 @@ func TestSendEvilInfoBetweenPeers(t *testing.T) {
 	peer, _ := newTestPeerForTwoChain("Peer", eth65, pm, true)
 	fmt.Println(peer)
 	fHeader := pm.fblockchain.CurrentHeader()
-	fext, err := fconsensus.ExtractFConExtra(fHeader)
+	fext, err := fconTypes.ExtractFConExtra(fHeader)
 	if err != nil {
 		panic(err)
 	}

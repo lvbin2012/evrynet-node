@@ -10,6 +10,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
 	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -66,7 +67,7 @@ func (fb *FBManager) GetBlockSections(newBlock *types.Block) (uint64, uint64, bo
 	currentBlock := fb.finaliseBlockchain.CurrentBlock()
 	packedBlockNumber := uint64(0)
 	if currentBlock.Number().Uint64() > 0 {
-		fce, err := fconsensus.ExtractFConExtra(currentBlock.Header())
+		fce, err := fconTypes.ExtractFConExtra(currentBlock.Header())
 		if err != nil {
 			log.Error("ExtractFConExtra failed", "err", err)
 			return 0, 0, false
@@ -228,7 +229,7 @@ func (fb *FBManager) CreateFinaliseBlock(newBlock *types.Block) *types.Block {
 	copy(header.Root[:], latestRoot[:])
 	header.GasUsed = *gasUsedSum
 
-	fce, err := fconsensus.ExtractFConExtra(header)
+	fce, err := fconTypes.ExtractFConExtra(header)
 	if err != nil {
 		log.Error("FBManager ExtractFConExtra  failed", "err", err.Error())
 		return nil
@@ -280,6 +281,7 @@ func (fb *FBManager) Start() {
 				log.Info("FBManager receive stop message")
 				return
 			case ev := <-fb.chainHeadCh:
+				continue
 				block := fb.CreateFinaliseBlock(ev.Block)
 				if block != nil {
 					fb.finaliseBlockchain.InsertChain(types.Blocks{block})

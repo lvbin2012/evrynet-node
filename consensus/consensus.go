@@ -147,6 +147,11 @@ type Engine interface {
 	Close() error
 }
 
+type TwoChainTest interface {
+	SealForTest( *types.Block) (*types.Block, error)
+}
+
+
 // PoW is a consensus engine based on proof-of-work.
 type PoW interface {
 	Engine

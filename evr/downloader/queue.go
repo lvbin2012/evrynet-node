@@ -22,12 +22,12 @@ package downloader
 import (
 	"errors"
 	"fmt"
-	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
 	"sync"
 	"time"
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/common/prque"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/metrics"
@@ -413,7 +413,7 @@ func (q *queue) Schedule(headers []*types.Header, from uint64) []*types.Header {
 
 		if q.isFinalChain {
 			//if false {
-			extra, err := fconsensus.ExtractFConExtra(header)
+			extra, err := fconTypes.ExtractFConExtra(header)
 			if err != nil {
 				log.Warn("Header.Extra parse fail", "number", header.Number, "hash", hash, "err", err.Error())
 				continue
@@ -435,7 +435,7 @@ func (q *queue) Schedule(headers []*types.Header, from uint64) []*types.Header {
 }
 
 func (q *queue) hasEvilInfo(header *types.Header) bool {
-	fex, err := fconsensus.ExtractFConExtra(header)
+	fex, err := fconTypes.ExtractFConExtra(header)
 	if err != nil {
 		return false
 	}
@@ -920,7 +920,7 @@ func (q *queue) DeliverBodies(id string, txLists [][]*types.Transaction, uncleLi
 }
 
 func (q *queue) DeliverEvilBodies(id string, txLists [][]*types.Transaction, uncleList [][]*types.Header,
-	 saveFunc func(header *types.Header, txs []*types.Transaction, uncles []*types.Header)) (int, error) {
+	saveFunc func(header *types.Header, txs []*types.Transaction, uncles []*types.Header)) (int, error) {
 	q.lock.Lock()
 	defer q.lock.Unlock()
 	reconstruct := func(header *types.Header, index int, result *fetchResult) error {

@@ -3,23 +3,25 @@ package fconsensus
 import (
 	"bytes"
 	"errors"
-	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
-	"github.com/Evrynetlabs/evrynet-node/log"
-	"github.com/Evrynetlabs/evrynet-node/params"
-	"golang.org/x/crypto/sha3"
 	"io"
 	"math/big"
 	"math/rand"
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/sha3"
+
 	"github.com/Evrynetlabs/evrynet-node/accounts"
 	"github.com/Evrynetlabs/evrynet-node/common"
+	"github.com/Evrynetlabs/evrynet-node/common/hexutil"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/crypto"
 	"github.com/Evrynetlabs/evrynet-node/evrdb"
+	"github.com/Evrynetlabs/evrynet-node/log"
+	"github.com/Evrynetlabs/evrynet-node/params"
 	"github.com/Evrynetlabs/evrynet-node/rlp"
 	"github.com/Evrynetlabs/evrynet-node/rpc"
 	lru "github.com/hashicorp/golang-lru"
@@ -77,59 +79,6 @@ var (
 )
 
 type SignerFn func(accounts.Account, string, []byte) ([]byte, error)
-
-type FConExtra struct {
-	Seal         []byte
-	CurrentBlock common.Hash
-	EvilHeader   *types.Header
-	Signers      []common.Address
-}
-
-func (fce *FConExtra) EncodeRLP(w io.Writer) error {
-	headerRLP, err := rlp.EncodeToBytes(fce.EvilHeader)
-	if err != nil {
-		return err
-	}
-	return rlp.Encode(w, []interface{}{
-		fce.Seal,
-		fce.CurrentBlock,
-		headerRLP,
-		fce.Signers,
-	})
-}
-
-func (fce *FConExtra) DecodeRLP(s *rlp.Stream) error {
-	var extra struct {
-		Seal         []byte
-		CurrentBlock common.Hash
-		EvilBytes    []byte
-		Signers      []common.Address
-	}
-	if err := s.Decode(&extra); err != nil {
-		return err
-	}
-	fce.Seal, fce.CurrentBlock, fce.Signers = extra.Seal, extra.CurrentBlock, extra.Signers
-
-	if len(extra.EvilBytes) > 1 {
-		var header types.Header
-		if err := rlp.Decode(bytes.NewReader(extra.EvilBytes), &header); err != nil {
-			return err
-		}
-		fce.EvilHeader = &header
-	}
-	return nil
-}
-
-func ExtractFConExtra(header *types.Header) (*FConExtra, error) {
-	if len(header.Extra) < ExtraVanity {
-		return nil, errInvalidHeaderExtra
-	}
-	var extra FConExtra
-	if err := rlp.Decode(bytes.NewReader(header.Extra[ExtraVanity:]), &extra); err != nil {
-		return nil, err
-	}
-	return &extra, nil
-}
 
 type FConsensus struct {
 	config *params.FConConfig
@@ -257,7 +206,7 @@ func (fc *FConsensus) verifyCascadingFields(chain consensus.ChainReader, header 
 		return err
 	}
 	if number%fc.config.Epoch == 0 {
-		fce, err := ExtractFConExtra(header)
+		fce, err := fconTypes.ExtractFConExtra(header)
 		if err != nil {
 			return err
 		}
@@ -306,7 +255,7 @@ func (fc *FConsensus) fsnapshot(chain consensus.ChainReader, number uint64, hash
 						copy(signers[i][:], checkpoint.Extra[32+i*common.AddressLength:])
 					}
 				} else {
-					fce, err := ExtractFConExtra(checkpoint)
+					fce, err := fconTypes.ExtractFConExtra(checkpoint)
 					if err != nil {
 						return nil, err
 					}
@@ -436,7 +385,7 @@ func (fc *FConsensus) Prepare(chain consensus.FullChainReader, header *types.Hea
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, ExtraVanity-len(header.Extra))...)
 	}
 
-	fce := FConExtra{}
+	fce := fconTypes.FConExtra{}
 	if number%fc.config.Epoch == 0 {
 		fce.Signers = fsnap.signers()
 	}
@@ -471,7 +420,7 @@ func (fc *FConsensus) SealForTest(block *types.Block) (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	fce, err := ExtractFConExtra(header)
+	fce, err := fconTypes.ExtractFConExtra(header)
 	if err != nil {
 		return nil, err
 	}
@@ -480,7 +429,7 @@ func (fc *FConsensus) SealForTest(block *types.Block) (*types.Block, error) {
 	byteBuffer := new(bytes.Buffer)
 	err = rlp.Encode(byteBuffer, &fce)
 	if err != nil {
-		return nil,  err
+		return nil, err
 	}
 	header.Extra = append(header.Extra[:ExtraVanity], byteBuffer.Bytes()...)
 	return block.WithSeal(header), nil
@@ -522,7 +471,7 @@ func (fc *FConsensus) Seal(chain consensus.ChainReader, block *types.Block, resu
 		return err
 	}
 
-	fce, err := ExtractFConExtra(header)
+	fce, err := fconTypes.ExtractFConExtra(header)
 	if err != nil {
 		return err
 	}
@@ -575,7 +524,7 @@ func ecrecover(header *types.Header, sigcache *lru.ARCCache) (common.Address, er
 	if len(header.Extra) < ExtraVanity {
 		return common.Address{}, errInvalidHeaderExtra
 	}
-	fce, err := ExtractFConExtra(header)
+	fce, err := fconTypes.ExtractFConExtra(header)
 	if err != nil {
 		return common.Address{}, err
 	}
@@ -607,7 +556,7 @@ func encodeSigHeader(w io.Writer, header *types.Header) {
 	if len(header.Extra) <= ExtraVanity {
 		panic(errInvalidHeaderExtra)
 	}
-	fce, err := ExtractFConExtra(header)
+	fce, err := fconTypes.ExtractFConExtra(header)
 	if err != nil {
 		panic("can't encode: " + err.Error())
 	}

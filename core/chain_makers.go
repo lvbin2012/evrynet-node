@@ -25,8 +25,7 @@ import (
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
-	"github.com/Evrynetlabs/evrynet-node/consensus/clique"
-	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/core/vm"
@@ -315,19 +314,19 @@ func GenerateTwoChain(config, fConfig *params.ChainConfig, parent, fParent *type
 			panic(fmt.Sprintf("trie write error: %v", err))
 		}
 
-		if clique, ok := engine.(*clique.Clique); ok {
-			block, err = clique.SealForTest(block)
+		if chainTest, ok := engine.(consensus.TwoChainTest); ok {
+			block, err = chainTest.SealForTest(block)
+			if err != nil {
+				panic(err)
+			}
+		}
+		if chainTest, ok := fEngine.(consensus.TwoChainTest); ok {
+			block, err = chainTest.SealForTest(block)
 			if err != nil {
 				panic(err)
 			}
 		}
 
-		if fcons, ok := engine.(*fconsensus.FConsensus); ok {
-			block, err = fcons.SealForTest(block)
-			if err != nil {
-				panic(err)
-			}
-		}
 		chainreader.blocksByNumber[block.NumberU64()] = block
 		chainreader.stateByHash[state.IntermediateRoot(true)] = state
 		return block
@@ -423,7 +422,7 @@ func makeHeaderExtra(hash common.Hash, evilHeader *types.Header) []byte {
 	if len(extra) < 32 {
 		extra = append(extra, bytes.Repeat([]byte{0x00}, 32-len(extra))...)
 	}
-	fce := fconsensus.FConExtra{}
+	fce := fconTypes.FConExtra{}
 	fce.CurrentBlock = hash
 	fce.EvilHeader = evilHeader
 	byteBuffer := new(bytes.Buffer)

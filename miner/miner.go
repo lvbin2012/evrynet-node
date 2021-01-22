@@ -37,6 +37,7 @@ import (
 // Backend wraps all methods required for mining.
 type Backend interface {
 	BlockChain() *core.BlockChain
+	FBlockChain() *core.BlockChain
 	TxPool() *core.TxPool
 }
 
@@ -55,6 +56,7 @@ type Config struct {
 type Miner struct {
 	mux      *event.TypeMux
 	worker   *worker
+	fWorker  *worker
 	coinbase common.Address
 	evr      Backend
 	engine   consensus.Engine
@@ -64,13 +66,14 @@ type Miner struct {
 	shouldStart int32 // should start indicates whether we should start after sync
 }
 
-func New(evr Backend, config *Config, chainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
+func New(evr Backend, config *Config, chainConfig *params.ChainConfig, fChainConfig *params.ChainConfig, mux *event.TypeMux, engine consensus.Engine, fEngine consensus.Engine, isLocalBlock func(block *types.Block) bool) *Miner {
 	miner := &Miner{
 		evr:      evr,
 		mux:      mux,
 		engine:   engine,
 		exitCh:   make(chan struct{}),
 		worker:   newWorker(config, chainConfig, engine, evr, mux, isLocalBlock),
+		fWorker:  newWorker(config, fChainConfig, fEngine, evr, mux, isLocalBlock),
 		canStart: 1,
 	}
 	go miner.update()
@@ -126,15 +129,23 @@ func (self *Miner) Start(coinbase common.Address) {
 		return
 	}
 	self.worker.start()
+
+	// TODO  split two worker
+	self.fWorker.start()
+
 }
 
 func (self *Miner) Stop() {
 	self.worker.stop()
+	// TODO  split two worker
+	self.fWorker.stop()
 	atomic.StoreInt32(&self.shouldStart, 0)
 }
 
 func (self *Miner) Close() {
 	self.worker.close()
+	// TODO  split two worker
+	self.fWorker.close()
 	close(self.exitCh)
 }
 
@@ -154,6 +165,7 @@ func (self *Miner) SetExtra(extra []byte) error {
 		return fmt.Errorf("Extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
 	}
 	self.worker.setExtra(extra)
+	self.fWorker.setExtra(extra)
 	return nil
 }
 
@@ -179,4 +191,6 @@ func (self *Miner) PendingBlock() *types.Block {
 func (self *Miner) SetEtherbase(addr common.Address) {
 	self.coinbase = addr
 	self.worker.setEtherbase(addr)
+	// TODO  split two worker
+	self.fWorker.setEtherbase(addr)
 }

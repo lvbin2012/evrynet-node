@@ -18,6 +18,7 @@ package miner
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 	"sync"
 	"sync/atomic"
@@ -27,12 +28,15 @@ import (
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	"github.com/Evrynetlabs/evrynet-node/consensus/fconsensus"
+	fconTypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
 	"github.com/Evrynetlabs/evrynet-node/event"
 	"github.com/Evrynetlabs/evrynet-node/log"
 	"github.com/Evrynetlabs/evrynet-node/params"
+	"github.com/Evrynetlabs/evrynet-node/rlp"
 )
 
 const (
@@ -73,6 +77,9 @@ const (
 
 	// staleThreshold is the maximum depth of the acceptable stale block.
 	staleThreshold = 7
+
+	M = uint64(2)
+	K = uint64(2)
 )
 
 // environment is the worker's current environment and holds all of the current state information.
@@ -89,6 +96,11 @@ type environment struct {
 	header   *types.Header
 	txs      []*types.Transaction
 	receipts []*types.Receipt
+}
+
+type AssistChainHandler interface {
+	consensus.ChainReader
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
 }
 
 // task contains all information for consensus engine sealing and result submitting.
@@ -126,15 +138,17 @@ type worker struct {
 	engine      consensus.Engine
 	evr         Backend
 	chain       *core.BlockChain
+	assistChain AssistChainHandler
 
 	// Subscriptions
-	mux          *event.TypeMux
-	txsCh        chan core.NewTxsEvent
-	txsSub       event.Subscription
-	chainHeadCh  chan core.ChainHeadEvent
-	chainHeadSub event.Subscription
-	chainSideCh  chan core.ChainSideEvent
-	chainSideSub event.Subscription
+	mux             *event.TypeMux
+	txsCh           chan core.NewTxsEvent
+	txsSub          event.Subscription
+	chainHeadCh     chan core.ChainHeadEvent
+	chainHeadSub    event.Subscription
+	chainSideCh     chan core.ChainSideEvent
+	chainSideSub    event.Subscription
+	assistHeaderSub event.Subscription
 
 	// Channels
 	newWorkCh          chan *newWorkReq
@@ -144,6 +158,7 @@ type worker struct {
 	exitCh             chan struct{}
 	resubmitIntervalCh chan time.Duration
 	resubmitAdjustCh   chan *intervalAdjust
+	assistHeaderCh     chan core.ChainHeadEvent
 
 	current      *environment                 // An environment for current running cycle.
 	localUncles  map[common.Hash]*types.Block // A set of side blocks generated locally as the possible uncle blocks.
@@ -177,16 +192,16 @@ type worker struct {
 
 func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus.Engine, evr Backend, mux *event.TypeMux, isLocalBlock func(*types.Block) bool) *worker {
 	worker := &worker{
-		config:             config,
-		chainConfig:        chainConfig,
-		engine:             engine,
-		evr:                evr,
-		mux:                mux,
-		chain:              evr.BlockChain(),
-		isLocalBlock:       isLocalBlock,
-		localUncles:        make(map[common.Hash]*types.Block),
-		remoteUncles:       make(map[common.Hash]*types.Block),
-		unconfirmed:        newUnconfirmedBlocks(evr.BlockChain(), miningLogAtDepth),
+		config:      config,
+		chainConfig: chainConfig,
+		engine:      engine,
+		evr:         evr,
+		mux:         mux,
+		//chain:              evr.BlockChain(),
+		isLocalBlock: isLocalBlock,
+		localUncles:  make(map[common.Hash]*types.Block),
+		remoteUncles: make(map[common.Hash]*types.Block),
+		//unconfirmed:        newUnconfirmedBlocks(evr.BlockChain(), miningLogAtDepth),
 		pendingTasks:       make(map[common.Hash]*task),
 		txsCh:              make(chan core.NewTxsEvent, txChanSize),
 		chainHeadCh:        make(chan core.ChainHeadEvent, chainHeadChanSize),
@@ -198,12 +213,24 @@ func newWorker(config *Config, chainConfig *params.ChainConfig, engine consensus
 		startCh:            make(chan struct{}, 1),
 		resubmitIntervalCh: make(chan time.Duration),
 		resubmitAdjustCh:   make(chan *intervalAdjust, resubmitAdjustChanSize),
+		assistHeaderCh:     make(chan core.ChainHeadEvent, 10),
 	}
+
+	if chainConfig.IsFinalChain {
+		worker.chain = evr.FBlockChain()
+		worker.assistChain = evr.BlockChain()
+	} else {
+		worker.chain = evr.BlockChain()
+		worker.assistChain = evr.FBlockChain()
+	}
+
+	worker.unconfirmed = newUnconfirmedBlocks(worker.chain, miningLogAtDepth)
 	// Subscribe NewTxsEvent for tx pool
 	worker.txsSub = evr.TxPool().SubscribeNewTxsEvent(worker.txsCh)
 	// Subscribe events for blockchain
-	worker.chainHeadSub = evr.BlockChain().SubscribeChainHeadEvent(worker.chainHeadCh)
-	worker.chainSideSub = evr.BlockChain().SubscribeChainSideEvent(worker.chainSideCh)
+	worker.chainHeadSub = worker.chain.SubscribeChainHeadEvent(worker.chainHeadCh)
+	worker.chainSideSub = worker.chain.SubscribeChainSideEvent(worker.chainSideCh)
+	worker.assistHeaderSub = worker.assistChain.SubscribeChainHeadEvent(worker.assistHeaderCh)
 
 	// Sanitize recommit interval if the user-specified one is too short.
 	recommit := worker.config.Recommit
@@ -356,7 +383,17 @@ func (w *worker) newWorkLoop(recommit time.Duration) {
 			timestamp = time.Now().Unix()
 			commit(false, commitInterruptNewHead)
 
+		case <-w.assistHeaderCh:
+			if w.chainConfig.IsFinalChain {
+				clearPending(w.chain.CurrentBlock().NumberU64())
+				timestamp = time.Now().Unix()
+				commit(false, commitInterruptNewHead)
+			} else {
+			}
+
+
 		case head := <-w.chainHeadCh:
+
 			if h, ok := w.engine.(consensus.Handler); ok {
 				headBlkNumber := new(big.Int).Set(head.Block.Number())
 				if headBlkNumber.Cmp(w.chain.CurrentBlock().Number()) < 0 {
@@ -421,6 +458,7 @@ func (w *worker) mainLoop() {
 	defer w.txsSub.Unsubscribe()
 	defer w.chainHeadSub.Unsubscribe()
 	defer w.chainSideSub.Unsubscribe()
+	defer w.assistHeaderSub.Unsubscribe()
 
 	for {
 		select {
@@ -606,11 +644,16 @@ func (w *worker) resultLoop() {
 				log.Error("Failed writing block to chain", "err", err)
 				continue
 			}
+
+			if w.chainConfig.IsFinalChain {
+				log.Info("FBManagerFinish creating block", "number", block.Number().String(), "hash", block.Hash().String(), "parent", block.ParentHash().String())
+			}
+
 			log.Info("Successfully sealed new block", "number", block.Number(), "sealhash", sealhash, "hash", hash,
-				"elapsed", common.PrettyDuration(time.Since(task.createdAt)))
+				"elapsed", common.PrettyDuration(time.Since(task.createdAt)), "IsFinalChain", w.chainConfig.IsFinalChain)
 
 			// Broadcast the block and announce chain insertion event
-			w.mux.Post(core.NewMinedBlockEvent{Block: block})
+			w.mux.Post(core.NewMinedBlockEvent{Block: block, IsFinalChain: w.chainConfig.IsFinalChain})
 
 			var events []interface{}
 			switch stat {
@@ -832,10 +875,126 @@ func (w *worker) commitTransactions(txs *types.TransactionsByPriceAndNonce, coin
 	return false
 }
 
+func (w *worker) commitTransactionsForFinalChain(begin, end uint64, coinbase common.Address, interrupt *int32) bool {
+	if w.current == nil {
+		return true
+	}
+	if w.current.gasPool == nil {
+		w.current.gasPool = new(core.GasPool).AddGas(w.current.header.GasLimit)
+	}
+	var evilHeader *types.Header
+	for begin <= end {
+
+		if interrupt != nil && atomic.LoadInt32(interrupt) != commitInterruptNone {
+			// Notify resubmit loop to increase resubmitting interval due to too frequent commits.
+			if atomic.LoadInt32(interrupt) == commitInterruptResubmit {
+				ratio := float64(w.current.header.GasLimit-w.current.gasPool.Gas()) / float64(w.current.header.GasLimit)
+				if ratio < 0.1 {
+					ratio = 0.1
+				}
+				w.resubmitAdjustCh <- &intervalAdjust{
+					ratio: ratio,
+					inc:   true,
+				}
+			}
+			return atomic.LoadInt32(interrupt) == commitInterruptNewHead
+		}
+
+		headerTerm := w.assistChain.GetHeaderByNumber(begin)
+		blockTerm := w.assistChain.GetBlock(headerTerm.Hash(), headerTerm.Number.Uint64())
+		snap := w.current.state.Snapshot()
+		txs := blockTerm.Transactions()
+		gasUsedPre := w.current.header.GasUsed
+		for _, tx := range txs {
+			receipt, _, err := core.ApplyTransaction(w.chainConfig, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+			if err != nil {
+				w.current.state.RevertToSnapshot(snap)
+				break
+			}
+			w.current.txs = append(w.current.txs, tx)
+			w.current.receipts = append(w.current.receipts, receipt)
+		}
+
+		s := w.current.state.Copy()
+		root := s.IntermediateRoot(true)
+		if root != blockTerm.Root() {
+			errStr := fmt.Sprintf("block: %s, number: %s  stateRoot is not equal, we get: %s, expect: %s", blockTerm.Hash().String(),
+				blockTerm.Number().String(), root.String(), blockTerm.Root().String())
+			log.Error("FBManager Apply transactions failed", "err", errStr)
+			evilHeader = headerTerm
+			break
+		}
+		if (w.current.header.GasUsed - gasUsedPre) != blockTerm.GasUsed() {
+			errStr := fmt.Sprintf("block: %s, number: %s  gasUsed is not equal, we get: %d, expect: %d", blockTerm.Hash().String(),
+				blockTerm.Number().String(), w.current.header.GasUsed-gasUsedPre, blockTerm.GasUsed())
+			log.Error("FBManager Apply transactions failed", "err", errStr)
+			evilHeader = headerTerm
+			break
+		}
+		begin++
+	}
+
+	packHeader := w.assistChain.GetHeaderByNumber(begin - 1)
+	log.Info("FBManager: latest package block", "hash", packHeader.Hash().String(), "number", packHeader.Number.String())
+	log.Info("FBManager: pack transactions", "len", len(w.current.txs), "gasUsed", w.current.header.GasUsed)
+
+	currentHash := packHeader.Hash()
+
+	fce, err := fconTypes.ExtractFConExtra(w.current.header)
+	if err != nil {
+		log.Error("FBManager ExtractFConExtra  failed", "err", err.Error())
+		return true
+	}
+	fce.EvilHeader = evilHeader
+	fce.CurrentBlock = currentHash
+	fce.CurrentHeight = begin - 1
+	rlpBytes, err := rlp.EncodeToBytes(&fce)
+	if err != nil {
+		log.Error("FBManager rlp extra failed", "err", err.Error())
+		return true
+	}
+	w.current.header.Extra = append(w.current.header.Extra[:fconsensus.ExtraVanity], rlpBytes...)
+	return false
+}
+
+// Get block pack section
+func (w *worker) GetBlockSections() (uint64, uint64, bool) {
+	number := w.assistChain.CurrentHeader().Number.Uint64()
+	currentBlock := w.chain.CurrentBlock()
+	packedBlockNumber := uint64(0)
+	if currentBlock.Number().Uint64() > 0 {
+		fce, err := fconTypes.ExtractFConExtra(currentBlock.Header())
+		if err != nil {
+			log.Error("ExtractFConExtra failed", "err", err)
+			return 0, 0, false
+		}
+		packedBlockNumber = fce.CurrentHeight
+	}
+
+	if packedBlockNumber+M+K > number {
+		return 0, 0, false
+	}
+	end := packedBlockNumber + M
+	if end < number-K {
+		end = number - K
+	}
+	return packedBlockNumber + 1, end, true
+
+}
+
 // commitNewWork generates several new sealing tasks based on the parent block.
 func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
+	var begin, end uint64
+	var trigger bool
+	if w.chainConfig.IsFinalChain {
+		begin, end, trigger = w.GetBlockSections()
+		if !trigger {
+			log.Info("Final chain commitNewWork not trigger to create block")
+			return
+		}
+	}
 
 	tstart := time.Now()
 	parent := w.chain.CurrentBlock()
@@ -903,6 +1062,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Prefer to locally generated uncle
 	commitUncles(w.localUncles)
 	commitUncles(w.remoteUncles)
+
+	if w.chainConfig.IsFinalChain {
+		if !w.commitTransactionsForFinalChain(begin, end, w.coinbase, interrupt) {
+			w.commit(uncles, w.fullTaskHook, true, tstart)
+		}
+		return
+	}
 
 	// Fill the block with all available pending transactions.
 	pending, err := w.evr.TxPool().Pending()
@@ -973,7 +1139,8 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 			feesEth := new(big.Float).Quo(new(big.Float).SetInt(feesWei), new(big.Float).SetInt(big.NewInt(params.Ether)))
 
 			log.Info("Commit new mining work", "number", block.Number(), "sealhash", w.engine.SealHash(block.Header()),
-				"uncles", len(uncles), "txs", w.current.tcount, "gas", block.GasUsed(), "fees", feesEth, "elapsed", common.PrettyDuration(time.Since(start)))
+				"uncles", len(uncles), "txs", w.current.tcount, "gas", block.GasUsed(), "fees", feesEth, "elapsed",
+				common.PrettyDuration(time.Since(start)), "isFinalChain", w.chainConfig.IsFinalChain)
 
 		case <-w.exitCh:
 			log.Info("Worker has exited")

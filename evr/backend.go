@@ -73,7 +73,7 @@ type Evrynet struct {
 	txPool          *core.TxPool
 	blockchain      *core.BlockChain
 	fBlockchain     *core.BlockChain
-	fb              *FBManager
+	//fb              *FBManager
 	protocolManager *ProtocolManager
 	lesServer       LesServer
 
@@ -205,7 +205,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	if err != nil {
 		return nil, err
 	}
-	evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fEngin, evr.EventMux())
+	//evr.fb = NewFBManager(evr.blockchain, evr.fBlockchain, fEngin, evr.EventMux())
 	// Rewind the chain in case of an incompatible config upgrade.
 	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
 		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
@@ -233,7 +233,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 		config.Whitelist); err != nil {
 		return nil, err
 	}
-	evr.miner = miner.New(evr, &config.Miner, chainConfig, evr.EventMux(), evr.engine, evr.isLocalBlock)
+	evr.miner = miner.New(evr, &config.Miner, chainConfig, fchainConfig, evr.EventMux(), evr.engine, evr.fEngine, evr.isLocalBlock)
 	evr.miner.SetExtra(makeExtraData(config.Miner.ExtraData))
 
 	evr.APIBackend = &EvrAPIBackend{ctx.ExtRPCEnabled(), evr, nil}
@@ -501,10 +501,14 @@ func (s *Evrynet) StartMining(threads int) error {
 				return fmt.Errorf("signer missing: %v", err)
 			}
 			clique.Authorize(eb, wallet.SignData)
-
-			// Test by lvbin
-			s.fb.Authorize(eb, wallet.SignData)
-
+		}
+		if fconse, ok := s.fEngine.(*fconsensus.FConsensus); ok {
+			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
+			if wallet == nil || err != nil {
+				log.Error("Etherbase account unavailable locally", "err", err)
+				return fmt.Errorf("signer missing: %v", err)
+			}
+			fconse.Authorize(eb, wallet.SignData)
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
@@ -534,6 +538,7 @@ func (s *Evrynet) Miner() *miner.Miner { return s.miner }
 
 func (s *Evrynet) AccountManager() *accounts.Manager  { return s.accountManager }
 func (s *Evrynet) BlockChain() *core.BlockChain       { return s.blockchain }
+func (s *Evrynet) FBlockChain() *core.BlockChain      { return s.fBlockchain }
 func (s *Evrynet) TxPool() *core.TxPool               { return s.txPool }
 func (s *Evrynet) EventMux() *event.TypeMux           { return s.eventMux }
 func (s *Evrynet) Engine() consensus.Engine           { return s.engine }
@@ -577,7 +582,7 @@ func (s *Evrynet) Start(srvr *p2p.Server) error {
 	if s.lesServer != nil {
 		s.lesServer.Start(srvr)
 	}
-	s.fb.Start()
+	//s.fb.Start()
 	return nil
 }
 
@@ -588,7 +593,7 @@ func (s *Evrynet) GetPm() *ProtocolManager {
 // Stop implements node.Service, terminating all internal goroutines used by the
 // Evrynet protocol.
 func (s *Evrynet) Stop() error {
-	s.fb.Stop()
+	//s.fb.Stop()
 	s.bloomIndexer.Close()
 	s.blockchain.Stop()
 	s.engine.Close()

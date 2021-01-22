@@ -56,6 +56,10 @@ func (tm *TestManager) BlockChain() *BlockChain {
 	return tm.blockChain
 }
 
+func (tm *TestManager) FBlockChain() *BlockChain {
+	panic("implement me later")
+}
+
 func (tm *TestManager) TxPool() *TxPool {
 	return tm.txPool
 }
