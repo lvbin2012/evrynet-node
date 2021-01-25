@@ -5320,6 +5320,10 @@ var blockCall = function (args) {
     return (utils.isString(args[0]) && args[0].indexOf('0x') === 0) ? "evr_getBlockByHash" : "evr_getBlockByNumber";
 };
 
+var fBlockCall = function (args) {
+  return (utils.isString(args[0]) && args[0].indexOf('0x') === 0) ? "evr_getFBlockByHash" : "evr_getFBlockByNumber";
+};
+
 var transactionFromBlockCall = function (args) {
     return (utils.isString(args[0]) && args[0].indexOf('0x') === 0) ? 'evr_getTransactionByBlockHashAndIndex' : 'evr_getTransactionByBlockNumberAndIndex';
 };
@@ -5407,6 +5411,14 @@ var methods = function () {
         outputFormatter: formatters.outputBlockFormatter
     });
 
+    var getFBlock = new Method({
+      name: 'getFBlock',
+      call: fBlockCall,
+      params: 2,
+      inputFormatter: [formatters.inputBlockNumberFormatter, function (val) { return !!val; }],
+      outputFormatter: formatters.outputBlockFormatter
+    });
+
     var getUncle = new Method({
         name: 'getUncle',
         call: uncleCall,
@@ -5445,6 +5457,13 @@ var methods = function () {
         outputFormatter: formatters.outputTransactionFormatter
     });
 
+     var getFTransaction = new Method({
+        name: 'getFTransaction',
+        call: 'evr_getFTransactionByHash',
+        params: 1,
+        outputFormatter: formatters.outputTransactionFormatter
+     });
+
     var getTransactionFromBlock = new Method({
         name: 'getTransactionFromBlock',
         call: transactionFromBlockCall,
@@ -5458,6 +5477,13 @@ var methods = function () {
         call: 'evr_getTransactionReceipt',
         params: 1,
         outputFormatter: formatters.outputTransactionReceiptFormatter
+    });
+
+    var getFTransactionReceipt = new Method({
+      name: 'getFTransactionReceipt',
+      call: 'evr_getFTransactionReceipt',
+      params: 1,
+      outputFormatter: formatters.outputTransactionReceiptFormatter
     });
 
     var getTransactionCount = new Method({
@@ -5546,13 +5572,16 @@ var methods = function () {
         getStorageAt,
         getCode,
         getBlock,
+        getFBlock,
         getUncle,
         getCompilers,
         getBlockTransactionCount,
         getBlockUncleCount,
         getTransaction,
+        getFTransaction,
         getTransactionFromBlock,
         getTransactionReceipt,
+        getFTransactionReceipt,
         getTransactionCount,
         call,
         estimateGas,
@@ -5602,6 +5631,11 @@ var properties = function () {
             name: 'blockNumber',
             getter: 'evr_blockNumber',
             outputFormatter: utils.toDecimal
+        }),
+        new Property({
+        name: 'fBlockNumber',
+        getter: 'evr_fBlockNumber',
+        outputFormatter: utils.toDecimal
         }),
         new Property({
             name: 'protocolVersion',

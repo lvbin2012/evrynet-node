@@ -58,7 +58,7 @@ func (b *LesApiBackend) SetHead(number uint64) {
 	b.evr.blockchain.SetHead(number)
 }
 
-func (b *LesApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+func (b *LesApiBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber, isFinalChain bool) (*types.Header, error) {
 	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.PendingBlockNumber {
 		return b.evr.blockchain.CurrentHeader(), nil
 	}
@@ -69,16 +69,16 @@ func (b *LesApiBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*ty
 	return b.evr.blockchain.GetHeaderByHash(hash), nil
 }
 
-func (b *LesApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
-	header, err := b.HeaderByNumber(ctx, blockNr)
+func (b *LesApiBackend) BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber,  isFinalChain bool) (*types.Block, error) {
+	header, err := b.HeaderByNumber(ctx, blockNr, isFinalChain)
 	if header == nil || err != nil {
 		return nil, err
 	}
-	return b.GetBlock(ctx, header.Hash())
+	return b.GetBlock(ctx, header.Hash(), isFinalChain)
 }
 
 func (b *LesApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
-	header, err := b.HeaderByNumber(ctx, blockNr)
+	header, err := b.HeaderByNumber(ctx, blockNr, false)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -88,12 +88,12 @@ func (b *LesApiBackend) StateAndHeaderByNumber(ctx context.Context, blockNr rpc.
 	return light.NewState(ctx, header, b.evr.odr), header, nil
 }
 
-func (b *LesApiBackend) GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error) {
+func (b *LesApiBackend) GetBlock(ctx context.Context, blockHash common.Hash, isFinalChain bool) (*types.Block, error) {
 	return b.evr.blockchain.GetBlockByHash(ctx, blockHash)
 }
 
-func (b *LesApiBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	if number := rawdb.ReadHeaderNumber(b.evr.chainDb, hash, b.evr.chainConfig.IsFinalChain); number != nil {
+func (b *LesApiBackend) GetReceipts(ctx context.Context, hash common.Hash, isFinalChain bool) (types.Receipts, error) {
+	if number := rawdb.ReadHeaderNumber(b.evr.chainDb, hash, isFinalChain); number != nil {
 		return light.GetBlockReceipts(ctx, b.evr.odr, hash, *number)
 	}
 	return nil, nil
@@ -132,7 +132,7 @@ func (b *LesApiBackend) GetPoolTransaction(txHash common.Hash) *types.Transactio
 	return b.evr.txPool.GetTransaction(txHash)
 }
 
-func (b *LesApiBackend) GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error) {
+func (b *LesApiBackend) GetTransaction(ctx context.Context, txHash common.Hash, isFinalChain bool) (*types.Transaction, common.Hash, uint64, uint64, error) {
 	return light.GetTransaction(ctx, b.evr.odr, txHash)
 }
 
@@ -218,21 +218,3 @@ func (b *LesApiBackend) ServiceFilter(ctx context.Context, session *bloombits.Ma
 	}
 }
 
-func (b *LesApiBackend) FHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
-	if blockNr == rpc.LatestBlockNumber || blockNr == rpc.PendingBlockNumber {
-		return b.evr.blockchain.CurrentHeader(), nil
-	}
-	return b.evr.blockchain.GetHeaderByNumberOdr(ctx, uint64(blockNr))
-}
-
-func (b *LesApiBackend) FBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error) {
-	header, err := b.FHeaderByNumber(ctx, blockNr)
-	if header == nil || err != nil {
-		return nil, err
-	}
-	return b.GetBlock(ctx, header.Hash())
-}
-
-func (b *LesApiBackend) FGetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error) {
-	return b.evr.blockchain.GetBlockByHash(ctx, blockHash)
-}

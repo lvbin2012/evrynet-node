@@ -33,9 +33,9 @@ import (
 type Backend interface {
 	ChainDb() evrdb.Database
 	EventMux() *event.TypeMux
-	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
+	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber, isFinalChain bool) (*types.Header, error)
 	HeaderByHash(ctx context.Context, blockHash common.Hash) (*types.Header, error)
-	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
+	GetReceipts(ctx context.Context, blockHash common.Hash,  isFinalChain bool) (types.Receipts, error)
 	GetLogs(ctx context.Context, blockHash common.Hash) ([][]*types.Log, error)
 
 	SubscribeNewTxsEvent(chan<- core.NewTxsEvent) event.Subscription
@@ -129,7 +129,7 @@ func (f *Filter) Logs(ctx context.Context) ([]*types.Log, error) {
 		return f.blockLogs(ctx, header)
 	}
 	// Figure out the limits of the filter range
-	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber)
+	header, _ := f.backend.HeaderByNumber(ctx, rpc.LatestBlockNumber, false)
 	if header == nil {
 		return nil, nil
 	}
@@ -194,7 +194,7 @@ func (f *Filter) indexedLogs(ctx context.Context, end uint64) ([]*types.Log, err
 			f.begin = int64(number) + 1
 
 			// Retrieve the suggested block and pull any truly matching logs
-			header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(number))
+			header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(number), false)
 			if header == nil || err != nil {
 				return logs, err
 			}
@@ -216,7 +216,7 @@ func (f *Filter) unindexedLogs(ctx context.Context, end uint64) ([]*types.Log, e
 	var logs []*types.Log
 
 	for ; f.begin <= int64(end); f.begin++ {
-		header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(f.begin))
+		header, err := f.backend.HeaderByNumber(ctx, rpc.BlockNumber(f.begin), false)
 		if header == nil || err != nil {
 			return logs, err
 		}
@@ -257,7 +257,7 @@ func (f *Filter) checkMatches(ctx context.Context, header *types.Header) (logs [
 	if len(logs) > 0 {
 		// We have matching logs, check if we need to resolve full logs via the light client
 		if logs[0].TxHash == (common.Hash{}) {
-			receipts, err := f.backend.GetReceipts(ctx, header.Hash())
+			receipts, err := f.backend.GetReceipts(ctx, header.Hash(), false)
 			if err != nil {
 				return nil, err
 			}

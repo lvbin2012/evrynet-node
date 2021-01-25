@@ -49,11 +49,11 @@ type Backend interface {
 
 	// BlockChain API
 	SetHead(number uint64)
-	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
-	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
+	HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber, isFinalChain bool) (*types.Header, error)
+	BlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, isFinalChain bool) (*types.Block, error)
 	StateAndHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*state.StateDB, *types.Header, error)
-	GetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
-	GetReceipts(ctx context.Context, blockHash common.Hash) (types.Receipts, error)
+	GetBlock(ctx context.Context, blockHash common.Hash, isFinalChain bool) (*types.Block, error)
+	GetReceipts(ctx context.Context, blockHash common.Hash, isFinalChain bool) (types.Receipts, error)
 	GetTd(blockHash common.Hash) *big.Int
 	GetEVM(ctx context.Context, msg core.Message, state *state.StateDB, header *types.Header) (*vm.EVM, func() error, error)
 	SubscribeChainEvent(ch chan<- core.ChainEvent) event.Subscription
@@ -62,7 +62,7 @@ type Backend interface {
 
 	// TxPool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
-	GetTransaction(ctx context.Context, txHash common.Hash) (*types.Transaction, common.Hash, uint64, uint64, error)
+	GetTransaction(ctx context.Context, txHash common.Hash, isFinalChain bool) (*types.Transaction, common.Hash, uint64, uint64, error)
 	GetPoolTransactions() (types.Transactions, error)
 	GetPoolTransaction(txHash common.Hash) *types.Transaction
 	GetPoolNonce(ctx context.Context, addr common.Address) (uint64, error)
@@ -72,11 +72,6 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
-
-	// Test by lvbin
-	FHeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error)
-	FBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Block, error)
-	FGetBlock(ctx context.Context, blockHash common.Hash) (*types.Block, error)
 }
 
 func GetAPIs(apiBackend Backend) []rpc.API {

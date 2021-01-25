@@ -364,7 +364,7 @@ func (b *Block) onMainChain(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		canonHeader, err := b.backend.HeaderByNumber(ctx, rpc.BlockNumber(header.Number.Uint64()))
+		canonHeader, err := b.backend.HeaderByNumber(ctx, rpc.BlockNumber(header.Number.Uint64()), false)
 		if err != nil {
 			return err
 		}
@@ -389,9 +389,9 @@ func (b *Block) resolve(ctx context.Context) (*types.Block, error) {
 
 	var err error
 	if b.hash != (common.Hash{}) {
-		b.block, err = b.backend.GetBlock(ctx, b.hash)
+		b.block, err = b.backend.GetBlock(ctx, b.hash, false)
 	} else {
-		b.block, err = b.backend.BlockByNumber(ctx, *b.num)
+		b.block, err = b.backend.BlockByNumber(ctx, *b.num, false)
 	}
 	if b.block != nil {
 		b.header = b.block.Header()
@@ -428,7 +428,7 @@ func (b *Block) resolveReceipts(ctx context.Context) ([]*types.Receipt, error) {
 			hash = header.Hash()
 		}
 
-		receipts, err := b.backend.GetReceipts(ctx, hash)
+		receipts, err := b.backend.GetReceipts(ctx, hash, false)
 		if err != nil {
 			return nil, err
 		}

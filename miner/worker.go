@@ -78,8 +78,8 @@ const (
 	// staleThreshold is the maximum depth of the acceptable stale block.
 	staleThreshold = 7
 
-	M = uint64(2)
-	K = uint64(2)
+	M = uint64(5)
+	K = uint64(5)
 )
 
 // environment is the worker's current environment and holds all of the current state information.

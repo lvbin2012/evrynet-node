@@ -213,6 +213,10 @@ func (self *Miner) PendingBlock() *types.Block {
 	return self.worker.pendingBlock()
 }
 
+func (self *Miner) PendingFBlock() *types.Block{
+	return self.fWorker.pendingBlock()
+}
+
 func (self *Miner) SetEtherbase(addr common.Address) {
 	self.coinbase = addr
 	self.worker.setEtherbase(addr)

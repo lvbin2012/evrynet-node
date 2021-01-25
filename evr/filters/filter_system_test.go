@@ -56,42 +56,42 @@ func (b *testBackend) EventMux() *event.TypeMux {
 	return b.mux
 }
 
-func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber) (*types.Header, error) {
+func (b *testBackend) HeaderByNumber(ctx context.Context, blockNr rpc.BlockNumber, isFinalChain bool) (*types.Header, error) {
 	var (
 		hash common.Hash
 		num  uint64
 	)
 	if blockNr == rpc.LatestBlockNumber {
-		hash = rawdb.ReadHeadBlockHash(b.db)
-		number := rawdb.ReadHeaderNumber(b.db, hash)
+		hash = rawdb.ReadHeadBlockHash(b.db, isFinalChain)
+		number := rawdb.ReadHeaderNumber(b.db, hash, isFinalChain)
 		if number == nil {
 			return nil, nil
 		}
 		num = *number
 	} else {
 		num = uint64(blockNr)
-		hash = rawdb.ReadCanonicalHash(b.db, num)
+		hash = rawdb.ReadCanonicalHash(b.db, num, isFinalChain)
 	}
-	return rawdb.ReadHeader(b.db, hash, num), nil
+	return rawdb.ReadHeader(b.db, hash, num, isFinalChain), nil
 }
 
 func (b *testBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
-	number := rawdb.ReadHeaderNumber(b.db, hash)
+	number := rawdb.ReadHeaderNumber(b.db, hash, false)
 	if number == nil {
 		return nil, nil
 	}
-	return rawdb.ReadHeader(b.db, hash, *number), nil
+	return rawdb.ReadHeader(b.db, hash, *number, false), nil
 }
 
-func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	if number := rawdb.ReadHeaderNumber(b.db, hash); number != nil {
+func (b *testBackend) GetReceipts(ctx context.Context, hash common.Hash, isFinalChain bool) (types.Receipts, error) {
+	if number := rawdb.ReadHeaderNumber(b.db, hash, isFinalChain); number != nil {
 		return rawdb.ReadReceipts(b.db, hash, *number, params.TestChainConfig), nil
 	}
 	return nil, nil
 }
 
 func (b *testBackend) GetLogs(ctx context.Context, hash common.Hash) ([][]*types.Log, error) {
-	number := rawdb.ReadHeaderNumber(b.db, hash)
+	number := rawdb.ReadHeaderNumber(b.db, hash, false)
 	if number == nil {
 		return nil, nil
 	}
@@ -141,8 +141,8 @@ func (b *testBackend) ServiceFilter(ctx context.Context, session *bloombits.Matc
 				task.Bitsets = make([][]byte, len(task.Sections))
 				for i, section := range task.Sections {
 					if rand.Int()%4 != 0 { // Handle occasional missing deliveries
-						head := rawdb.ReadCanonicalHash(b.db, (section+1)*params.BloomBitsBlocks-1)
-						task.Bitsets[i], _ = rawdb.ReadBloomBits(b.db, task.Bit, section, head)
+						head := rawdb.ReadCanonicalHash(b.db, (section+1)*params.BloomBitsBlocks-1, false)
+						task.Bitsets[i], _ = rawdb.ReadBloomBits(b.db, task.Bit, section, head, false)
 					}
 				}
 				request <- task

@@ -372,7 +372,6 @@ func (s *PrivateAccountAPI) signTransaction(ctx context.Context, args *SendTxArg
 	// Assemble the transaction and sign with the wallet
 	tx := args.toTransaction()
 
-
 	return wallet.SignTxWithPassphrase(account, passwd, tx, s.b.ChainConfig().ChainID)
 }
 
@@ -572,13 +571,13 @@ func (s *PublicBlockChainAPI) ChainId() *hexutil.Big {
 
 // BlockNumber returns the block number of the chain head.
 func (s *PublicBlockChainAPI) BlockNumber() hexutil.Uint64 {
-	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber) // latest header should always be available
+	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber, false) // latest header should always be available
 	return hexutil.Uint64(header.Number.Uint64())
 }
 
 // Test by lvbin
 func (s *PublicBlockChainAPI) FBlockNumber() hexutil.Uint64 {
-	header, _ := s.b.FHeaderByNumber(context.Background(), rpc.LatestBlockNumber)
+	header, _ := s.b.HeaderByNumber(context.Background(), rpc.LatestBlockNumber, true)
 	return hexutil.Uint64(header.Number.Uint64())
 }
 
@@ -661,7 +660,7 @@ func (s *PublicBlockChainAPI) GetProof(ctx context.Context, address common.Addre
 
 // GetBlockSignerByHash return to requested extradata's infor with the fields blockProposer, commitSigner via the block's hash
 func (s *PublicBlockChainAPI) GetBlockSignerByHash(ctx context.Context, blockHash common.Hash) (map[string]interface{}, error) {
-	block, err := s.b.GetBlock(ctx, blockHash)
+	block, err := s.b.GetBlock(ctx, blockHash, false)
 	if block != nil {
 		return s.rpcOutputExtraData(block)
 	}
@@ -670,7 +669,7 @@ func (s *PublicBlockChainAPI) GetBlockSignerByHash(ctx context.Context, blockHas
 
 // GetBlockSignerByNumber return to requested extradata's infor with the fields blockProposer, commitSigner via the block's number
 func (s *PublicBlockChainAPI) GetBlockSignerByNumber(ctx context.Context, blockNr rpc.BlockNumber) (map[string]interface{}, error) {
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	block, err := s.b.BlockByNumber(ctx, blockNr, false)
 	if block != nil {
 		return s.rpcOutputExtraData(block)
 	}
@@ -680,7 +679,7 @@ func (s *PublicBlockChainAPI) GetBlockSignerByNumber(ctx context.Context, blockN
 // GetBlockByNumber returns the requested block. When blockNr is -1 the chain head is returned. When fullTx is true all
 // transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	block, err := s.b.BlockByNumber(ctx, blockNr, false)
 	if block != nil {
 		response, err := s.rpcOutputBlock(block, true, fullTx)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
@@ -696,7 +695,7 @@ func (s *PublicBlockChainAPI) GetBlockByNumber(ctx context.Context, blockNr rpc.
 
 // Test by lvbin
 func (s *PublicBlockChainAPI) GetFBlockByNumber(ctx context.Context, blockNr rpc.BlockNumber, fullTx bool) (map[string]interface{}, error) {
-	block, err := s.b.FBlockByNumber(ctx, blockNr)
+	block, err := s.b.BlockByNumber(ctx, blockNr, true)
 	if block != nil {
 		response, err := s.rpcOutputBlock(block, true, fullTx)
 		if err == nil && blockNr == rpc.PendingBlockNumber {
@@ -710,11 +709,10 @@ func (s *PublicBlockChainAPI) GetFBlockByNumber(ctx context.Context, blockNr rpc
 	return nil, err
 }
 
-
 // GetBlockByHash returns the requested block. When fullTx is true all transactions in the block are returned in full
 // detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
-	block, err := s.b.GetBlock(ctx, blockHash)
+	block, err := s.b.GetBlock(ctx, blockHash, false)
 	if block != nil {
 		return s.rpcOutputBlock(block, true, fullTx)
 	}
@@ -723,7 +721,7 @@ func (s *PublicBlockChainAPI) GetBlockByHash(ctx context.Context, blockHash comm
 
 // Test by lvbin
 func (s *PublicBlockChainAPI) GetFBlockByHash(ctx context.Context, blockHash common.Hash, fullTx bool) (map[string]interface{}, error) {
-	block, err := s.b.FGetBlock(ctx, blockHash)
+	block, err := s.b.GetBlock(ctx, blockHash, true)
 	if block != nil {
 		return s.rpcOutputBlock(block, true, fullTx)
 	}
@@ -733,7 +731,7 @@ func (s *PublicBlockChainAPI) GetFBlockByHash(ctx context.Context, blockHash com
 // GetUncleByBlockNumberAndIndex returns the uncle block for the given block hash and index. When fullTx is true
 // all transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetUncleByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) (map[string]interface{}, error) {
-	block, err := s.b.BlockByNumber(ctx, blockNr)
+	block, err := s.b.BlockByNumber(ctx, blockNr, false)
 	if block != nil {
 		uncles := block.Uncles()
 		if index >= hexutil.Uint(len(uncles)) {
@@ -749,7 +747,7 @@ func (s *PublicBlockChainAPI) GetUncleByBlockNumberAndIndex(ctx context.Context,
 // GetUncleByBlockHashAndIndex returns the uncle block for the given block hash and index. When fullTx is true
 // all transactions in the block are returned in full detail, otherwise only the transaction hash is returned.
 func (s *PublicBlockChainAPI) GetUncleByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) (map[string]interface{}, error) {
-	block, err := s.b.GetBlock(ctx, blockHash)
+	block, err := s.b.GetBlock(ctx, blockHash, false)
 	if block != nil {
 		uncles := block.Uncles()
 		if index >= hexutil.Uint(len(uncles)) {
@@ -764,7 +762,7 @@ func (s *PublicBlockChainAPI) GetUncleByBlockHashAndIndex(ctx context.Context, b
 
 // GetUncleCountByBlockNumber returns number of uncles in the block for the given block number
 func (s *PublicBlockChainAPI) GetUncleCountByBlockNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr, false); block != nil {
 		n := hexutil.Uint(len(block.Uncles()))
 		return &n
 	}
@@ -773,7 +771,7 @@ func (s *PublicBlockChainAPI) GetUncleCountByBlockNumber(ctx context.Context, bl
 
 // GetUncleCountByBlockHash returns number of uncles in the block for the given block hash
 func (s *PublicBlockChainAPI) GetUncleCountByBlockHash(ctx context.Context, blockHash common.Hash) *hexutil.Uint {
-	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+	if block, _ := s.b.GetBlock(ctx, blockHash, false); block != nil {
 		n := hexutil.Uint(len(block.Uncles()))
 		return &n
 	}
@@ -909,7 +907,7 @@ func DoEstimateGas(ctx context.Context, b Backend, args CallArgs, blockNr rpc.Bl
 		hi = uint64(*args.Gas)
 	} else {
 		// Retrieve the block to act as the gas ceiling
-		block, err := b.BlockByNumber(ctx, blockNr)
+		block, err := b.BlockByNumber(ctx, blockNr, false)
 		if err != nil {
 			return 0, err
 		}
@@ -1267,7 +1265,7 @@ func NewPublicTransactionPoolAPI(b Backend, nonceLock *AddrLocker) *PublicTransa
 
 // GetBlockTransactionCountByNumber returns the number of transactions in the block with the given block number.
 func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.Context, blockNr rpc.BlockNumber) *hexutil.Uint {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr, false); block != nil {
 		n := hexutil.Uint(len(block.Transactions()))
 		return &n
 	}
@@ -1276,7 +1274,7 @@ func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByNumber(ctx context.
 
 // GetBlockTransactionCountByHash returns the number of transactions in the block with the given hash.
 func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Context, blockHash common.Hash) *hexutil.Uint {
-	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+	if block, _ := s.b.GetBlock(ctx, blockHash, false); block != nil {
 		n := hexutil.Uint(len(block.Transactions()))
 		return &n
 	}
@@ -1285,7 +1283,7 @@ func (s *PublicTransactionPoolAPI) GetBlockTransactionCountByHash(ctx context.Co
 
 // GetTransactionByBlockNumberAndIndex returns the transaction for the given block number and index.
 func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) *RPCTransaction {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr, false); block != nil {
 		return newRPCTransactionFromBlockIndex(block, uint64(index))
 	}
 	return nil
@@ -1293,7 +1291,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockNumberAndIndex(ctx conte
 
 // GetTransactionByBlockHashAndIndex returns the transaction for the given block hash and index.
 func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) *RPCTransaction {
-	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+	if block, _ := s.b.GetBlock(ctx, blockHash, false); block != nil {
 		return newRPCTransactionFromBlockIndex(block, uint64(index))
 	}
 	return nil
@@ -1301,7 +1299,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByBlockHashAndIndex(ctx context
 
 // GetRawTransactionByBlockNumberAndIndex returns the bytes of the transaction for the given block number and index.
 func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockNumberAndIndex(ctx context.Context, blockNr rpc.BlockNumber, index hexutil.Uint) hexutil.Bytes {
-	if block, _ := s.b.BlockByNumber(ctx, blockNr); block != nil {
+	if block, _ := s.b.BlockByNumber(ctx, blockNr, false); block != nil {
 		return newRPCRawTransactionFromBlockIndex(block, uint64(index))
 	}
 	return nil
@@ -1309,7 +1307,7 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockNumberAndIndex(ctx co
 
 // GetRawTransactionByBlockHashAndIndex returns the bytes of the transaction for the given block hash and index.
 func (s *PublicTransactionPoolAPI) GetRawTransactionByBlockHashAndIndex(ctx context.Context, blockHash common.Hash, index hexutil.Uint) hexutil.Bytes {
-	if block, _ := s.b.GetBlock(ctx, blockHash); block != nil {
+	if block, _ := s.b.GetBlock(ctx, blockHash, false); block != nil {
 		return newRPCRawTransactionFromBlockIndex(block, uint64(index))
 	}
 	return nil
@@ -1337,7 +1335,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionCount(ctx context.Context, addr
 // GetTransactionByHash returns the transaction for the given hash
 func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, hash common.Hash) (*RPCTransaction, error) {
 	// Try to return an already finalized transaction
-	tx, blockHash, blockNumber, index, err := s.b.GetTransaction(ctx, hash)
+	tx, blockHash, blockNumber, index, err := s.b.GetTransaction(ctx, hash, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1353,10 +1351,29 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 	return nil, nil
 }
 
+func (s *PublicTransactionPoolAPI) GetFTransactionByHash(ctx context.Context, hash common.Hash) (*RPCTransaction, error) {
+	// Try to return an already finalized transaction
+	tx, blockHash, blockNumber, index, err := s.b.GetTransaction(ctx, hash, true)
+	if err != nil {
+		return nil, err
+	}
+	if tx != nil {
+		return newRPCTransaction(tx, blockHash, blockNumber, index), nil
+	}
+
+	//// No finalized transaction, try to retrieve it from the pool
+	//if tx := s.b.GetPoolTransaction(hash); tx != nil {
+	//	return newRPCPendingTransaction(tx), nil
+	//}
+
+	// Transaction unknown, return as such
+	return nil, nil
+}
+
 // GetRawTransactionByHash returns the bytes of the transaction for the given hash.
 func (s *PublicTransactionPoolAPI) GetRawTransactionByHash(ctx context.Context, hash common.Hash) (hexutil.Bytes, error) {
 	// Retrieve a finalized transaction, or a pooled otherwise
-	tx, _, _, _, err := s.b.GetTransaction(ctx, hash)
+	tx, _, _, _, err := s.b.GetTransaction(ctx, hash, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1370,13 +1387,21 @@ func (s *PublicTransactionPoolAPI) GetRawTransactionByHash(ctx context.Context, 
 	return rlp.EncodeToBytes(tx)
 }
 
-// GetTransactionReceipt returns the transaction receipt for the given transaction hash.
 func (s *PublicTransactionPoolAPI) GetTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
-	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash, false)
+	return s.GetTransactionReceiptBase(ctx, hash, false)
+}
+
+func (s *PublicTransactionPoolAPI) GetFTransactionReceipt(ctx context.Context, hash common.Hash) (map[string]interface{}, error) {
+	return s.GetTransactionReceiptBase(ctx, hash, true)
+}
+
+// GetTransactionReceipt returns the transaction receipt for the given transaction hash.
+func (s *PublicTransactionPoolAPI) GetTransactionReceiptBase(ctx context.Context, hash common.Hash, isFinalChain bool) (map[string]interface{}, error) {
+	tx, blockHash, blockNumber, index := rawdb.ReadTransaction(s.b.ChainDb(), hash, isFinalChain)
 	if tx == nil {
 		return nil, nil
 	}
-	receipts, err := s.b.GetReceipts(ctx, blockHash)
+	receipts, err := s.b.GetReceipts(ctx, blockHash, isFinalChain)
 	if err != nil {
 		return nil, err
 	}
@@ -1765,7 +1790,7 @@ func NewPublicDebugAPI(b Backend) *PublicDebugAPI {
 
 // GetBlockRlp retrieves the RLP encoded for of a single block.
 func (api *PublicDebugAPI) GetBlockRlp(ctx context.Context, number uint64) (string, error) {
-	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
+	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number), false)
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}
@@ -1782,7 +1807,7 @@ func (api *PublicDebugAPI) GetBlockRlp(ctx context.Context, number uint64) (stri
 // This is a temporary method to debug the externalsigner integration,
 // TODO: Remove this method when the integration is mature
 func (api *PublicDebugAPI) TestSignCliqueBlock(ctx context.Context, address common.Address, number uint64) (common.Address, error) {
-	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
+	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number), false)
 	if block == nil {
 		return common.Address{}, fmt.Errorf("block #%d not found", number)
 	}
@@ -1817,7 +1842,7 @@ func (api *PublicDebugAPI) TestSignCliqueBlock(ctx context.Context, address comm
 
 // PrintBlock retrieves a block and returns its pretty printed form.
 func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (string, error) {
-	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
+	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number), false)
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}
@@ -1826,7 +1851,7 @@ func (api *PublicDebugAPI) PrintBlock(ctx context.Context, number uint64) (strin
 
 // SeedHash retrieves the seed hash of a block.
 func (api *PublicDebugAPI) SeedHash(ctx context.Context, number uint64) (string, error) {
-	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number))
+	block, _ := api.b.BlockByNumber(ctx, rpc.BlockNumber(number), false)
 	if block == nil {
 		return "", fmt.Errorf("block #%d not found", number)
 	}

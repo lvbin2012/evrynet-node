@@ -39,6 +39,7 @@ var (
 	epochLength   = uint64(30000) // Default number of blocks after which to checkpoint and reset the pending votes
 	uncleHash     = types.CalcUncleHash(nil)
 	diffInTurn    = big.NewInt(2)
+	diffNoTurn    = big.NewInt(1)
 	nonceAuthVote = hexutil.MustDecode("0xffffffffffffffff") // Magic nonce number to vote on adding a new signer
 	nonceDropVote = hexutil.MustDecode("0x0000000000000000") // Magic nonce number to vote on removing a signer.
 )
@@ -379,7 +380,7 @@ func (fc *FConsensus) Prepare(chain consensus.FullChainReader, header *types.Hea
 		fc.lock.RUnlock()
 	}
 
-	header.Difficulty = diffInTurn
+	header.Difficulty = CalcDifficulty(fsnap, fc.signer)
 
 	if len(header.Extra) < ExtraVanity {
 		header.Extra = append(header.Extra, bytes.Repeat([]byte{0x00}, ExtraVanity-len(header.Extra))...)
@@ -504,7 +505,18 @@ func (fc *FConsensus) SealHash(header *types.Header) common.Hash {
 }
 
 func (fc *FConsensus) CalcDifficulty(chain consensus.ChainReader, time uint64, parent *types.Header) *big.Int {
-	return diffInTurn
+	snap, err := fc.fsnapshot(chain, parent.Number.Uint64(), parent.Hash(), nil)
+	if err != nil {
+		return nil
+	}
+	return CalcDifficulty(snap, fc.signer)
+}
+
+func CalcDifficulty(snap *FSnapshot, signer common.Address) *big.Int {
+	if snap.inturn(snap.Number+1, signer) {
+		return new(big.Int).Set(diffInTurn)
+	}
+	return new(big.Int).Set(diffNoTurn)
 }
 
 func (fc *FConsensus) APIs(chain consensus.ChainReader) []rpc.API {

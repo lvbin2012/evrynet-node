@@ -495,7 +495,7 @@ type filterBackend struct {
 func (fb *filterBackend) ChainDb() evrdb.Database  { return fb.db }
 func (fb *filterBackend) EventMux() *event.TypeMux { panic("not supported") }
 
-func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber) (*types.Header, error) {
+func (fb *filterBackend) HeaderByNumber(ctx context.Context, block rpc.BlockNumber, isFinalChain bool) (*types.Header, error) {
 	if block == rpc.LatestBlockNumber {
 		return fb.bc.CurrentHeader(), nil
 	}
@@ -506,8 +506,8 @@ func (fb *filterBackend) HeaderByHash(ctx context.Context, hash common.Hash) (*t
 	return fb.bc.GetHeaderByHash(hash), nil
 }
 
-func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash) (types.Receipts, error) {
-	number := rawdb.ReadHeaderNumber(fb.db, hash, fb.bc.Config().IsFinalChain)
+func (fb *filterBackend) GetReceipts(ctx context.Context, hash common.Hash, isFinalChain bool) (types.Receipts, error) {
+	number := rawdb.ReadHeaderNumber(fb.db, hash, isFinalChain)
 	if number == nil {
 		return nil, nil
 	}
