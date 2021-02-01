@@ -107,6 +107,7 @@ type Backend struct {
 	coreStarted                bool
 	mutex                      *sync.RWMutex
 	chain                      consensus.FullChainReader
+	assistChain                consensus.FullChainReader
 	controlChan                chan struct{}
 	closingBackgroundThreadsCh chan struct{}
 

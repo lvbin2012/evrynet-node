@@ -9,6 +9,7 @@ import (
 
 	"github.com/Evrynetlabs/evrynet-node/common"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	fcontypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/utils"
 	"github.com/Evrynetlabs/evrynet-node/consensus/tendermint/validator"
@@ -152,7 +153,7 @@ func (sb *Backend) tryStartCore() bool {
 }
 
 // Start implements consensus.Tendermint.Start
-func (sb *Backend) Start(chain consensus.FullChainReader, currentBlock func() *types.Block, verifyAndSubmitBlock func(*types.Block) error) error {
+func (sb *Backend) Start(chain consensus.FullChainReader, assistChain consensus.FullChainReader, currentBlock func() *types.Block, verifyAndSubmitBlock func(*types.Block) error) error {
 	sb.mutex.Lock()
 	if sb.coreStarted {
 		sb.mutex.Unlock()
@@ -161,6 +162,7 @@ func (sb *Backend) Start(chain consensus.FullChainReader, currentBlock func() *t
 
 	//set chain reader
 	sb.chain = chain
+	sb.assistChain = assistChain
 	sb.currentBlock = currentBlock
 	sb.verifyAndSubmitBlock = verifyAndSubmitBlock
 	if sb.commitChs != nil {
@@ -667,6 +669,27 @@ func (sb *Backend) getStakingCaller(chainReader consensus.FullChainReader, state
 	}
 }
 
+func (sb *Backend) getEvilProof(parentNumber uint64) common.Hash {
+	if sb.assistChain == nil {
+		return common.Hash{}
+	}
+	fChainHead := sb.assistChain.CurrentHeader()
+	fChainHeight := fChainHead.Number.Uint64()
+	if fChainHeight == 0 || fChainHeight <= parentNumber {
+		return common.Hash{}
+	}
+	fex, err := fcontypes.ExtractFConExtra(fChainHead)
+	if err != nil {
+		log.Warn("Engine prepare extract final chain fail", "err", err)
+		return common.Hash{}
+	}
+	if fex.EvilHeader != nil {
+		return fChainHead.Hash()
+	}
+	return common.Hash{}
+
+}
+
 func (sb *Backend) prepareExtra(header *types.Header) []byte {
 	var (
 		tdm     *types.TendermintExtra
@@ -680,7 +703,8 @@ func (sb *Backend) prepareExtra(header *types.Header) []byte {
 	}
 	buf.Write(header.Extra[:types.TendermintExtraVanity])
 
-	tdm = &types.TendermintExtra{}
+	evilProof := sb.getEvilProof(header.Number.Uint64() - 1)
+	tdm = &types.TendermintExtra{EvilProof: evilProof}
 	payload, err = rlp.EncodeToBytes(&tdm)
 
 	if err != nil {

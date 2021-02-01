@@ -57,6 +57,7 @@ type FullChainReader interface {
 	StateAt(hash common.Hash) (*state.StateDB, error)
 }
 
+
 // Engine is an algorithm agnostic consensus engine.
 // Note: Prepare, Finalize and FinalizeAndAssemple are used in order to
 // populate all of the necessary header fields including the state root.
@@ -148,9 +149,8 @@ type Engine interface {
 }
 
 type TwoChainTest interface {
-	SealForTest( *types.Block) (*types.Block, error)
+	SealForTest(*types.Block) (*types.Block, error)
 }
-
 
 // PoW is a consensus engine based on proof-of-work.
 type PoW interface {
@@ -165,7 +165,7 @@ type Tendermint interface {
 	Engine
 
 	// Start starts the engine
-	Start(chain FullChainReader, currentBlock func() *types.Block, verifyAndSubmitBlock func(*types.Block) error) error
+	Start(chain FullChainReader, assistChain FullChainReader, currentBlock func() *types.Block, verifyAndSubmitBlock func(*types.Block) error) error
 
 	// Stop stops the engine
 	Stop() error

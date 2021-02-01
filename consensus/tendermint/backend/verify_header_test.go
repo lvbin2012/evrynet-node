@@ -85,7 +85,7 @@ func mustStartTestChainAndBackend(nodePK *ecdsa.PrivateKey, genesisHeader *types
 		},
 	}
 
-	if err := b.Start(&chain, currentBlock, nil); err != nil {
+	if err := b.Start(&chain, nil, currentBlock, nil); err != nil {
 		log.Panicf("cannot start backend, error:%v", err)
 	}
 	return &chain, b

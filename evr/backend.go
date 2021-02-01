@@ -202,6 +202,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Evrynet, error) {
 	//fEngin.Authorize(coinbase, wallet.SignData)
 
 	evr.fBlockchain, err = core.NewBlockChain(chainDb, cacheConfig, fchainConfig, fEngin, vmConfig, evr.shouldPreserve)
+	evr.blockchain.SubscribeAssistChainEvent(evr.blockchain)
+
 	if err != nil {
 		return nil, err
 	}
@@ -624,6 +626,7 @@ func (s *Evrynet) GetPm() *ProtocolManager {
 func (s *Evrynet) Stop() error {
 	//s.fb.Stop()
 	s.bloomIndexer.Close()
+	s.fBlockchain.Stop()
 	s.blockchain.Stop()
 	s.engine.Close()
 	s.protocolManager.Stop()

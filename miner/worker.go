@@ -82,6 +82,11 @@ const (
 	K = uint64(5)
 )
 
+type AssistChainHandler interface {
+	consensus.FullChainReader
+	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
+}
+
 // environment is the worker's current environment and holds all of the current state information.
 type environment struct {
 	signer types.Signer
@@ -98,10 +103,7 @@ type environment struct {
 	receipts []*types.Receipt
 }
 
-type AssistChainHandler interface {
-	consensus.ChainReader
-	SubscribeChainHeadEvent(ch chan<- core.ChainHeadEvent) event.Subscription
-}
+
 
 // task contains all information for consensus engine sealing and result submitting.
 type task struct {
@@ -292,7 +294,7 @@ func (w *worker) pendingBlock() *types.Block {
 func (w *worker) start() {
 	if tendermint, ok := w.engine.(consensus.Tendermint); ok {
 		log.Info("Start Tendermint worker")
-		err := tendermint.Start(w.chain, w.chain.CurrentBlock, w.VerifyAndSubmitPendingBlock)
+		err := tendermint.Start(w.chain, w.assistChain,  w.chain.CurrentBlock, w.VerifyAndSubmitPendingBlock)
 		if err != nil {
 			log.Error("Failed to start Tendermint engine", "err", err)
 			return

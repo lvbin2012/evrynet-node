@@ -40,7 +40,7 @@ func TestTendermintBroadcast(t *testing.T) {
 		n2           = enode.MustParseV4("enode://" + hex.EncodeToString(crypto.FromECDSAPub(&nodePk2.PublicKey)[1:]) + "@0.0.0.0:30304")
 		//chain        = tests_utils.MockBlockChain{}
 	)
-	assert.NoError(t, tbe1.Start(nil, func() *types.Block {
+	assert.NoError(t, tbe1.Start(nil, nil,  func() *types.Block {
 		return types.NewBlock(&types.Header{
 			GasLimit: 1000000000,
 			Number:   big.NewInt(1),

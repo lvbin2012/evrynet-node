@@ -18,6 +18,7 @@
 package core
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +32,7 @@ import (
 	"github.com/Evrynetlabs/evrynet-node/common/mclock"
 	"github.com/Evrynetlabs/evrynet-node/common/prque"
 	"github.com/Evrynetlabs/evrynet-node/consensus"
+	fcontypes "github.com/Evrynetlabs/evrynet-node/consensus/fconsensus/types"
 	"github.com/Evrynetlabs/evrynet-node/core/rawdb"
 	"github.com/Evrynetlabs/evrynet-node/core/state"
 	"github.com/Evrynetlabs/evrynet-node/core/types"
@@ -170,8 +172,10 @@ type BlockChain struct {
 	vmConfig   vm.Config
 
 	badBlocks       *lru.Cache                     // Bad block cache
-	shouldPreserve  func(*types.Block, bool) bool        // Function used to determine whether should preserve the given block.
+	shouldPreserve  func(*types.Block, bool) bool  // Function used to determine whether should preserve the given block.
 	terminateInsert func(common.Hash, uint64) bool // Testing hook used to terminate ancient receipt chain insertion.
+	recogEvent      chan ChainHeadEvent
+	assistHeaderSub event.Subscription
 }
 
 // NewBlockChain returns a fully initialised block chain using information
@@ -212,6 +216,7 @@ func NewBlockChain(db evrdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	bc.validator = NewBlockValidator(chainConfig, bc, engine)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc, engine)
 	bc.processor = NewStateProcessor(chainConfig, bc, engine)
+	bc.recogEvent = make(chan ChainHeadEvent, 10)
 
 	var err error
 	bc.hc, err = NewHeaderChain(db, chainConfig, engine, bc.getProcInterrupt)
@@ -813,7 +818,9 @@ func (bc *BlockChain) Stop() {
 	bc.scope.Close()
 	close(bc.quit)
 	atomic.StoreInt32(&bc.procInterrupt, 1)
-
+	if bc.assistHeaderSub != nil{
+		bc.assistHeaderSub.Unsubscribe()
+	}
 	bc.wg.Wait()
 
 	// Ensure the state of a recent block is also stored to disk before exiting.
@@ -2009,6 +2016,10 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 	}
 }
 
+func (bc *BlockChain)SubscribeAssistChainEvent(assistChain *BlockChain){
+	bc.assistHeaderSub = assistChain.SubscribeChainHeadEvent(bc.recogEvent)
+}
+
 func (bc *BlockChain) update() {
 	futureTimer := time.NewTicker(5 * time.Second)
 	defer futureTimer.Stop()
@@ -2016,10 +2027,55 @@ func (bc *BlockChain) update() {
 		select {
 		case <-futureTimer.C:
 			bc.procFutureBlocks()
+
+		case event := <-bc.recogEvent:
+			bc.reorgByFinalChain(event.Block)
+
 		case <-bc.quit:
 			return
 		}
 	}
+}
+
+func (bc *BlockChain) reorgByFinalChain(block *types.Block) {
+	bc.wg.Add(1)
+	bc.chainmu.Lock()
+	defer func() {
+		bc.chainmu.Unlock()
+		bc.wg.Done()
+	}()
+
+	fex, err := fcontypes.ExtractFConExtra(block.Header())
+	if err != nil {
+		log.Error("reorgByFinalChain:ExtractFConExtra failed", "err", err)
+		return
+	}
+	if fex.EvilHeader == nil {
+		return
+	}
+	packBlock := bc.GetBlockByNumber(fex.CurrentHeight)
+	if packBlock == nil {
+		log.Warn("reorgByFinalChain", "err", "packBlock is not in blockchain wait for sync")
+		return
+	}
+	if !bytes.Equal(packBlock.Hash().Bytes(), fex.CurrentBlock[:]) {
+		log.Error("reorgByFinalChain packed block is not in blockchain", "height", fex.CurrentHeight,
+			"packHash", fex.CurrentBlock, "hash", packBlock.Hash())
+		return
+	}
+	nextBlock := bc.GetHeaderByNumber(fex.CurrentHeight + 1)
+	if nextBlock == nil {
+		return
+	}
+	tExtra, err := types.ExtractTendermintExtra(nextBlock)
+	if err == nil || bytes.Equal(tExtra.EvilProof[:], block.Hash().Bytes()) {
+		return
+	}
+	if err != nil {
+		log.Warn("reorgByFinalChain:ExtractTendermintExtra failed", "err", err)
+	}
+	currentBlock := bc.CurrentBlock()
+	bc.reorg(currentBlock, packBlock)
 }
 
 // BadBlocks returns a list of the last 'bad blocks' that the client has seen on the network

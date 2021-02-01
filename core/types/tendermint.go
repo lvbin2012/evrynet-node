@@ -47,6 +47,7 @@ type TendermintExtra struct {
 	CommittedSeal [][]byte
 	// Set of authorized validators at this moment
 	ValidatorAdds []byte
+	EvilProof     common.Hash
 }
 
 // EncodeRLP serializes ist into the Evrynet RLP format.
@@ -55,6 +56,7 @@ func (te *TendermintExtra) EncodeRLP(w io.Writer) error {
 		te.Seal,
 		te.CommittedSeal,
 		te.ValidatorAdds,
+		te.EvilProof,
 	})
 }
 
@@ -64,11 +66,12 @@ func (te *TendermintExtra) DecodeRLP(s *rlp.Stream) error {
 		Seal          []byte
 		CommittedSeal [][]byte
 		ValidatorAdds []byte
+		EvilProof     common.Hash
 	}
 	if err := s.Decode(&tendermintExtra); err != nil {
 		return err
 	}
-	te.Seal, te.CommittedSeal, te.ValidatorAdds = tendermintExtra.Seal, tendermintExtra.CommittedSeal, tendermintExtra.ValidatorAdds
+	te.Seal, te.CommittedSeal, te.ValidatorAdds, te.EvilProof = tendermintExtra.Seal, tendermintExtra.CommittedSeal, tendermintExtra.ValidatorAdds, tendermintExtra.EvilProof
 	return nil
 }
 
