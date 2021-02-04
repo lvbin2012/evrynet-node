@@ -582,7 +582,7 @@ func (sb *Backend) verifyCommittedSeals(header *types.Header, valSet tendermint.
 
 // blockProposer extracts the Evrynet account address from a signed header.
 func (sb *Backend) blockProposer(header *types.Header) (common.Address, error) {
-	if value, known := sb.blockProposerCache.Get(header.Number.Uint64()); known {
+	if value, known := sb.blockProposerCache.Get(header.Hash()); known {
 		if proposer, ok := value.(common.Address); ok {
 			return proposer, nil
 		}
@@ -598,7 +598,7 @@ func (sb *Backend) blockProposer(header *types.Header) (common.Address, error) {
 		return addr, err
 	}
 
-	sb.blockProposerCache.Add(header.Number.Uint64(), addr)
+	sb.blockProposerCache.Add(header.Hash(), addr)
 	return addr, nil
 }
 
